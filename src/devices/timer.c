@@ -20,6 +20,11 @@
 /* Number of timer ticks since OS booted. */
 static int64_t ticks;
 
+/* List of threads that are blocked.  Processes are added to
+   this list when timer_sleep blocks a thread and removed
+   when they get unblocked. */
+static struct list blocked_list;
+
 /* Number of loops per timer tick.
    Initialized by timer_calibrate(). */
 static unsigned loops_per_tick;
@@ -36,6 +41,7 @@ static void real_time_delay (int64_t num, int32_t denom);
 void
 timer_init (void) 
 {
+  list_init (&blocked_list);
   pit_configure_channel (0, 2, TIMER_FREQ);
   intr_register_ext (0x20, timer_interrupt, "8254 Timer");
 }
@@ -99,10 +105,12 @@ timer_sleep (int64_t ticks)
   ASSERT (intr_get_level () == INTR_ON);
   
   /* Keep track of ticks for timer_interrupt function */
-  thread_current ()->thread_timer_ticks = ticks;
-  thread_current ()->starting_timer_ticks = timer_ticks ();
+  struct thread *current_thread = thread_current ();
+  current_thread->thread_timer_ticks = ticks;
+  current_thread->starting_timer_ticks = timer_ticks ();
 
   old_level = intr_disable ();
+  list_push_back (&blocked_list, &current_thread->blockelem);
   thread_block ();
   intr_set_level (old_level);
 }
@@ -184,16 +192,24 @@ timer_interrupt (struct intr_frame *args UNUSED)
   ticks++;
   thread_tick ();
   
-  struct thread *current_thread = thread_current ();
-  int64_t thread_ticks = current_thread->thread_timer_ticks;
-  int64_t starting_ticks = current_thread->starting_timer_ticks;
-  
-  if (timer_elapsed (starting_ticks) >= thread_ticks)
-	if (current_thread->status == THREAD_BLOCKED)
+  struct list_elem *e_iter;
+  for (e_iter = list_begin (&blocked_list); e_iter != list_end (&blocked_list); e_iter = list_next (e_iter))
+    {
+      struct thread *current_thread = list_entry (e_iter, struct thread, blockelem);
+      int64_t thread_ticks = current_thread->thread_timer_ticks;
+      int64_t starting_ticks = current_thread->starting_timer_ticks;
+    if (timer_elapsed (starting_ticks) >= thread_ticks)
       {
-	  printf ("Thread ID: %d; Sleep Ticks: %d; Ticks: %d\n", thread_tid (), current_thread->thread_timer_ticks, ticks);
-      thread_unblock (current_thread);
+        if (e_iter == list_begin (&blocked_list))
+  		  list_pop_front (&blocked_list);
+        else if (e_iter == list_end (&blocked_list))
+          list_pop_back (&blocked_list);
+        else
+          list_remove (e_iter);
+        
+		thread_unblock (current_thread);
       }
+    }
 }
 
 /* Returns true if LOOPS iterations waits for more than one timer

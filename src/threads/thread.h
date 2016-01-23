@@ -103,6 +103,9 @@ struct thread
 
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
+	
+	/* Owned by thread.c */
+	struct list_elem blockelem;			/* List element for blocked threads list. */
 
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
