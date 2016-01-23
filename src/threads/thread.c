@@ -15,8 +15,6 @@
 #include "userprog/process.h"
 #endif
 
-// Franky Test
-
 /* Random value for struct thread's `magic' member.
    Used to detect stack overflow.  See the big comment at the top
    of thread.h for details. */
@@ -464,6 +462,10 @@ init_thread (struct thread *t, const char *name, int priority)
   memset (t, 0, sizeof *t);
   t->status = THREAD_BLOCKED;
   strlcpy (t->name, name, sizeof t->name);
+
+  t->thread_timer_ticks = 0;
+  t->starting_timer_ticks = 0;
+
   t->stack = (uint8_t *) t + PGSIZE;
   t->priority = priority;
   t->magic = THREAD_MAGIC;
@@ -525,7 +527,6 @@ thread_schedule_tail (struct thread *prev)
 
   /* Mark us as running. */
   cur->status = THREAD_RUNNING;
-
   /* Start new time slice. */
   thread_ticks = 0;
 

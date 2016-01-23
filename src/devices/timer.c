@@ -32,6 +32,7 @@ static void real_time_delay (int64_t num, int32_t denom);
 
 /* Sets up the timer to interrupt TIMER_FREQ times per second,
    and registers the corresponding interrupt. */
+/* Also initialize the timer_sleep list. */
 void
 timer_init (void) 
 {
@@ -89,11 +90,21 @@ timer_elapsed (int64_t then)
 void
 timer_sleep (int64_t ticks) 
 {
-  int64_t start = timer_ticks ();
-
+  /* Immediately return if ticks <= 0 */
+  if (ticks <= 0)
+    return; 
+  
+  enum intr_level old_level;
+  
   ASSERT (intr_get_level () == INTR_ON);
-  while (timer_elapsed (start) < ticks) 
-    thread_yield ();
+  
+  /* Keep track of ticks for timer_interrupt function */
+  thread_current ()->thread_timer_ticks = ticks;
+  thread_current ()->starting_timer_ticks = timer_ticks ();
+
+  old_level = intr_disable ();
+  thread_block ();
+  intr_set_level (old_level);
 }
 
 /* Sleeps for approximately MS milliseconds.  Interrupts must be
@@ -172,6 +183,17 @@ timer_interrupt (struct intr_frame *args UNUSED)
 {
   ticks++;
   thread_tick ();
+  
+  struct thread *current_thread = thread_current ();
+  int64_t thread_ticks = current_thread->thread_timer_ticks;
+  int64_t starting_ticks = current_thread->starting_timer_ticks;
+  
+  if (timer_elapsed (starting_ticks) >= thread_ticks)
+	if (current_thread->status == THREAD_BLOCKED)
+      {
+	  printf ("Thread ID: %d; Sleep Ticks: %d; Ticks: %d\n", thread_tid (), current_thread->thread_timer_ticks, ticks);
+      thread_unblock (current_thread);
+      }
 }
 
 /* Returns true if LOOPS iterations waits for more than one timer
