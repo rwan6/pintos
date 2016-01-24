@@ -201,6 +201,8 @@ thread_create (const char *name, int priority,
   /* Add to run queue. */
   thread_unblock (t);
 
+  if (priority > thread_current ()->donated_priority)
+    thread_yield ();
   return tid;
 }
 
@@ -349,7 +351,8 @@ thread_set_priority (int new_priority)
     return;
 
   thread_current ()->priority = new_priority;
-  if (thread_current ()->donated_priority < new_priority)
+  if (thread_current ()->donated_priority == thread_current ()->priority ||
+      thread_current ()->donated_priority < new_priority)
     thread_current ()->donated_priority = new_priority;
 
   struct list_elem *max_priority_element = list_max (&ready_list, priority_less, NULL);
