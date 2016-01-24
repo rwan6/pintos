@@ -100,12 +100,11 @@ struct thread
     /* Member variables for Advanced scheduler. */
     int nice;
     fixed_point_t recent_cpu;
+    int donated_priority;
 
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
 
-    /* Owned by thread.c. */
-    struct list_elem blockelem;              /* List element. */
 
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
@@ -114,11 +113,10 @@ struct thread
 
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */
+    struct list_elem blockelem;              /* List element. */
 
 	/* Owned by timer.c */
 	int64_t thread_timer_ticks;			/* Ticks for sleep wakeup. */
-
-	/* Owned by timer.c */
 	int64_t starting_timer_ticks;		/* Starting ticks use reference for sleep wakeup */
   };
 
