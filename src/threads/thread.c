@@ -88,7 +88,7 @@ void
 thread_init (void)
 {
   ASSERT (intr_get_level () == INTR_OFF);
-
+  
   lock_init (&tid_lock);
   list_init (&ready_list);
   list_init (&all_list);
@@ -522,9 +522,9 @@ next_thread_to_run (void)
     return idle_thread;
   else
     {
-      struct list_elem *thread_max = list_max (&ready_list, priority_less, NULL);
-      list_remove (thread_max);
-      return list_entry (thread_max, struct thread, elem);
+      struct list_elem *thread_max_elem = list_max (&ready_list, priority_less, NULL);
+      list_remove (thread_max_elem);
+      return list_entry (thread_max_elem, struct thread, elem);
     }
 }
 

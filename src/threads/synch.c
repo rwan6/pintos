@@ -32,6 +32,18 @@
 #include "threads/interrupt.h"
 #include "threads/thread.h"
 
+/* less_list_func used by sema_up when determining the highest
+   priority thread to wake up. */
+static bool
+cond_less (const struct list_elem *thread_a_, const struct list_elem *thread_b_,
+            void *aux UNUSED)
+{
+  const struct thread *thread_a = list_entry (thread_a_, struct thread, elem);
+  const struct thread *thread_b = list_entry (thread_b_, struct thread, elem);
+
+  return thread_a->donated_priority < thread_b->donated_priority;
+}
+
 /* Initializes semaphore SEMA to VALUE.  A semaphore is a
    nonnegative integer along with two atomic operators for
    manipulating it:
@@ -115,8 +127,12 @@ sema_up (struct semaphore *sema)
 
   old_level = intr_disable ();
   if (!list_empty (&sema->waiters))
-    thread_unblock (list_entry (list_pop_front (&sema->waiters),
-                                struct thread, elem));
+    {
+      struct list_elem *thread_max_elem = list_max (&sema->waiters, cond_less, NULL);
+      list_remove (thread_max_elem);
+      thread_unblock (list_entry (thread_max_elem, struct thread, elem));
+    }
+    
   sema->value++;
   intr_set_level (old_level);
 }
@@ -336,7 +352,7 @@ cond_signal (struct condition *cond, struct lock *lock UNUSED)
 
   if (!list_empty (&cond->waiters))
     sema_up (&list_entry (list_pop_front (&cond->waiters),
-                          struct semaphore_elem, elem)->semaphore);
+     struct semaphore_elem, elem)->semaphore);
 }
 
 /* Wakes up all threads, if any, waiting on COND (protected by
