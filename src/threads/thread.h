@@ -97,15 +97,17 @@ struct thread
     int priority;                       /* Priority. */
     struct list_elem allelem;           /* List element for all threads list. */
 
+    int donated_priority;
+
     /* Member variables for Advanced scheduler */
     int nice;
     fixed_point_t recent_cpu;
 
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
-	
-	/* Owned by thread.c */
-	struct list_elem blockelem;			/* List element for blocked threads list. */
+
+    /* Owned by thread.c. */
+    struct list_elem blockelem;              /* List element. */
 
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
@@ -126,6 +128,10 @@ struct thread
    If true, use multi-level feedback queue scheduler.
    Controlled by kernel command-line option "-o mlfqs". */
 extern bool thread_mlfqs;
+
+/* List of processes in THREAD_READY state, that is, processes
+   that are ready to run but not actually running. */
+extern struct list ready_list;
 
 void thread_init (void);
 void thread_start (void);

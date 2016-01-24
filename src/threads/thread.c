@@ -20,9 +20,7 @@
    of thread.h for details. */
 #define THREAD_MAGIC 0xcd6abf4b
 
-/* List of processes in THREAD_READY state, that is, processes
-   that are ready to run but not actually running. */
-static struct list ready_list;
+struct list ready_list;
 
 /* List of all processes.  Processes are added to this list
    when they are first scheduled and removed when they exit. */
@@ -333,18 +331,38 @@ thread_foreach (thread_action_func *func, void *aux)
     }
 }
 
+static bool
+priority_less (const struct list_elem *thread_a_, const struct list_elem *thread_b_,
+            void *aux UNUSED)
+{
+  const struct thread *thread_a = list_entry (thread_a_, struct thread, elem);
+  const struct thread *thread_b = list_entry (thread_b_, struct thread, elem);
+
+  return thread_a->donated_priority < thread_b->donated_priority;
+}
+
 /* Sets the current thread's priority to NEW_PRIORITY. */
 void
 thread_set_priority (int new_priority)
 {
+  if (new_priority < PRI_MIN || new_priority > PRI_MAX)
+    return;
+
   thread_current ()->priority = new_priority;
+  if (thread_current ()->donated_priority < new_priority)
+    thread_current ()->donated_priority = new_priority;
+
+  struct list_elem *max_priority_element = list_max (&ready_list, priority_less, NULL);
+  struct thread *max_priority_thread = list_entry (max_priority_element, struct thread, elem);
+  if (thread_current ()->donated_priority < max_priority_thread->donated_priority)
+    thread_yield ();
 }
 
 /* Returns the current thread's priority. */
 int
 thread_get_priority (void)
 {
-  return thread_current ()->priority;
+  return thread_current ()->donated_priority;
 }
 
 /* Sets the current thread's nice value to NICE. */
@@ -468,6 +486,7 @@ init_thread (struct thread *t, const char *name, int priority)
 
   t->stack = (uint8_t *) t + PGSIZE;
   t->priority = priority;
+  t->donated_priority = priority;
   t->magic = THREAD_MAGIC;
 
   old_level = intr_disable ();
