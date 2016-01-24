@@ -97,9 +97,7 @@ struct thread
     int priority;                       /* Priority. */
     struct list_elem allelem;           /* List element for all threads list. */
 
-    int donated_priority;
-
-    /* Member variables for Advanced scheduler */
+    /* Member variables for Advanced scheduler. */
     int nice;
     fixed_point_t recent_cpu;
 
