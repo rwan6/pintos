@@ -128,6 +128,10 @@ struct thread
    Controlled by kernel command-line option "-o mlfqs". */
 extern bool thread_mlfqs;
 
+/* Used by thread.c and synch.c. See comments related to this less_list_func in thread.c.  */
+bool priority_less (const struct list_elem *thread_a_, const struct list_elem *thread_b_,
+            void *aux UNUSED);
+
 /* List of processes in THREAD_READY state, that is, processes
    that are ready to run but not actually running. */
 extern struct list ready_list;

@@ -41,7 +41,7 @@ cond_less (const struct list_elem *thread_a_, const struct list_elem *thread_b_,
   const struct thread *thread_a = list_entry (thread_a_, struct thread, elem);
   const struct thread *thread_b = list_entry (thread_b_, struct thread, elem);
 
-  return thread_a->donated_priority < thread_b->donated_priority;
+  return thread_a->priority < thread_b->priority;
 }
 
 /* Initializes semaphore SEMA to VALUE.  A semaphore is a
@@ -125,12 +125,15 @@ sema_up (struct semaphore *sema)
 
   ASSERT (sema != NULL);
 
+  struct list_elem *thread_max_elem = list_max (&sema->waiters, priority_less, NULL);
+  struct thread *thread_max = list_entry (thread_max_elem, struct thread, elem);
+  
+  /* Added minimal number of lines between disabled interrupts */
   old_level = intr_disable ();
   if (!list_empty (&sema->waiters))
     {
-      struct list_elem *thread_max_elem = list_max (&sema->waiters, cond_less, NULL);
       list_remove (thread_max_elem);
-      thread_unblock (list_entry (thread_max_elem, struct thread, elem));
+      thread_unblock (thread_max);
     }
     
   sema->value++;
@@ -212,7 +215,7 @@ lock_acquire (struct lock *lock)
   ASSERT (lock != NULL);
   ASSERT (!intr_context ());
   ASSERT (!lock_held_by_current_thread (lock));
-
+  
   struct list_elem *e_r;
   for (e_r = list_begin (&ready_list); e_r != list_end (&ready_list); e_r = list_next (e_r))
     {
@@ -227,7 +230,7 @@ lock_acquire (struct lock *lock)
           break;
         }
     }
-
+  
   sema_down (&lock->semaphore);
   lock->holder = thread_current ();
 }
@@ -285,6 +288,7 @@ struct semaphore_elem
   {
     struct list_elem elem;              /* List element. */
     struct semaphore semaphore;         /* This semaphore. */
+    int semaphore_priority;             /* Priority of semaphore waiter */
   };
 
 /* Initializes condition variable COND.  A condition variable
@@ -329,7 +333,8 @@ cond_wait (struct condition *cond, struct lock *lock)
   ASSERT (lock_held_by_current_thread (lock));
 
   sema_init (&waiter.semaphore, 0);
-  list_push_back (&cond->waiters, &waiter.elem);
+  waiter.semaphore_priority = (lock->holder)->priority; /* Update priority and add it in an ordered manner to the list */
+  list_insert_ordered (&cond->waiters, &waiter.elem, cond_less, NULL); /* Keep list ordered so the first thread is the highest priority to be awoken */
   lock_release (lock);
   sema_down (&waiter.semaphore);
   lock_acquire (lock);
