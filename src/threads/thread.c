@@ -350,10 +350,10 @@ thread_set_priority (int new_priority)
   if (new_priority < PRI_MIN || new_priority > PRI_MAX)
     return;
 
-  thread_current ()->priority = new_priority;
   if (thread_current ()->donated_priority == thread_current ()->priority ||
       thread_current ()->donated_priority < new_priority)
     thread_current ()->donated_priority = new_priority;
+  thread_current ()->priority = new_priority;
 
   struct list_elem *max_priority_element = list_max (&ready_list, priority_less, NULL);
   struct thread *max_priority_thread = list_entry (max_priority_element, struct thread, elem);
