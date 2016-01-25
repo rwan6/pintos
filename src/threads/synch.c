@@ -32,18 +32,6 @@
 #include "threads/interrupt.h"
 #include "threads/thread.h"
 
-/* less_list_func used by sema_up when determining the highest
-   priority thread to wake up. */
-static bool
-cond_less (const struct list_elem *thread_a_, const struct list_elem *thread_b_,
-            void *aux UNUSED)
-{
-  const struct thread *thread_a = list_entry (thread_a_, struct thread, elem);
-  const struct thread *thread_b = list_entry (thread_b_, struct thread, elem);
-
-  return thread_a->priority < thread_b->priority;
-}
-
 /* Initializes semaphore SEMA to VALUE.  A semaphore is a
    nonnegative integer along with two atomic operators for
    manipulating it:
@@ -282,7 +270,7 @@ lock_held_by_current_thread (const struct lock *lock)
 
   return lock->holder == thread_current ();
 }
-
+
 /* One semaphore in a list. */
 struct semaphore_elem
   {
@@ -290,6 +278,18 @@ struct semaphore_elem
     struct semaphore semaphore;         /* This semaphore. */
     int semaphore_priority;             /* Priority of semaphore waiter */
   };
+  
+/* less_list_func used by cond_signal when determining the highest
+   priority thread to wake up. */
+static bool
+cond_less (const struct list_elem *sem_a_, const struct list_elem *sem_b_, 
+        void *aux UNUSED)
+{
+  const struct semaphore_elem *sem_a = list_entry (sem_a_, struct semaphore_elem, elem);
+  const struct semaphore_elem *sem_b = list_entry (sem_b_, struct semaphore_elem, elem);
+
+  return sem_a->semaphore_priority > sem_b->semaphore_priority;
+}
 
 /* Initializes condition variable COND.  A condition variable
    allows one piece of code to signal a condition and cooperating
@@ -356,8 +356,10 @@ cond_signal (struct condition *cond, struct lock *lock UNUSED)
   ASSERT (lock_held_by_current_thread (lock));
 
   if (!list_empty (&cond->waiters))
-    sema_up (&list_entry (list_pop_front (&cond->waiters),
-     struct semaphore_elem, elem)->semaphore);
+    {
+      struct semaphore_elem *signaled_elem = list_entry (list_pop_front (&cond->waiters), struct semaphore_elem, elem);
+      sema_up (&signaled_elem->semaphore);      
+    }
 }
 
 /* Wakes up all threads, if any, waiting on COND (protected by
