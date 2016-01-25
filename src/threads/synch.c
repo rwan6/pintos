@@ -121,7 +121,8 @@ sema_up (struct semaphore *sema)
   old_level = intr_disable ();
   if (!list_empty (&sema->waiters))
     {
-      list_remove (thread_max_elem);
+      if (!thread_mlfqs)
+        list_remove (thread_max_elem);
       thread_unblock (thread_max);
       
       if (thread_max->priority > thread_current ()->priority)
@@ -130,7 +131,7 @@ sema_up (struct semaphore *sema)
     
   sema->value++;
   intr_set_level (old_level);
-  if (yield)
+  if (yield && !thread_mlfqs)
     thread_yield ();
 }
 
@@ -296,11 +297,11 @@ lock_release (struct lock *lock)
 {
   ASSERT (lock != NULL);
   ASSERT (lock_held_by_current_thread (lock));
+  
+  lock->holder = NULL;
 
   if (!thread_mlfqs)
     {
-      lock->holder = NULL;
-      
       struct list_elem *e;
       for (e = list_begin (&lock->semaphore.waiters);
            e != list_end (&lock->semaphore.waiters);
