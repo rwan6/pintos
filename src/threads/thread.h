@@ -6,6 +6,7 @@
 #include <stdint.h>
 #include "threads/synch.h"
 #include "threads/fixed-point.h"
+#include "devices/timer.h"
 
 /* States in a thread's life cycle. */
 enum thread_status
@@ -96,11 +97,13 @@ struct thread
     uint8_t *stack;                     /* Saved stack pointer. */
     int priority;                       /* Priority. */
     struct list_elem allelem;           /* List element for all threads list. */
+    int donated_priority;               /* Donated Priority. */
 
     /* Member variables for Advanced scheduler */
-    int nice;
-    fixed_point_t recent_cpu;
-    int donated_priority;
+    int nice;                           /* Nice value. */
+    fixed_point_t recent_cpu;           /* Recent cpu. */
+    int mlfqs_priority;                 /* Priority for advanced scheduler. */
+    struct list_elem mlfqs_elem;
 
     /* List of threads that donated to this thread */
     struct list donated_list;
@@ -121,11 +124,11 @@ struct thread
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */
 
-	/* Owned by timer.c */
-	int64_t thread_timer_ticks;			/* Ticks for sleep wakeup. */
+	  /* Owned by timer.c */
+	  int64_t thread_timer_ticks;			/* Ticks for sleep wakeup. */
 
-	/* Owned by timer.c */
-	int64_t starting_timer_ticks;		/* Starting ticks use reference for sleep wakeup */
+	  /* Owned by timer.c */
+	  int64_t starting_timer_ticks;		/* Starting ticks use reference for sleep wakeup */
   };
 
 /* If false (default), use round-robin scheduler.
