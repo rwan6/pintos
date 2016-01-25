@@ -353,11 +353,14 @@ thread_set_priority (int new_priority)
 {
   enum intr_level old_level;
   
-  if (new_priority < PRI_MIN || new_priority > PRI_MAX)
-    return;
+  if (new_priority < PRI_MIN)
+    new_priority = PRI_MIN;
+  else if (new_priority > PRI_MAX)
+    new_priority = PRI_MIN;
 
   if (thread_current ()->donated_priority == thread_current ()->priority)
     thread_current ()->donated_priority = new_priority;
+  
   thread_current ()->priority = new_priority;
 
   old_level = intr_disable ();
