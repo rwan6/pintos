@@ -210,24 +210,19 @@ lock_acquire (struct lock *lock)
   ASSERT (!intr_context ());
   ASSERT (!lock_held_by_current_thread (lock));
   
-  struct list_elem *e_r;
-  for (e_r = list_begin (&ready_list); e_r != list_end (&ready_list); e_r = list_next (e_r))
-    {
-      struct thread *t_lock = list_entry (e_r, struct thread, elem);
-      if (lock->holder == t_lock)
-        {
-          enum intr_level old_level;
-          old_level = intr_disable ();
-          if (thread_current ()->donated_priority > t_lock->donated_priority)
-            {
-              /* Add to thread's list of priority donors */
-              list_insert_ordered (&t_lock->donated_list, &t_lock->donatedelem, priority_less, NULL);
-              t_lock->donated_priority = thread_current ()->donated_priority;
-            }
-          intr_set_level (old_level);
-          break;
-        }
-    }
+  struct thread *t_lock = lock->holder;
+    if (t_lock && t_lock->status == THREAD_READY)
+      {
+        enum intr_level old_level;
+        old_level = intr_disable ();
+        if (thread_current ()->donated_priority > t_lock->donated_priority)
+          {
+            /* Add to thread's list of priority donors */
+            list_insert_ordered (&t_lock->donated_list, &thread_current ()->donatedelem, priority_less, NULL);
+            t_lock->donated_priority = thread_current ()->donated_priority;
+          }
+        intr_set_level (old_level);
+      }
   
   sema_down (&lock->semaphore);
   lock->holder = thread_current ();
