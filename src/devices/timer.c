@@ -93,18 +93,18 @@ timer_elapsed (int64_t then)
 }
 
 /* less_list_func used by timer_sleep when determining the
-   thread with the least number of ticks. */
+   thread with the least number of ticks before being awoken. */
 bool
 ticks_less (const struct list_elem *thread_a_, const struct list_elem *thread_b_,
             void *aux UNUSED)
 {
-  const struct thread *thread_a = list_entry (thread_a_, struct thread, elem);
-  const struct thread *thread_b = list_entry (thread_b_, struct thread, elem);
+  const struct thread *thread_a = list_entry (thread_a_, struct thread, blockelem);
+  const struct thread *thread_b = list_entry (thread_b_, struct thread, blockelem);
   int64_t a_total_ticks = thread_a->thread_timer_ticks +
      thread_a->starting_timer_ticks;
   int64_t b_total_ticks = thread_b->thread_timer_ticks +
      thread_b->starting_timer_ticks;
-  return a_total_ticks > b_total_ticks;
+  return a_total_ticks < b_total_ticks;
 }
 
 /* Sleeps for approximately TICKS timer ticks.  Interrupts must
@@ -208,15 +208,31 @@ timer_interrupt (struct intr_frame *args UNUSED)
 {
   ticks++;
   thread_tick ();
-  
-  struct thread *current_thread = list_entry (list_begin (&blocked_list),
-    struct thread, blockelem);
-  int64_t thread_ticks = current_thread->thread_timer_ticks;
-  int64_t starting_ticks = current_thread->starting_timer_ticks;
-  if (timer_elapsed (starting_ticks) >= thread_ticks)
+
+  struct list_elem *e_iter;
+  for (e_iter = list_begin (&blocked_list); 
+    e_iter != list_end (&blocked_list); e_iter = list_next (e_iter))
     {
-      list_remove (list_begin (&blocked_list));
-      thread_unblock (current_thread);
+      struct thread *current_thread = list_entry (e_iter, struct thread, blockelem);
+      int64_t thread_ticks = current_thread->thread_timer_ticks;
+      int64_t starting_ticks = current_thread->starting_timer_ticks;
+      if (timer_elapsed (starting_ticks) >= thread_ticks)
+        {
+          if (e_iter == list_begin (&blocked_list))
+    		  list_pop_front (&blocked_list);
+          else if (e_iter == list_end (&blocked_list))
+            list_pop_back (&blocked_list);
+          else
+            list_remove (e_iter);
+        
+  		    thread_unblock (current_thread);
+        }
+      /* Since the list is ordered, if we reach a thread that is
+         not ready to be awoken, everyone behind it will not be
+         ready either. */
+      else
+        return;
+        
     }
 }
 
