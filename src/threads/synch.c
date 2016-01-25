@@ -221,7 +221,8 @@ lock_acquire (struct lock *lock)
           if (thread_current ()->donated_priority > t_lock->donated_priority)
             {
               /* Add to thread's list of priority donors */
-              list_insert_ordered (&t_lock->donated_list, &t_lock->donatedelem, priority_less, NULL);
+              list_insert_ordered (&t_lock->donated_list, &thread_current ()->donatedelem, 
+              priority_less, NULL);
               t_lock->donated_priority = thread_current ()->donated_priority;
             }
           intr_set_level (old_level);
