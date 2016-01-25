@@ -210,52 +210,55 @@ lock_acquire (struct lock *lock)
   ASSERT (!intr_context ());
   ASSERT (!lock_held_by_current_thread (lock));
   
-  struct thread *t_lock = lock->holder;
-  enum intr_level old_level;
-  if (t_lock && t_lock->status == THREAD_READY)
+  if (!thread_mlfqs)
     {
-      thread_current ()->waiting_on_lock = lock;
-      old_level = intr_disable ();
-      if (thread_current ()->donated_priority > t_lock->donated_priority)
+      struct thread *t_lock = lock->holder;
+      enum intr_level old_level;
+      if (t_lock && t_lock->status == THREAD_READY)
         {
-          /* Add to thread's list of priority donors */
-          list_insert_ordered (&t_lock->donated_list,
-            &thread_current ()->donatedelem, priority_less, NULL);
-          t_lock->donated_priority = thread_current ()->donated_priority;
-        }
-      intr_set_level (old_level);
-    }
-  else
-    {
-      thread_current ()->waiting_on_lock = lock;
-      struct thread *prev_thread = thread_current ();
-      while (t_lock)
-        {
-          if (prev_thread->donated_priority > t_lock->donated_priority)
+          thread_current ()->waiting_on_lock = lock;
+          old_level = intr_disable ();
+          if (thread_current ()->donated_priority > t_lock->donated_priority)
             {
-              /* If I was already in the list, remove myself before being reinserted in-order */
-              struct list_elem *dup_e;
-              for (dup_e = list_begin (&t_lock->donated_list);
-                dup_e != list_end (&t_lock->donated_list); 
-                dup_e = list_next (dup_e))
-                {
-                  if (dup_e == &prev_thread->donatedelem)
-                    list_remove(&prev_thread->donatedelem);
-                }
               /* Add to thread's list of priority donors */
-              old_level = intr_disable ();
               list_insert_ordered (&t_lock->donated_list,
-                &prev_thread->donatedelem, priority_less, NULL);
-              t_lock->donated_priority = prev_thread->donated_priority;
-              intr_set_level (old_level);
+                &thread_current ()->donatedelem, priority_less, NULL);
+              t_lock->donated_priority = thread_current ()->donated_priority;
             }
-          if (t_lock->waiting_on_lock)
+          intr_set_level (old_level);
+        }
+      else
+        {
+          thread_current ()->waiting_on_lock = lock;
+          struct thread *prev_thread = thread_current ();
+          while (t_lock)
             {
-              prev_thread = t_lock;
-              t_lock = t_lock->waiting_on_lock->holder;
+              if (prev_thread->donated_priority > t_lock->donated_priority)
+                {
+                  /* If I was already in the list, remove myself before being reinserted in-order */
+                  struct list_elem *dup_e;
+                  for (dup_e = list_begin (&t_lock->donated_list);
+                    dup_e != list_end (&t_lock->donated_list); 
+                    dup_e = list_next (dup_e))
+                    {
+                      if (dup_e == &prev_thread->donatedelem)
+                        list_remove(&prev_thread->donatedelem);
+                    }
+                  /* Add to thread's list of priority donors */
+                  old_level = intr_disable ();
+                  list_insert_ordered (&t_lock->donated_list,
+                    &prev_thread->donatedelem, priority_less, NULL);
+                  t_lock->donated_priority = prev_thread->donated_priority;
+                  intr_set_level (old_level);
+                }
+              if (t_lock->waiting_on_lock)
+                {
+                  prev_thread = t_lock;
+                  t_lock = t_lock->waiting_on_lock->holder;
+                }
+              else
+                t_lock = NULL;
             }
-          else
-            t_lock = NULL;
         }
     }
   
@@ -294,26 +297,29 @@ lock_release (struct lock *lock)
   ASSERT (lock != NULL);
   ASSERT (lock_held_by_current_thread (lock));
 
-  lock->holder = NULL;
-  
-  struct list_elem *e;
-  for (e = list_begin (&lock->semaphore.waiters);
-       e != list_end (&lock->semaphore.waiters);
-       e = list_next(e))
+  if (!thread_mlfqs)
     {
-      struct thread *t = list_entry (e, struct thread, elem);
-      list_remove (&t->donatedelem);
-    }
+      lock->holder = NULL;
+      
+      struct list_elem *e;
+      for (e = list_begin (&lock->semaphore.waiters);
+           e != list_end (&lock->semaphore.waiters);
+           e = list_next(e))
+        {
+          struct thread *t = list_entry (e, struct thread, elem);
+          list_remove (&t->donatedelem);
+        }
 
-  if (list_empty(&thread_current ()->donated_list))
-    thread_current ()->donated_priority = thread_current ()->priority;
-  else
-    {
-      struct thread *max = list_entry (list_begin (&thread_current ()->donated_list),
-        struct thread, donatedelem);
-      thread_current ()->donated_priority = max->donated_priority;
+      if (list_empty(&thread_current ()->donated_list))
+        thread_current ()->donated_priority = thread_current ()->priority;
+      else
+        {
+          struct thread *max = list_entry (list_begin (&thread_current ()->donated_list),
+            struct thread, donatedelem);
+          thread_current ()->donated_priority = max->donated_priority;
+        }
+      thread_current ()->waiting_on_lock = NULL; 
     }
-  thread_current ()->waiting_on_lock = NULL;  
   sema_up (&lock->semaphore);
 }
 
