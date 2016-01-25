@@ -401,6 +401,9 @@ priority_less (const struct list_elem *thread_a_, const struct list_elem *thread
 void
 thread_set_priority (int new_priority)
 {
+  if (thread_mlfqs)
+    return;
+  
   enum intr_level old_level;
 
   if (new_priority < PRI_MIN)
@@ -425,7 +428,10 @@ thread_set_priority (int new_priority)
 int
 thread_get_priority (void)
 {
-  return thread_current ()->donated_priority;
+  if (thread_mlfqs)
+    return thread_current ()->mlfqs_priority;
+  else
+    return thread_current ()->donated_priority;
 }
 
 /* Sets the current thread's nice value to NICE. */
@@ -460,7 +466,6 @@ thread_get_nice (void)
 int
 thread_get_load_avg (void)
 {
-  // printf("%d\n", fix_round (fix_scale (load_avg, 100)));
   return fix_trunc (fix_scale (load_avg, 100));
 }
 
