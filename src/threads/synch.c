@@ -211,18 +211,36 @@ lock_acquire (struct lock *lock)
   ASSERT (!lock_held_by_current_thread (lock));
   
   struct thread *t_lock = lock->holder;
+  enum intr_level old_level;
   if (t_lock && t_lock->status == THREAD_READY)
     {
-      enum intr_level old_level;
+      thread_current ()->waiting_on_lock = lock;
       old_level = intr_disable ();
       if (thread_current ()->donated_priority > t_lock->donated_priority)
         {
           /* Add to thread's list of priority donors */
-          list_insert_ordered (&t_lock->donated_list, 
+          list_insert_ordered (&t_lock->donated_list,
             &thread_current ()->donatedelem, priority_less, NULL);
           t_lock->donated_priority = thread_current ()->donated_priority;
         }
       intr_set_level (old_level);
+    }
+  else
+    {
+      while (t_lock && t_lock->waiting_on_lock)
+        {
+          thread_current ()->waiting_on_lock = lock;
+          old_level = intr_disable ();
+          if (thread_current ()->donated_priority > t_lock->donated_priority)
+            {
+              /* Add to thread's list of priority donors */
+              list_insert_ordered (&t_lock->donated_list,
+                &thread_current ()->donatedelem, priority_less, NULL);
+              t_lock->donated_priority = thread_current ()->donated_priority;
+            }
+          intr_set_level (old_level);
+          t_lock = t_lock->waiting_on_lock->holder;
+        }
     }
   
   sema_down (&lock->semaphore);
@@ -279,6 +297,7 @@ lock_release (struct lock *lock)
         struct thread, donatedelem);
       thread_current ()->donated_priority = max->donated_priority;
     }
+  thread_current ()->waiting_on_lock = NULL;  
   sema_up (&lock->semaphore);
 }
 

@@ -108,6 +108,7 @@ struct thread
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
     struct list_elem donatedelem;       /* List element */
+    struct lock *waiting_on_lock;       /* Pointer to lock the thread is waiting on */
 
     /* Owned by thread.c. */
     struct list_elem blockelem;              /* List element. */

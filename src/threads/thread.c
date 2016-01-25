@@ -496,6 +496,8 @@ init_thread (struct thread *t, const char *name, int priority)
 
   t->thread_timer_ticks = 0;
   t->starting_timer_ticks = 0;
+  
+  t->waiting_on_lock = NULL;
 
   t->stack = (uint8_t *) t + PGSIZE;
   t->priority = priority;
