@@ -102,8 +102,12 @@ struct thread
     fixed_point_t recent_cpu;
     int donated_priority;
 
+    /* List of threads that donated to this thread */
+    struct list donated_list;
+
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
+    struct list_elem donatedelem;       /* List element */
 
     /* Owned by thread.c. */
     struct list_elem blockelem;              /* List element. */
