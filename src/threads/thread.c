@@ -26,8 +26,7 @@ struct list ready_list;
    when they are first scheduled and removed when they exit. */
 static struct list all_list;
 
-/*
-. */
+/* Array of MLFQS Queues */
 static struct list mlfqs_list[PRI_MAX - PRI_MIN + 1];
 
 /* Idle thread. */
@@ -725,6 +724,7 @@ update_recent_cpu (struct thread *t, void *aux UNUSED)
                              t->recent_cpu));
 }
 
+/* Updates the mlfqs_priority of a given thread */
 static void
 update_mlfqs_priority (struct thread *t, void *aux UNUSED)
 {
@@ -735,7 +735,7 @@ update_mlfqs_priority (struct thread *t, void *aux UNUSED)
                       - t->nice * 2;
   if (t->mlfqs_priority > PRI_MAX)
     t->mlfqs_priority = PRI_MAX;
-  else if (t->mlfqs_priority > PRI_MIN)
+  else if (t->mlfqs_priority < PRI_MIN)
     t->mlfqs_priority = PRI_MIN;
 
   /* Update the mlfqs list if it's a running thread. */
@@ -768,12 +768,16 @@ update_mlfqs_every_second (struct thread *t)
                           fix_unscale (fix_int (threads_ready), 60));
       // printf("load_avg2 = %d, %d\n", fix_round (fix_scale (load_avg, 10000)), threads_ready);
       // Update recent_cpu
-      thread_foreach (update_recent_cpu, NULL);
+      enum intr_level old_level;
+      old_level = intr_disable ();
+      thread_foreach (update_recent_cpu, NULL);      
+      
       // Update mlfqs_priority
       thread_foreach (update_mlfqs_priority, NULL);
+      intr_set_level (old_level);
     }
 }
-
+
 /* Offset of `stack' member within `struct thread'.
    Used by switch.S, which can't figure it out on its own. */
 uint32_t thread_stack_ofs = offsetof (struct thread, stack);
