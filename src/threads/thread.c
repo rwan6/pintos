@@ -358,8 +358,7 @@ thread_set_priority (int new_priority)
   else if (new_priority > PRI_MAX)
     new_priority = PRI_MIN;
 
-  if (thread_current ()->donated_priority == thread_current ()->priority ||
-      thread_current ()->donated_priority < new_priority)
+  if (thread_current ()->donated_priority == thread_current ()->priority)
     thread_current ()->donated_priority = new_priority;
   
   thread_current ()->priority = new_priority;
@@ -504,6 +503,7 @@ init_thread (struct thread *t, const char *name, int priority)
   t->magic = THREAD_MAGIC;
 
   old_level = intr_disable ();
+  list_init (&t->donated_list);
   list_push_back (&all_list, &t->allelem);
   intr_set_level (old_level);
 }
