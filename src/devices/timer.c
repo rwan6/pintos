@@ -92,6 +92,21 @@ timer_elapsed (int64_t then)
   return timer_ticks () - then;
 }
 
+/* less_list_func used by timer_sleep when determining the
+   thread with the least number of ticks. */
+bool
+ticks_less (const struct list_elem *thread_a_, const struct list_elem *thread_b_,
+            void *aux UNUSED)
+{
+  const struct thread *thread_a = list_entry (thread_a_, struct thread, elem);
+  const struct thread *thread_b = list_entry (thread_b_, struct thread, elem);
+  int64_t a_total_ticks = thread_a->thread_timer_ticks +
+     thread_a->starting_timer_ticks;
+  int64_t b_total_ticks = thread_b->thread_timer_ticks +
+     thread_b->starting_timer_ticks;
+  return a_total_ticks > b_total_ticks;
+}
+
 /* Sleeps for approximately TICKS timer ticks.  Interrupts must
    be turned on. */
 void
@@ -111,7 +126,8 @@ timer_sleep (int64_t ticks)
   current_thread->starting_timer_ticks = timer_ticks ();
 
   old_level = intr_disable ();
-  list_push_back (&blocked_list, &current_thread->blockelem);
+  list_insert_ordered(&blocked_list, &current_thread->blockelem, 
+    ticks_less, NULL);
   thread_block ();
   intr_set_level (old_level);
 }
@@ -185,7 +201,7 @@ timer_print_stats (void)
 {
   printf ("Timer: %"PRId64" ticks\n", timer_ticks ());
 }
-
+
 /* Timer interrupt handler. */
 static void
 timer_interrupt (struct intr_frame *args UNUSED)
@@ -193,23 +209,14 @@ timer_interrupt (struct intr_frame *args UNUSED)
   ticks++;
   thread_tick ();
   
-  struct list_elem *e_iter;
-  for (e_iter = list_begin (&blocked_list); e_iter != list_end (&blocked_list); e_iter = list_next (e_iter))
+  struct thread *current_thread = list_entry (list_begin (&blocked_list),
+    struct thread, blockelem);
+  int64_t thread_ticks = current_thread->thread_timer_ticks;
+  int64_t starting_ticks = current_thread->starting_timer_ticks;
+  if (timer_elapsed (starting_ticks) >= thread_ticks)
     {
-      struct thread *current_thread = list_entry (e_iter, struct thread, blockelem);
-      int64_t thread_ticks = current_thread->thread_timer_ticks;
-      int64_t starting_ticks = current_thread->starting_timer_ticks;
-    if (timer_elapsed (starting_ticks) >= thread_ticks)
-      {
-        if (e_iter == list_begin (&blocked_list))
-  		    list_pop_front (&blocked_list);
-        else if (e_iter == list_end (&blocked_list))
-          list_pop_back (&blocked_list);
-        else
-          list_remove (e_iter);
-        
-        thread_unblock (current_thread);
-      }
+      list_remove (list_begin (&blocked_list));
+      thread_unblock (current_thread);
     }
 }
 

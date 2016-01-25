@@ -58,7 +58,7 @@ static unsigned thread_ticks;   /* # of timer ticks since last yield. */
 
 /* If false (default), use round-robin scheduler.
    If true, use multi-level feedback queue scheduler.
-   Controlled by kernel command-line option "-o mlfqs". */
+   Controlled by kernel command-line option "-mlfqs". */
 bool thread_mlfqs;
 
 static fixed_point_t load_avg;
@@ -466,6 +466,7 @@ thread_get_nice (void)
 int
 thread_get_load_avg (void)
 {
+  //printf("Ld Avg: %02d\n", fix_trunc (fix_scale (load_avg, 100)));
   return fix_trunc (fix_scale (load_avg, 100));
 }
 
