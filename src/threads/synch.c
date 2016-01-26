@@ -121,19 +121,19 @@ sema_up (struct semaphore *sema)
   old_level = intr_disable ();
   if (!list_empty (&sema->waiters))
     {
-      // if (!thread_mlfqs)
-        list_remove (thread_max_elem);
+      list_remove (thread_max_elem);
       thread_unblock (thread_max);
 
-      if (thread_max->priority > thread_current ()->priority)
-        yield = 1;
-      if (thread_mlfqs && thread_max->mlfqs_priority > thread_current ()->mlfqs_priority)
+      if ((!thread_mlfqs && thread_max->priority >
+         thread_current ()->priority) ||
+         (thread_mlfqs && thread_max->mlfqs_priority >
+         thread_current ()->mlfqs_priority))
         yield = 1;
     }
 
   sema->value++;
   intr_set_level (old_level);
-  if (yield /*&& !thread_mlfqs*/)
+  if (yield)
     thread_yield ();
 }
 

@@ -766,7 +766,7 @@ update_mlfqs_every_second (struct thread *t)
 
       load_avg = fix_add (fix_mul (fix_frac (59, 60), load_avg),
                           fix_unscale (fix_int (threads_ready), 60));
-      //printf("load_avg2 = %d, %d\n", fix_round (fix_scale (load_avg, 10000)), threads_ready);
+                          
       /* Update recent_cpu */
       thread_foreach (update_recent_cpu, NULL);
 
