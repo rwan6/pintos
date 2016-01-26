@@ -155,7 +155,7 @@ thread_tick (void)
   if (thread_mlfqs)
     {
       /* Update recent_cpu of the current thread every tick. */
-      struct thread *t = thread_current ();
+      // struct thread *t = thread_current ();
       if (t != idle_thread)
         t->recent_cpu = fix_add (t->recent_cpu, fix_int (1));
       /* Update load_avg for the operating system as well as
@@ -405,13 +405,13 @@ thread_set_priority (int new_priority)
 {
   if (thread_mlfqs)
     return;
-  
+
   enum intr_level old_level;
 
   if (new_priority < PRI_MIN)
     new_priority = PRI_MIN;
   else if (new_priority > PRI_MAX)
-    new_priority = PRI_MIN;
+    new_priority = PRI_MAX;
 
   if (thread_current ()->donated_priority == thread_current ()->priority)
     thread_current ()->donated_priority = new_priority;
@@ -469,7 +469,7 @@ int
 thread_get_load_avg (void)
 {
   //printf("Ld Avg: %02d\n", fix_trunc (fix_scale (load_avg, 100)));
-  return fix_trunc (fix_scale (load_avg, 100));
+  return fix_round (fix_scale (load_avg, 100));
 }
 
 /* Returns 100 times the current thread's recent_cpu value. */
@@ -477,7 +477,7 @@ int
 thread_get_recent_cpu (void)
 {
   /* Not yet implemented. */
-  return fix_trunc (fix_mul (fix_int (100), thread_current ()->recent_cpu));
+  return fix_round (fix_mul (fix_int (100), thread_current ()->recent_cpu));
 }
 
 /* Idle thread.  Executes when no other thread is ready to run.
@@ -768,7 +768,7 @@ update_mlfqs_every_second (struct thread *t)
       // printf("ready_threads = %d\n", threads_ready);
       load_avg = fix_add (fix_mul (fix_frac (59, 60), load_avg),
                           fix_unscale (fix_int (threads_ready), 60));
-      // printf("load_avg2 = %d, %d\n", fix_round (fix_scale (load_avg, 10000)), threads_ready);
+      printf("load_avg2 = %d, %d\n", fix_round (fix_scale (load_avg, 10000)), threads_ready);
       // Update recent_cpu
       thread_foreach (update_recent_cpu, NULL);      
       
