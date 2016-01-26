@@ -217,6 +217,8 @@ thread_create (const char *name, int priority,
   /* Initialize thread. */
   init_thread (t, name, priority);
   tid = t->tid = allocate_tid ();
+  
+  /* Inherits from creator */
   t->nice = thread_current ()->nice;
 
   /* Stack frame for kernel_thread(). */
@@ -397,10 +399,14 @@ priority_less (const struct list_elem *thread_a_, const struct list_elem *thread
   return thread_a->donated_priority < thread_b->donated_priority;
 }
 
-/* Sets the current thread's priority to NEW_PRIORITY. */
-/* Interrupts need to briefly be disabled while the
+/* Sets the current thread's priority to NEW_PRIORITY.  
+   Interrupts need to briefly be disabled while the
    ready list is being iterated over to find the max
-   priority. */
+   priority.
+  
+   Also checks to see whether the new priority value requires
+   the thread to yield to a thread with a higher priority from
+   the ready list. */
 void
 thread_set_priority (int new_priority)
 {
@@ -408,7 +414,8 @@ thread_set_priority (int new_priority)
     return;
 
   enum intr_level old_level;
-
+  
+  /* Clip priority to be between PRI_MIN and PRI_MAX. */
   if (new_priority < PRI_MIN)
     new_priority = PRI_MIN;
   else if (new_priority > PRI_MAX)
@@ -419,6 +426,11 @@ thread_set_priority (int new_priority)
 
   thread_current ()->priority = new_priority;
 
+  /* Find the thread with the maximum priority in the ready list to
+     check whether it should cause the running thread to yield.
+     List is not sorted.  However, inserting it in-order would
+     also have to happen with interrupts disabled, so this is an
+     equivalent situation (i.e. one is not better than the other). */
   old_level = intr_disable ();
   struct list_elem *max_priority_element = list_max (&ready_list, priority_less, NULL);
   struct thread *max_priority_thread = list_entry (max_priority_element, struct thread, elem);

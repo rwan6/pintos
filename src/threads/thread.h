@@ -94,16 +94,23 @@ struct thread
     tid_t tid;                          /* Thread identifier. */
     enum thread_status status;          /* Thread state. */
     char name[16];                      /* Name (for debugging purposes). */
+    struct list_elem blockelem;         /* List element. */
+    unsigned magic;                     /* Detects stack overflow. */
+    
+    /* Member variables for Advanced scheduler.  Also owned by thread.c */
+    int nice;                           /* Nice value. */
+    fixed_point_t recent_cpu;           /* Recent cpu. */
+    int mlfqs_priority;                 /* Priority for advanced scheduler. */
+    struct list_elem mlfqs_elem;        /* List element for MLFQS List */
+    
     uint8_t *stack;                     /* Saved stack pointer. */
     int priority;                       /* Priority. */
     struct list_elem allelem;           /* List element for all threads list. */
     int donated_priority;               /* Donated Priority. */
-
-    /* Member variables for Advanced scheduler */
-    int nice;                           /* Nice value. */
-    fixed_point_t recent_cpu;           /* Recent cpu. */
-    int mlfqs_priority;                 /* Priority for advanced scheduler. */
-    struct list_elem mlfqs_elem;
+    
+	  /* Owned by timer.c */
+	  int64_t thread_timer_ticks;			/* Ticks for sleep wakeup. */
+	  int64_t starting_timer_ticks;		/* Starting ticks use reference for sleep wakeup */
 
     /* List of threads that donated to this thread */
     struct list donated_list;
@@ -113,22 +120,10 @@ struct thread
     struct list_elem donatedelem;       /* List element */
     struct lock *waiting_on_lock;       /* Pointer to lock the thread is waiting on */
 
-    /* Owned by thread.c. */
-    struct list_elem blockelem;              /* List element. */
-
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
     uint32_t *pagedir;                  /* Page directory. */
 #endif
-
-    /* Owned by thread.c. */
-    unsigned magic;                     /* Detects stack overflow. */
-
-	  /* Owned by timer.c */
-	  int64_t thread_timer_ticks;			/* Ticks for sleep wakeup. */
-
-	  /* Owned by timer.c */
-	  int64_t starting_timer_ticks;		/* Starting ticks use reference for sleep wakeup */
   };
 
 /* If false (default), use round-robin scheduler.
