@@ -116,22 +116,24 @@ sema_up (struct semaphore *sema)
 
   struct list_elem *thread_max_elem = list_max (&sema->waiters, priority_less, NULL);
   struct thread *thread_max = list_entry (thread_max_elem, struct thread, elem);
-  
+
   /* Added minimal number of lines between disabled interrupts */
   old_level = intr_disable ();
   if (!list_empty (&sema->waiters))
     {
-      if (!thread_mlfqs)
+      // if (!thread_mlfqs)
         list_remove (thread_max_elem);
       thread_unblock (thread_max);
-      
+
       if (thread_max->priority > thread_current ()->priority)
         yield = 1;
+      if (thread_mlfqs && thread_max->mlfqs_priority > thread_current ()->mlfqs_priority)
+        yield = 1;
     }
-    
+
   sema->value++;
   intr_set_level (old_level);
-  if (yield && !thread_mlfqs)
+  if (yield /*&& !thread_mlfqs*/)
     thread_yield ();
 }
 
@@ -210,7 +212,7 @@ lock_acquire (struct lock *lock)
   ASSERT (lock != NULL);
   ASSERT (!intr_context ());
   ASSERT (!lock_held_by_current_thread (lock));
-  
+
   if (!thread_mlfqs)
     {
       struct thread *t_lock = lock->holder;
@@ -239,7 +241,7 @@ lock_acquire (struct lock *lock)
                   /* If I was already in the list, remove myself before being reinserted in-order */
                   struct list_elem *dup_e;
                   for (dup_e = list_begin (&t_lock->donated_list);
-                    dup_e != list_end (&t_lock->donated_list); 
+                    dup_e != list_end (&t_lock->donated_list);
                     dup_e = list_next (dup_e))
                     {
                       if (dup_e == &prev_thread->donatedelem)
@@ -262,7 +264,7 @@ lock_acquire (struct lock *lock)
             }
         }
     }
-  
+
   sema_down (&lock->semaphore);
   lock->holder = thread_current ();
 }
@@ -297,7 +299,7 @@ lock_release (struct lock *lock)
 {
   ASSERT (lock != NULL);
   ASSERT (lock_held_by_current_thread (lock));
-  
+
   lock->holder = NULL;
 
   if (!thread_mlfqs)
@@ -319,7 +321,7 @@ lock_release (struct lock *lock)
             struct thread, donatedelem);
           thread_current ()->donated_priority = max->donated_priority;
         }
-      thread_current ()->waiting_on_lock = NULL; 
+      thread_current ()->waiting_on_lock = NULL;
     }
   sema_up (&lock->semaphore);
 }
@@ -342,11 +344,11 @@ struct semaphore_elem
     struct semaphore semaphore;         /* This semaphore. */
     int semaphore_priority;             /* Priority of semaphore waiter */
   };
-  
+
 /* less_list_func used by cond_signal when determining the highest
    priority thread to wake up. */
 static bool
-cond_less (const struct list_elem *sem_a_, const struct list_elem *sem_b_, 
+cond_less (const struct list_elem *sem_a_, const struct list_elem *sem_b_,
         void *aux UNUSED)
 {
   const struct semaphore_elem *sem_a = list_entry (sem_a_, struct semaphore_elem, elem);
