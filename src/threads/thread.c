@@ -744,8 +744,8 @@ update_mlfqs_priority (struct thread *t, void *aux UNUSED)
   else if (t->mlfqs_priority < PRI_MIN)
     t->mlfqs_priority = PRI_MIN;
 
-  /* Update the mlfqs list if it's a running thread. */
-  if (t->status == THREAD_RUNNING)
+  /* Update the mlfqs list if it's a ready thread. */
+  if (t->status == THREAD_READY)
     {      
       list_remove (&t->mlfqs_elem);
       list_push_back (&mlfqs_list[t->mlfqs_priority], &t->mlfqs_elem);
