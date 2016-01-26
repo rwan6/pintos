@@ -352,7 +352,7 @@ cond_less (const struct list_elem *sem_a_, const struct list_elem *sem_b_,
   const struct semaphore_elem *sem_a = list_entry (sem_a_, struct semaphore_elem, elem);
   const struct semaphore_elem *sem_b = list_entry (sem_b_, struct semaphore_elem, elem);
 
-  return sem_a->semaphore_priority < sem_b->semaphore_priority;
+  return sem_a->semaphore_priority > sem_b->semaphore_priority;
 }
 
 /* Initializes condition variable COND.  A condition variable
