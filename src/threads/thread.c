@@ -217,6 +217,7 @@ thread_create (const char *name, int priority,
   /* Initialize thread. */
   init_thread (t, name, priority);
   tid = t->tid = allocate_tid ();
+  t->nice = thread_current ()->nice;
 
   /* Stack frame for kernel_thread(). */
   kf = alloc_frame (t, sizeof *kf);
@@ -235,7 +236,7 @@ thread_create (const char *name, int priority,
 
   /* Add to run queue. */
   thread_unblock (t);
-  
+
   if (!thread_mlfqs)
     {
       if (priority > thread_current ()->donated_priority)
@@ -718,12 +719,11 @@ static void
 update_recent_cpu (struct thread *t, void *aux UNUSED)
 {
   fixed_point_t double_load_avg = fix_scale (load_avg, 2);
+  fixed_point_t coef = fix_div (
+                         double_load_avg,
+                         fix_add (double_load_avg, fix_int (1)));
   t->recent_cpu = fix_add (fix_int (t->nice),
-                           fix_mul (
-                             fix_div (
-                               double_load_avg,
-                               fix_add (double_load_avg, fix_int (1))),
-                             t->recent_cpu));
+                           fix_mul (coef, t->recent_cpu));
 }
 
 /* Updates the mlfqs_priority of a given thread */
@@ -770,8 +770,8 @@ update_mlfqs_every_second (struct thread *t)
                           fix_unscale (fix_int (threads_ready), 60));
       printf("load_avg2 = %d, %d\n", fix_round (fix_scale (load_avg, 10000)), threads_ready);
       // Update recent_cpu
-      thread_foreach (update_recent_cpu, NULL);      
-      
+      thread_foreach (update_recent_cpu, NULL);
+
       // Update mlfqs_priority
       thread_foreach (update_mlfqs_priority, NULL);
     }
