@@ -125,9 +125,9 @@ timer_sleep (int64_t ticks)
   current_thread->thread_timer_ticks = ticks;
   current_thread->starting_timer_ticks = timer_ticks ();
 
-  old_level = intr_disable ();
   list_insert_ordered(&blocked_list, &current_thread->blockelem, 
     ticks_less, NULL);
+  old_level = intr_disable ();
   thread_block ();
   intr_set_level (old_level);
 }

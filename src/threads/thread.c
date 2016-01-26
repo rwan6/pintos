@@ -576,8 +576,8 @@ init_thread (struct thread *t, const char *name, int priority)
 
   t->magic = THREAD_MAGIC;
 
-  old_level = intr_disable ();
   list_init (&t->donated_list);
+  old_level = intr_disable ();
   list_push_back (&all_list, &t->allelem);
   intr_set_level (old_level);
 }
@@ -769,12 +769,10 @@ update_mlfqs_every_second (struct thread *t)
       // printf("load_avg2 = %d, %d\n", fix_round (fix_scale (load_avg, 10000)), threads_ready);
       // Update recent_cpu
       enum intr_level old_level;
-      old_level = intr_disable ();
       thread_foreach (update_recent_cpu, NULL);      
       
       // Update mlfqs_priority
       thread_foreach (update_mlfqs_priority, NULL);
-      intr_set_level (old_level);
     }
 }
 
