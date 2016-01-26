@@ -235,9 +235,12 @@ thread_create (const char *name, int priority,
 
   /* Add to run queue. */
   thread_unblock (t);
-
-  if (priority > thread_current ()->donated_priority)
-    thread_yield ();
+  
+  if (!thread_mlfqs)
+    {
+      if (priority > thread_current ()->donated_priority)
+        thread_yield ();
+    }
   return tid;
 }
 
@@ -612,7 +615,6 @@ next_thread_to_run (void)
             {
               ready_threads--;
               struct list_elem *next_thread_elem = list_pop_front (&mlfqs_list[i]);
-              list_remove (next_thread_elem);
               return list_entry (next_thread_elem, struct thread, mlfqs_elem);
             }
         }
@@ -742,12 +744,12 @@ update_mlfqs_priority (struct thread *t, void *aux UNUSED)
   if (t->status == THREAD_RUNNING)
     {
       enum intr_level old_level;
-      old_level = intr_disable ();
+      //old_level = intr_disable ();
 
       list_remove (&t->mlfqs_elem);
       list_push_back (&mlfqs_list[t->mlfqs_priority], &t->mlfqs_elem);
 
-      intr_set_level (old_level);
+      //intr_set_level (old_level);
     }
 }
 
@@ -768,7 +770,6 @@ update_mlfqs_every_second (struct thread *t)
                           fix_unscale (fix_int (threads_ready), 60));
       // printf("load_avg2 = %d, %d\n", fix_round (fix_scale (load_avg, 10000)), threads_ready);
       // Update recent_cpu
-      enum intr_level old_level;
       thread_foreach (update_recent_cpu, NULL);      
       
       // Update mlfqs_priority

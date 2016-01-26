@@ -218,12 +218,7 @@ timer_interrupt (struct intr_frame *args UNUSED)
       int64_t starting_ticks = current_thread->starting_timer_ticks;
       if (timer_elapsed (starting_ticks) >= thread_ticks)
         {
-          if (e_iter == list_begin (&blocked_list))
-    		  list_pop_front (&blocked_list);
-          else if (e_iter == list_end (&blocked_list))
-            list_pop_back (&blocked_list);
-          else
-            list_remove (e_iter);
+          list_remove (e_iter);
         
   		    thread_unblock (current_thread);
         }
