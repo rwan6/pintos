@@ -609,17 +609,21 @@ next_thread_to_run (void)
 {
   if (thread_mlfqs)
     {
-      int i = PRI_MAX;
-      for (; i >= PRI_MIN; i--)
+      if (!ready_threads)
+        return idle_thread;
+      else
         {
-          if (!list_empty (&mlfqs_list[i]))
+          int i = PRI_MAX;
+          for (; i >= PRI_MIN; i--)
             {
-              ready_threads--;
-              struct list_elem *next_thread_elem = list_pop_front (&mlfqs_list[i]);
-              return list_entry (next_thread_elem, struct thread, mlfqs_elem);
+              if (!list_empty (&mlfqs_list[i]))
+                {
+                  ready_threads--;
+                  struct list_elem *next_thread_elem = list_pop_front (&mlfqs_list[i]);
+                  return list_entry (next_thread_elem, struct thread, mlfqs_elem);
+                }
             }
         }
-      return idle_thread;
     }
 
 
@@ -687,7 +691,7 @@ thread_schedule_tail (struct thread *prev)
    has completed. */
 static void
 schedule (void)
-{
+{ 
   struct thread *cur = running_thread ();
   struct thread *next = next_thread_to_run ();
   struct thread *prev = NULL;
@@ -742,14 +746,9 @@ update_mlfqs_priority (struct thread *t, void *aux UNUSED)
 
   /* Update the mlfqs list if it's a running thread. */
   if (t->status == THREAD_RUNNING)
-    {
-      enum intr_level old_level;
-      //old_level = intr_disable ();
-
+    {      
       list_remove (&t->mlfqs_elem);
       list_push_back (&mlfqs_list[t->mlfqs_priority], &t->mlfqs_elem);
-
-      //intr_set_level (old_level);
     }
 }
 
@@ -760,19 +759,18 @@ update_mlfqs_every_second (struct thread *t)
 {
   if (timer_ticks () % TIMER_FREQ == 0)
     {
-      // Update load_avg
+      /* Update load_avg */
       int threads_ready = ready_threads;
       if (t != idle_thread)
         threads_ready++;
-      // printf("%f\n", );
-      // printf("ready_threads = %d\n", threads_ready);
+
       load_avg = fix_add (fix_mul (fix_frac (59, 60), load_avg),
                           fix_unscale (fix_int (threads_ready), 60));
-      printf("load_avg2 = %d, %d\n", fix_round (fix_scale (load_avg, 10000)), threads_ready);
-      // Update recent_cpu
+      //printf("load_avg2 = %d, %d\n", fix_round (fix_scale (load_avg, 10000)), threads_ready);
+      /* Update recent_cpu */
       thread_foreach (update_recent_cpu, NULL);
 
-      // Update mlfqs_priority
+      /* Update mlfqs_priority */
       thread_foreach (update_mlfqs_priority, NULL);
     }
 }
