@@ -439,7 +439,10 @@ thread_set_priority (int new_priority)
     thread_yield ();
 }
 
-/* Returns the current thread's priority. */
+/* Returns the current thread's priority.  Note that we return the
+   donated priority when priority donation is being used since
+   a donated priority that is equal to the base priority means that
+   a thread has not received any donated priority. */
 int
 thread_get_priority (void)
 {
@@ -449,11 +452,10 @@ thread_get_priority (void)
     return thread_current ()->donated_priority;
 }
 
-/* Sets the current thread's nice value to NICE. */
+/* Sets the current thread's nice value to new_nice. */
 void
 thread_set_nice (int new_nice)
 {
-  /* Not yet implemented. */
   if (new_nice < NICE_MIN || new_nice > NICE_MAX)
     return;
 
@@ -473,7 +475,6 @@ thread_set_nice (int new_nice)
 int
 thread_get_nice (void)
 {
-  /* Not yet implemented. */
   return thread_current ()->nice;
 }
 
@@ -481,7 +482,6 @@ thread_get_nice (void)
 int
 thread_get_load_avg (void)
 {
-  //printf("Ld Avg: %02d\n", fix_trunc (fix_scale (load_avg, 100)));
   return fix_round (fix_scale (load_avg, 100));
 }
 
@@ -489,10 +489,9 @@ thread_get_load_avg (void)
 int
 thread_get_recent_cpu (void)
 {
-  /* Not yet implemented. */
   return fix_round (fix_mul (fix_int (100), thread_current ()->recent_cpu));
 }
-
+
 /* Idle thread.  Executes when no other thread is ready to run.
 
    The idle thread is initially put on the ready list by
@@ -643,6 +642,10 @@ next_thread_to_run (void)
     return idle_thread;
   else
     {
+      /* Select thread with the maximum priority to run.  Since
+         list_max grabs the first thread with the maximum value
+         it finds, round-robin for multiple threads with the max
+         thread value is taken care of */
       struct list_elem *thread_max_elem = list_max (&ready_list, priority_less, NULL);
       list_remove (thread_max_elem);
       return list_entry (thread_max_elem, struct thread, elem);
@@ -731,6 +734,7 @@ allocate_tid (void)
   return tid;
 }
 
+/* Updates the value of recent_cpu */
 static void
 update_recent_cpu (struct thread *t, void *aux UNUSED)
 {
