@@ -100,6 +100,10 @@ ticks_less (const struct list_elem *thread_a_, const struct list_elem *thread_b_
 {
   const struct thread *thread_a = list_entry (thread_a_, struct thread, blockelem);
   const struct thread *thread_b = list_entry (thread_b_, struct thread, blockelem);
+  
+  /* Consider not only the number ticks to sleep for, but also
+     the starting ticks (i.e. how many ticks relative to when)
+     you start. */
   int64_t a_total_ticks = thread_a->thread_timer_ticks +
      thread_a->starting_timer_ticks;
   int64_t b_total_ticks = thread_b->thread_timer_ticks +
@@ -112,7 +116,7 @@ ticks_less (const struct list_elem *thread_a_, const struct list_elem *thread_b_
 void
 timer_sleep (int64_t ticks) 
 {
-  /* Immediately return if ticks <= 0 */
+  /* Immediately return if ticks <= 0. */
   if (ticks <= 0)
     return; 
   
@@ -125,6 +129,8 @@ timer_sleep (int64_t ticks)
   current_thread->thread_timer_ticks = ticks;
   current_thread->starting_timer_ticks = timer_ticks ();
 
+  /* Keep list ordered to minimize time spent looking for threads
+     that need to be awoken in timer_interrupt. */
   list_insert_ordered(&blocked_list, &current_thread->blockelem, 
     ticks_less, NULL);
   old_level = intr_disable ();
@@ -202,7 +208,8 @@ timer_print_stats (void)
   printf ("Timer: %"PRId64" ticks\n", timer_ticks ());
 }
 
-/* Timer interrupt handler. */
+/* Timer interrupt handler.  Wakes up threads whose waiting ticks
+   are greater than or equal to the number of ticks that have passed. */
 static void
 timer_interrupt (struct intr_frame *args UNUSED)
 {

@@ -104,6 +104,11 @@ sema_try_down (struct semaphore *sema)
 
 /* Up or "V" operation on a semaphore.  Increments SEMA's value
    and wakes up one thread of those waiting for SEMA, if any.
+   
+   When determining which thread to unblock, awaken the one
+   with the highest priority.  If the priority of the thread
+   that will be awoken is higher than that of the current thread
+   yield the CPU to switch threads.
 
    This function may be called from an interrupt handler. */
 void
@@ -126,6 +131,8 @@ sema_up (struct semaphore *sema)
       list_remove (thread_max_elem);
       thread_unblock (thread_max);
 
+      /* Check the appropriate priority, depending on which scheduler
+         is being used */
       if ((!thread_mlfqs && thread_max->priority >
          thread_current ()->priority) ||
          (thread_mlfqs && thread_max->mlfqs_priority >
@@ -203,6 +210,13 @@ lock_init (struct lock *lock)
 /* Acquires LOCK, sleeping until it becomes available if
    necessary.  The lock must not already be held by the current
    thread.
+   
+   Perform priority donation within lock aquire. We detect whether
+   the lock holder is ready to be run and if we need to donate
+   priority to it to avoid priority inversion. If nested dependency
+   exists, we update the priority up the dependency chain until the
+   bottleneck thread has a high-enough priority to complete its
+   execution. More details can be found in the design documentation.
 
    This function may sleep, so it must not be called within an
    interrupt handler.  This function may be called with
@@ -294,6 +308,12 @@ lock_try_acquire (struct lock *lock)
 }
 
 /* Releases LOCK, which must be owned by the current thread.
+   
+   Ask all threads that donated to the current thread to remove
+   themselves from the current thread's personal donated list.
+   This ensures that priorities donated due to other locks are
+   not interrupted/prematurely released.  Donation list is ordered,
+   so obtaining next highest priority donation takes place in O(1).
 
    An interrupt handler cannot acquire a lock, so it does not
    make sense to try to release a lock within an interrupt
@@ -308,6 +328,8 @@ lock_release (struct lock *lock)
 
   if (!thread_mlfqs)
     {
+      /* Remove threads that donated to me related to this lock from
+         my donation list. */
       struct list_elem *e;
       for (e = list_begin (&lock->semaphore.waiters);
            e != list_end (&lock->semaphore.waiters);
@@ -317,6 +339,9 @@ lock_release (struct lock *lock)
           list_remove (&t->donatedelem);
         }
 
+      /* Update my donated_priority to the appropriate value (i.e.
+         either my base priority or the next highest in the donation
+         list). */
       if (list_empty(&thread_current ()->donated_list))
         thread_current ()->donated_priority = thread_current ()->priority;
       else
@@ -326,6 +351,8 @@ lock_release (struct lock *lock)
             struct thread, donatedelem);
           thread_current ()->donated_priority = max->donated_priority;
         }
+      /* Reset my waiting_on_lock variable (i.e. no longer waiting
+         on a lock). */
       thread_current ()->waiting_on_lock = NULL;
     }
   sema_up (&lock->semaphore);
@@ -342,7 +369,9 @@ lock_held_by_current_thread (const struct lock *lock)
   return lock->holder == thread_current ();
 }
 
-/* One semaphore in a list. */
+/* One semaphore in a list.
+   Added semaphore_priority to track the highest priority of the thread
+   waiting for this semaphore. */
 struct semaphore_elem
   {
     struct list_elem elem;              /* List element. */
@@ -391,6 +420,9 @@ cond_init (struct condition *cond)
    condition variables.  That is, there is a one-to-many mapping
    from locks to condition variables.
 
+   Keep threads that are waiting on this condition ordered based on
+   priority to make wake-up of the highest_priority thread O(1).
+
    This function may sleep, so it must not be called within an
    interrupt handler.  This function may be called with
    interrupts disabled, but interrupts will be turned back on if
@@ -419,6 +451,9 @@ cond_wait (struct condition *cond, struct lock *lock)
 /* If any threads are waiting on COND (protected by LOCK), then
    this function signals one of them to wake up from its wait.
    LOCK must be held before calling this function.
+  
+   Passes the semaphore to the highest priority waiting thread
+   since the waiting list is sorted.
 
    An interrupt handler cannot acquire a lock, so it does not
    make sense to try to signal a condition variable within an

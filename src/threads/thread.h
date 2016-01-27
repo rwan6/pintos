@@ -97,28 +97,40 @@ struct thread
     struct list_elem blockelem;         /* List element. */
     unsigned magic;                     /* Detects stack overflow. */
     
-    /* Member variables for Advanced scheduler.  Also owned by thread.c */
+    /* Member variables for Advanced scheduler.
+       Also owned by thread.c. */
     int nice;                           /* Nice value. */
     fixed_point_t recent_cpu;           /* Recent cpu. */
     int mlfqs_priority;                 /* Priority for advanced scheduler. */
-    struct list_elem mlfqs_elem;        /* List element for MLFQS List */
+    struct list_elem mlfqs_elem;        /* List element for MLFQS List. */
     
     uint8_t *stack;                     /* Saved stack pointer. */
     int priority;                       /* Priority. */
     struct list_elem allelem;           /* List element for all threads list. */
     int donated_priority;               /* Donated Priority. */
     
+<<<<<<< Updated upstream
     /* Owned by timer.c */
     int64_t thread_timer_ticks;         /* Ticks for sleep wakeup. */
     int64_t starting_timer_ticks;       /* Starting ticks use reference for sleep wakeup */
 
     /* List of threads that donated to this thread */
     struct list donated_list;
+=======
+	  /* Owned by timer.c */
+	  int64_t thread_timer_ticks;			/* Ticks for sleep wakeup. */
+	  int64_t starting_timer_ticks;		/* Starting ticks use reference for
+       sleep wakeup. */
+>>>>>>> Stashed changes
 
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
     struct list_elem donatedelem;       /* List element */
-    struct lock *waiting_on_lock;       /* Pointer to lock the thread is waiting on */
+    struct lock *waiting_on_lock;       /* Pointer to lock the thread is
+       waiting on */
+    struct list donated_list;           /* List of threads that donated to
+       this thread */
+
 
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
