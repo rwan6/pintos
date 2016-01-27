@@ -439,7 +439,7 @@ cond_wait (struct condition *cond, struct lock *lock)
 
   sema_init (&waiter.semaphore, 0);
   /* Update priority and add it in an ordered manner to the list. */
-  waiter.semaphore_priority = (lock->holder)->priority;
+  waiter.semaphore_priority = (lock->holder)->donated_priority;
   /* Keep list ordered so the first thread is the highest priority
   to be awoken. */
   list_insert_ordered (&cond->waiters, &waiter.elem, cond_less, NULL);

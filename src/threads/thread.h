@@ -109,19 +109,9 @@ struct thread
     struct list_elem allelem;           /* List element for all threads list. */
     int donated_priority;               /* Donated Priority. */
     
-<<<<<<< Updated upstream
     /* Owned by timer.c */
     int64_t thread_timer_ticks;         /* Ticks for sleep wakeup. */
     int64_t starting_timer_ticks;       /* Starting ticks use reference for sleep wakeup */
-
-    /* List of threads that donated to this thread */
-    struct list donated_list;
-=======
-	  /* Owned by timer.c */
-	  int64_t thread_timer_ticks;			/* Ticks for sleep wakeup. */
-	  int64_t starting_timer_ticks;		/* Starting ticks use reference for
-       sleep wakeup. */
->>>>>>> Stashed changes
 
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
