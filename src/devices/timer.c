@@ -131,9 +131,9 @@ timer_sleep (int64_t ticks)
 
   /* Keep list ordered to minimize time spent looking for threads
      that need to be awoken in timer_interrupt. */
+  old_level = intr_disable ();
   list_insert_ordered(&blocked_list, &current_thread->blockelem, 
     ticks_less, NULL);
-  old_level = intr_disable ();
   thread_block ();
   intr_set_level (old_level);
 }
