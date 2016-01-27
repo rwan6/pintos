@@ -213,14 +213,15 @@ timer_interrupt (struct intr_frame *args UNUSED)
   for (e_iter = list_begin (&blocked_list); 
     e_iter != list_end (&blocked_list); e_iter = list_next (e_iter))
     {
-      struct thread *current_thread = list_entry (e_iter, struct thread, blockelem);
+      struct thread *current_thread = list_entry (e_iter, struct thread,
+        blockelem);
       int64_t thread_ticks = current_thread->thread_timer_ticks;
       int64_t starting_ticks = current_thread->starting_timer_ticks;
       if (timer_elapsed (starting_ticks) >= thread_ticks)
         {
           list_remove (e_iter);
         
-  		    thread_unblock (current_thread);
+          thread_unblock (current_thread);
         }
       /* Since the list is ordered, if we reach a thread that is
          not ready to be awoken, everyone behind it will not be
@@ -299,5 +300,6 @@ real_time_delay (int64_t num, int32_t denom)
   /* Scale the numerator and denominator down by 1000 to avoid
      the possibility of overflow. */
   ASSERT (denom % 1000 == 0);
-  busy_wait (loops_per_tick * num / 1000 * TIMER_FREQ / (denom / 1000)); 
+  busy_wait (loops_per_tick * num / 1000 * TIMER_FREQ /
+    (denom / 1000)); 
 }

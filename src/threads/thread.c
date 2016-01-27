@@ -360,7 +360,8 @@ thread_yield (void)
     {
       if (thread_mlfqs)
         {
-          list_push_back (&mlfqs_list[cur->mlfqs_priority], &cur->mlfqs_elem);
+          list_push_back (&mlfqs_list[cur->mlfqs_priority],
+              &cur->mlfqs_elem);
           ready_threads++;
         }
       else
@@ -433,7 +434,8 @@ thread_set_priority (int new_priority)
      equivalent situation (i.e. one is not better than the other). */
   old_level = intr_disable ();
   struct list_elem *max_priority_element = list_max (&ready_list, priority_less, NULL);
-  struct thread *max_priority_thread = list_entry (max_priority_element, struct thread, elem);
+  struct thread *max_priority_thread = list_entry (max_priority_element,
+      struct thread, elem);
   intr_set_level (old_level);
   if (thread_current ()->donated_priority < max_priority_thread->donated_priority)
     thread_yield ();
@@ -489,7 +491,8 @@ thread_get_load_avg (void)
 int
 thread_get_recent_cpu (void)
 {
-  return fix_round (fix_mul (fix_int (100), thread_current ()->recent_cpu));
+  fixed_point_t recent_cpu = thread_current ()->recent_cpu;
+  return fix_round (fix_mul (fix_int (100), recent_cpu));
 }
 
 /* Idle thread.  Executes when no other thread is ready to run.
@@ -630,8 +633,10 @@ next_thread_to_run (void)
               if (!list_empty (&mlfqs_list[i]))
                 {
                   ready_threads--;
-                  struct list_elem *next_thread_elem = list_pop_front (&mlfqs_list[i]);
-                  return list_entry (next_thread_elem, struct thread, mlfqs_elem);
+                  struct list_elem *next_thread_elem = 
+                      list_pop_front (&mlfqs_list[i]);
+                  return list_entry (next_thread_elem, struct thread,
+                      mlfqs_elem);
                 }
             }
         }
@@ -646,7 +651,8 @@ next_thread_to_run (void)
          list_max grabs the first thread with the maximum value
          it finds, round-robin for multiple threads with the max
          thread value is taken care of */
-      struct list_elem *thread_max_elem = list_max (&ready_list, priority_less, NULL);
+      struct list_elem *thread_max_elem = list_max (&ready_list,
+          priority_less, NULL);
       list_remove (thread_max_elem);
       return list_entry (thread_max_elem, struct thread, elem);
     }
