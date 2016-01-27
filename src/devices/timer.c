@@ -102,8 +102,8 @@ ticks_less (const struct list_elem *thread_a_, const struct list_elem *thread_b_
   const struct thread *thread_b = list_entry (thread_b_, struct thread, blockelem);
   
   /* Consider not only the number ticks to sleep for, but also
-     the starting ticks (i.e. how many ticks relative to when)
-     you start. */
+     the starting ticks (i.e. how many ticks relative to when
+     you start). */
   int64_t a_total_ticks = thread_a->thread_timer_ticks +
      thread_a->starting_timer_ticks;
   int64_t b_total_ticks = thread_b->thread_timer_ticks +
@@ -119,7 +119,7 @@ timer_sleep (int64_t ticks)
   /* Immediately return if ticks <= 0. */
   if (ticks <= 0)
     return; 
-  
+
   enum intr_level old_level;
   
   ASSERT (intr_get_level () == INTR_ON);
