@@ -94,7 +94,6 @@ struct thread
     tid_t tid;                          /* Thread identifier. */
     enum thread_status status;          /* Thread state. */
     char name[16];                      /* Name (for debugging purposes). */
-    struct list_elem blockelem;         /* List element. */
     unsigned magic;                     /* Detects stack overflow. */
     
     /* Member variables for Advanced scheduler.
@@ -112,6 +111,7 @@ struct thread
     /* Owned by timer.c */
     int64_t thread_timer_ticks;         /* Ticks for sleep wakeup. */
     int64_t starting_timer_ticks;       /* Starting ticks use reference for sleep wakeup */
+    struct list_elem blockelem;         /* List element. */
 
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
