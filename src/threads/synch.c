@@ -269,8 +269,8 @@ lock_acquire (struct lock *lock)
                   old_level = intr_disable ();
                   list_insert_ordered (&t_lock->donated_list,
                     &prev_t->donatedelem, priority_less, NULL);
-                  t_lock->donated_priority = prev_t->donated_priority;
                   intr_set_level (old_level);
+                  t_lock->donated_priority = prev_t->donated_priority;
                 }
               if (t_lock->waiting_on_lock)
                 {
