@@ -370,7 +370,7 @@ lock_held_by_current_thread (const struct lock *lock)
 }
 
 /* One semaphore in a list.
-   Added semaphore_priority to track the highest priority of the thread
+   Added semaphore_priority to track the priority of the thread
    waiting for this semaphore. */
 struct semaphore_elem
   {
