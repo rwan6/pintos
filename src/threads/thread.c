@@ -392,11 +392,14 @@ thread_foreach (thread_action_func *func, void *aux)
 /* less_list_func used by sema_up and thread_set_priority when
    determining the highest priority thread. */
 bool
-priority_less (const struct list_elem *thread_a_, const struct list_elem *thread_b_,
+priority_less (const struct list_elem *thread_a_,
+            const struct list_elem *thread_b_,
             void *aux UNUSED)
 {
-  const struct thread *thread_a = list_entry (thread_a_, struct thread, elem);
-  const struct thread *thread_b = list_entry (thread_b_, struct thread, elem);
+  const struct thread *thread_a =
+      list_entry (thread_a_, struct thread, elem);
+  const struct thread *thread_b =
+      list_entry (thread_b_, struct thread, elem);
 
   return thread_a->donated_priority < thread_b->donated_priority;
 }
@@ -434,11 +437,13 @@ thread_set_priority (int new_priority)
      also have to happen with interrupts disabled, so this is an
      equivalent situation (i.e. one is not better than the other). */
   old_level = intr_disable ();
-  struct list_elem *max_priority_element = list_max (&ready_list, priority_less, NULL);
+  struct list_elem *max_priority_element = list_max (&ready_list,
+      priority_less, NULL);
   struct thread *max_priority_thread = list_entry (max_priority_element,
       struct thread, elem);
   intr_set_level (old_level);
-  if (thread_current ()->donated_priority < max_priority_thread->donated_priority)
+  if (thread_current ()->donated_priority <
+      max_priority_thread->donated_priority)
     thread_yield ();
 }
 

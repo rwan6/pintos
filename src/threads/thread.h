@@ -110,7 +110,7 @@ struct thread
 
     /* Owned by timer.c */
     int64_t thread_timer_ticks;         /* Ticks for sleep wakeup. */
-    int64_t starting_timer_ticks;       /* Starting ticks use reference for sleep wakeup */
+    int64_t starting_timer_ticks;       /* Starting ticks for wakeup */
     struct list_elem blockelem;         /* List element. */
 
     /* Shared between thread.c and synch.c. */
