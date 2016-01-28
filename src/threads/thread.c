@@ -74,6 +74,7 @@ static void schedule (void);
 void thread_schedule_tail (struct thread *prev);
 static tid_t allocate_tid (void);
 
+/* Helper functions to achieve MLFQS advenced scheduler. */
 static void update_mlfqs_every_second (struct thread *t);
 static void update_recent_cpu (struct thread *t, void *aux UNUSED);
 static void update_mlfqs_priority (struct thread *t, void *aux UNUSED);
@@ -153,10 +154,10 @@ thread_tick (void)
   /* Update mlfqs scheduler. */
   if (thread_mlfqs)
     {
-      /* Update recent_cpu of the current thread every tick. */
-      // struct thread *t = thread_current ();
+      /* Update recent_cpu of the current thread (if not idle). */
       if (t != idle_thread)
         t->recent_cpu = fix_add (t->recent_cpu, fix_int (1));
+
       /* Update load_avg for the operating system as well as
          recent_cpu & mlfqs_priority for all threads every second. */
       update_mlfqs_every_second (t);
@@ -216,7 +217,7 @@ thread_create (const char *name, int priority,
   /* Initialize thread. */
   init_thread (t, name, priority);
   tid = t->tid = allocate_tid ();
-  
+
   /* Inherits from creator */
   t->nice = thread_current ()->nice;
 
@@ -388,7 +389,8 @@ thread_foreach (thread_action_func *func, void *aux)
     }
 }
 
-/* less_list_func used by sema_up and thread_set_priority when determining the highest priority thread. */
+/* less_list_func used by sema_up and thread_set_priority when
+   determining the highest priority thread. */
 bool
 priority_less (const struct list_elem *thread_a_, const struct list_elem *thread_b_,
             void *aux UNUSED)
@@ -399,11 +401,11 @@ priority_less (const struct list_elem *thread_a_, const struct list_elem *thread
   return thread_a->donated_priority < thread_b->donated_priority;
 }
 
-/* Sets the current thread's priority to NEW_PRIORITY.  
+/* Sets the current thread's priority to NEW_PRIORITY.
    Interrupts need to briefly be disabled while the
    ready list is being iterated over to find the max
    priority.
-  
+
    Also checks to see whether the new priority value requires
    the thread to yield to a thread with a higher priority from
    the ready list. */
@@ -414,7 +416,7 @@ thread_set_priority (int new_priority)
     return;
 
   enum intr_level old_level;
-  
+
   /* Clip priority to be between PRI_MIN and PRI_MAX. */
   if (new_priority < PRI_MIN)
     new_priority = PRI_MIN;
@@ -464,6 +466,8 @@ thread_set_nice (int new_nice)
   t->nice = new_nice;
   update_mlfqs_priority (t, NULL);
 
+  /* If current thread's updated mlfqs_priority is not
+     the highest one, then yield immediately. */
   int i = PRI_MAX;
   for (; i > t->mlfqs_priority; i--)
     {
@@ -620,6 +624,8 @@ alloc_frame (struct thread *t, size_t size)
 static struct thread *
 next_thread_to_run (void)
 {
+  /* MLFQS scheduler part: if there is any ready thread, then return
+     the thread with highest priority from the queue array. */
   if (thread_mlfqs)
     {
       if (!ready_threads)
@@ -632,7 +638,7 @@ next_thread_to_run (void)
               if (!list_empty (&mlfqs_list[i]))
                 {
                   ready_threads--;
-                  struct list_elem *next_thread_elem = 
+                  struct list_elem *next_thread_elem =
                       list_pop_front (&mlfqs_list[i]);
                   return list_entry (next_thread_elem, struct thread,
                       mlfqs_elem);
@@ -711,7 +717,7 @@ thread_schedule_tail (struct thread *prev)
    has completed. */
 static void
 schedule (void)
-{ 
+{
   struct thread *cur = running_thread ();
   struct thread *next = next_thread_to_run ();
   struct thread *prev = NULL;
@@ -739,16 +745,15 @@ allocate_tid (void)
   return tid;
 }
 
-/* Updates the value of recent_cpu */
+/* Updates the value of recent_cpu. */
 static void
 update_recent_cpu (struct thread *t, void *aux UNUSED)
 {
   fixed_point_t double_load_avg = fix_scale (load_avg, 2);
-  fixed_point_t coef = fix_div (
-                         double_load_avg,
-                         fix_add (double_load_avg, fix_int (1)));
+  fixed_point_t coef = fix_div (double_load_avg,
+      fix_add (double_load_avg, fix_int (1)));
   t->recent_cpu = fix_add (fix_int (t->nice),
-                           fix_mul (coef, t->recent_cpu));
+      fix_mul (coef, t->recent_cpu));
 }
 
 /* Updates the mlfqs_priority of a given thread */
@@ -758,8 +763,8 @@ update_mlfqs_priority (struct thread *t, void *aux UNUSED)
   if (t == idle_thread)
     return;
 
-  t->mlfqs_priority = PRI_MAX - fix_trunc(fix_unscale (t->recent_cpu, 4))
-                      - t->nice * 2;
+  t->mlfqs_priority = PRI_MAX -
+      fix_trunc(fix_unscale (t->recent_cpu, 4)) - t->nice * 2;
   if (t->mlfqs_priority > PRI_MAX)
     t->mlfqs_priority = PRI_MAX;
   else if (t->mlfqs_priority < PRI_MIN)
@@ -767,7 +772,7 @@ update_mlfqs_priority (struct thread *t, void *aux UNUSED)
 
   /* Update the mlfqs list if it's a ready thread. */
   if (t->status == THREAD_READY)
-    {      
+    {
       list_remove (&t->mlfqs_elem);
       list_push_back (&mlfqs_list[t->mlfqs_priority], &t->mlfqs_elem);
     }
@@ -781,13 +786,11 @@ update_mlfqs_every_second (struct thread *t)
   if (timer_ticks () % TIMER_FREQ == 0)
     {
       /* Update load_avg */
-      int threads_ready = ready_threads;
-      if (t != idle_thread)
-        threads_ready++;
-
+      int threads_ready = (t == idle_thread) ? ready_threads
+          : ready_threads + 1;
       load_avg = fix_add (fix_mul (fix_frac (59, 60), load_avg),
-                          fix_unscale (fix_int (threads_ready), 60));
-                          
+          fix_unscale (fix_int (threads_ready), 60));
+
       /* Update recent_cpu */
       thread_foreach (update_recent_cpu, NULL);
 

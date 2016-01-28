@@ -104,7 +104,7 @@ sema_try_down (struct semaphore *sema)
 
 /* Up or "V" operation on a semaphore.  Increments SEMA's value
    and wakes up one thread of those waiting for SEMA, if any.
-   
+
    When determining which thread to unblock, awaken the one
    with the highest priority.  If the priority of the thread
    that will be awoken is higher than that of the current thread
@@ -210,7 +210,7 @@ lock_init (struct lock *lock)
 /* Acquires LOCK, sleeping until it becomes available if
    necessary.  The lock must not already be held by the current
    thread.
-   
+
    Perform priority donation within lock aquire. We detect whether
    the lock holder is ready to be run and if we need to donate
    priority to it to avoid priority inversion. If nested dependency
@@ -308,7 +308,7 @@ lock_try_acquire (struct lock *lock)
 }
 
 /* Releases LOCK, which must be owned by the current thread.
-   
+
    Ask all threads that donated to the current thread to remove
    themselves from the current thread's personal donated list.
    This ensures that priorities donated due to other locks are
@@ -451,7 +451,7 @@ cond_wait (struct condition *cond, struct lock *lock)
 /* If any threads are waiting on COND (protected by LOCK), then
    this function signals one of them to wake up from its wait.
    LOCK must be held before calling this function.
-  
+
    Passes the semaphore to the highest priority waiting thread
    since the waiting list is sorted.
 

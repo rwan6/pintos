@@ -28,9 +28,9 @@ typedef int tid_t;
 #define PRI_MAX 63                      /* Highest priority. */
 
 /* Thread nice values. */
-#define NICE_MIN -20
-#define NICE_DEFAULT 0
-#define NICE_MAX 20
+#define NICE_MIN -20                    /* Lowest nice value. */
+#define NICE_DEFAULT 0                  /* Default nice value. */
+#define NICE_MAX 20                     /* Highest nice value. */
 
 /* A kernel thread or user process.
 
@@ -95,19 +95,19 @@ struct thread
     enum thread_status status;          /* Thread state. */
     char name[16];                      /* Name (for debugging purposes). */
     unsigned magic;                     /* Detects stack overflow. */
-    
+
     /* Member variables for Advanced scheduler.
        Also owned by thread.c. */
     int nice;                           /* Nice value. */
     fixed_point_t recent_cpu;           /* Recent cpu. */
     int mlfqs_priority;                 /* Priority for advanced scheduler. */
     struct list_elem mlfqs_elem;        /* List element for MLFQS List. */
-    
+
     uint8_t *stack;                     /* Saved stack pointer. */
     int priority;                       /* Priority. */
     struct list_elem allelem;           /* List element for all threads list. */
     int donated_priority;               /* Donated Priority. */
-    
+
     /* Owned by timer.c */
     int64_t thread_timer_ticks;         /* Ticks for sleep wakeup. */
     int64_t starting_timer_ticks;       /* Starting ticks use reference for sleep wakeup */
