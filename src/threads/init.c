@@ -262,6 +262,9 @@ parse_options (char **argv)
 #endif
       else
         PANIC ("unknown option `%s' (use -h for help)", name);
+      /* Initializing mlfqs to be on by default because userprog doesn't
+         work with priority donation */
+      thread_mlfqs = true;
     }
 
   /* Initialize the random number generator based on the system
