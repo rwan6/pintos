@@ -63,8 +63,11 @@ static void
 start_process (void *file_name_)
 {
   char *file_name = file_name_;
+  char *save_ptr;
   struct intr_frame if_;
   bool success;
+  
+  file_name = strtok_r(file_name, " ", &save_ptr);
 
   /* Initialize interrupt frame and load executable. */
   memset (&if_, 0, sizeof if_);
@@ -74,9 +77,61 @@ start_process (void *file_name_)
   success = load (file_name, &if_.eip, &if_.esp);
 
   /* If load failed, quit. */
-  palloc_free_page (file_name);
   if (!success) 
-    thread_exit ();
+    {
+      palloc_free_page (file_name);
+      thread_exit ();
+    }
+
+  /* Populate the stack with arguments */
+  char *argv[128]; /* Assume there are at most 128 arguments */
+  char *token;
+  argv[0] = file_name;
+  int argc = 1, i;
+  while ((token = strtok_r (NULL, " ", &save_ptr)))
+    {
+      argv[argc] = token;
+      argc++;
+    }
+    
+  /* Push each argument in reverse order */
+  char *ptrs[128];
+  for (i = argc - 1; i >= 0; i--)
+    {
+      size_t len = strlen (argv[i]) + 1;
+      if_.esp = (void *) ((char *) if_.esp - len);
+      strlcpy ((char *) if_.esp, argv[i], len);
+      ptrs[i] = (char *) if_.esp;
+    }
+    
+  /* Word align the stack pointer to a multiple of 4 */
+  if_.esp = (void *) ((unsigned int) if_.esp & 0xfffffffc);
+    
+  /* Push null pointer sentinel */
+  if_.esp = (void *) ((char **) if_.esp - 1);
+  *((char **) if_.esp) = 0;
+  
+  /* Push addresses of each argument in reverse order */
+  for (i = argc - 1; i >= 0; i--)
+    {
+      if_.esp = (void *) ((char **) if_.esp - 1);
+      *((char **) if_.esp) = ptrs[i];
+    }
+    
+  /* Push argv */
+  char **argv0_ptr = (char **) if_.esp;
+  if_.esp = (void *) ((char **) if_.esp - 1);
+  *((char ***) if_.esp) = argv0_ptr;
+  
+  /* Push argc */
+  if_.esp = (void *) ((int *) if_.esp - 1);
+  *((int *) if_.esp) = argc;
+  
+  /* Push return address */
+  if_.esp = ((void **) if_.esp - 1);
+  *((void **) if_.esp) = 0;
+  
+  palloc_free_page (file_name);
 
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in
