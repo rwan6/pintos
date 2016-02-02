@@ -20,6 +20,7 @@
 
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
+#define MAX_ARG_NUM 128
 
 /* Starts a new thread running a user program loaded from
    FILENAME.  The new thread may be scheduled (and may even exit)
@@ -84,7 +85,7 @@ start_process (void *file_name_)
     }
 
   /* Populate the stack with arguments */
-  char *argv[128]; /* Assume there are at most 128 arguments */
+  char *argv[MAX_ARG_NUM]; /* Assume there are at most 128 arguments. */
   char *token;
   argv[0] = file_name;
   int argc = 1, i;
@@ -94,8 +95,8 @@ start_process (void *file_name_)
       argc++;
     }
     
-  /* Push each argument in reverse order */
-  char *ptrs[128];
+  /* Push each argument in reverse order. */
+  char *ptrs[MAX_ARG_NUM];
   for (i = argc - 1; i >= 0; i--)
     {
       size_t len = strlen (argv[i]) + 1;
@@ -104,35 +105,35 @@ start_process (void *file_name_)
       ptrs[i] = (char *) if_.esp;
     }
     
-  /* Word align the stack pointer to a multiple of 4 */
+  /* Word align the stack pointer to a multiple of 4. */
   if_.esp = (void *) ((unsigned int) if_.esp & 0xfffffffc);
     
-  /* Push null pointer sentinel */
+  /* Push null pointer sentinel. */
   if_.esp = (void *) ((char **) if_.esp - 1);
   *((char **) if_.esp) = 0;
   
-  /* Push addresses of each argument in reverse order */
+  /* Push addresses of each argument in reverse order. */
   for (i = argc - 1; i >= 0; i--)
     {
       if_.esp = (void *) ((char **) if_.esp - 1);
       *((char **) if_.esp) = ptrs[i];
     }
     
-  /* Push argv */
+  /* Push argv. */
   char **argv0_ptr = (char **) if_.esp;
   if_.esp = (void *) ((char **) if_.esp - 1);
   *((char ***) if_.esp) = argv0_ptr;
   
-  /* Push argc */
+  /* Push argc. */
   if_.esp = (void *) ((int *) if_.esp - 1);
   *((int *) if_.esp) = argc;
   
-  /* Push return address */
+  /* Push return address. */
   if_.esp = ((void **) if_.esp - 1);
   *((void **) if_.esp) = 0;
   
   palloc_free_page (file_name);
-
+  
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in
      threads/intr-stubs.S).  Because intr_exit takes all of its
@@ -149,6 +150,8 @@ start_process (void *file_name_)
    child of the calling process, or if process_wait() has already
    been successfully called for the given TID, returns -1
    immediately, without waiting.
+    
+   Majority of wait involves this function!!
 
    This function will be implemented in problem 2-2.  For now, it
    does nothing. */

@@ -13,9 +13,45 @@ syscall_init (void)
   intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
 }
 
+/* Takes the interrupt frame as an argument and traces the stack
+   to determine which system call function needs to be invoked. */
 static void
 syscall_handler (struct intr_frame *f UNUSED) 
 {
+  int syscall_num = *(int *) (f->esp);
+  int num_arg = *(int *) (f->esp+4);
+  
+  switch (syscall_num)
+    {
+      case SYS_HALT :
+        break;
+      case SYS_EXIT :
+        break;
+      case SYS_EXEC :
+        break;
+      case SYS_WAIT :
+        break;
+      case SYS_CREATE :
+        break;
+      case SYS_REMOVE :
+        break;
+      case SYS_OPEN :
+        break;
+      case SYS_FILESIZE :
+        break;
+      case SYS_READ :
+        break;
+      case SYS_WRITE :
+        break;
+      case SYS_SEEK :
+        break;
+      case SYS_TELL :
+        break;
+      case SYS_CLOSE :
+        break;
+    }
+  
+  //Destined for removal
   printf ("system call!\n");
   thread_exit ();
 }
@@ -120,10 +156,5 @@ close (int fd)
 {
   
 }
-
-
-
-
-
 
 
