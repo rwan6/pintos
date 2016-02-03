@@ -38,9 +38,9 @@ syscall_handler (struct intr_frame *f UNUSED)
 {
   int syscall_num = *((int *) (f->esp)++);
   int num_arg = *((int *) (f->esp)++);
-  
+
   printf ("syscall_num: %d\n", syscall_num);
-  
+
   char *name;
   /* The possible system calls start at 0. */
   switch (syscall_num)
@@ -96,7 +96,7 @@ static void
 exit (int status)
 {
   struct thread *t = thread_current ();
-  
+
   /* Close any open file handles */
   struct list_elem *e;
   for (e = list_begin (&t->opened_fds);
@@ -106,7 +106,7 @@ exit (int status)
       int fd = list_entry (e, struct sys_fd, fd_elem);
       close (fd);
     }
-  
+
   thread_exit ();
 }
 
@@ -129,7 +129,10 @@ wait (pid_t pid)
 static bool
 create (const char *file, unsigned initial_size)
 {
-  return true;
+	if (!check_pointer (file))
+		return false;
+  else
+  	return filesys_create (file, initial_size);
 }
 
 /* Deletes the file.  Returns true if successful, false otherwise.
@@ -137,7 +140,19 @@ create (const char *file, unsigned initial_size)
 static bool
 remove (const char *file)
 {
-  return true;
+  for (e = list_begin (&opened_files);
+       e != list_end (&opened_files);
+       e = list_next(e))
+    {
+      sf = list_entry (e, struct sys_file, sys_file_elem);
+      if (!strcmp(file, sf->name))
+        {
+          sf->to_be_removed = true;
+          break;
+        }
+    }
+  bool success = filesys_remove(file);
+  return success;
 }
 
 /* Opens the file and returns a file descriptor.  If open fails,
@@ -148,12 +163,12 @@ open (const char *file)
   struct file *f = filesys_open (file);
   if (!f)
     return -1;
-  
+
   struct sys_file* sf;
   struct sys_fd *fd = malloc (sizeof (struct sys_fd));
   fd->value = next_avail_fd++;
   fd->file = f;
-  
+
   bool found = false;
   struct list_elem *e;
   /* Figure out if we have opened this file before */
@@ -175,19 +190,20 @@ open (const char *file)
       strlcpy (sf->name, file, strlen (file) + 1);
     }
 
-  /* Now that sf points to something useful, add it to the opened_files 
+  /* Now that sf points to something useful, add it to the opened_files
      list, add the fd to sf's list and update fd's sys_file pointer */
   list_push_back (&opened_files, &sf->sys_file_elem);
   list_push_back (&sf->fd_list, &fd->fd_elem);
   fd->sys_file = sf;
-  
+  sf->to_be_removed = false;
+
   /* Add the fd to the thread's opened_fds list */
   struct thread *t = thread_current ();
   list_push_back (&t->opened_fds, &fd->fd_elem);
-  
+
   /* Add to used_fds list */
   list_push_back (&used_fds, &fd->fd_elem);
-  
+
   return fd->value;
 }
 
@@ -236,6 +252,17 @@ static void
 close (int fd)
 {
 
+  for (e = list_begin (&opened_files);
+       e != list_end (&opened_files);
+       e = list_next(e))
+    {
+      sf = list_entry (e, struct sys_file, sys_file_elem);
+      if (!strcmp(file, sf->name))
+        {
+          found = true;
+          break;
+        }
+    }
 }
 
 static bool
@@ -243,7 +270,7 @@ check_pointer (void *pointer)
 {
 	if (pointer == NULL || is_kernel_vaddr (pointer))
 		return false;
-	else if (lookup_page (active_pd (), pointer, false) == NULL)
+	else if (pagedir_get_page (active_pd (), pointer) == NULL)
 		return false;
 	else
 		return true;
