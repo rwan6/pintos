@@ -11,8 +11,9 @@ struct sys_file
     char name[15];
     struct list_elem sys_file_elem;
     struct list fd_list;
+    bool to_be_removed;
   };
-  
+
 struct sys_fd
   {
     int value;
@@ -22,7 +23,7 @@ struct sys_fd
     struct list_elem used_fds_elem;
     struct list_elem thread_opened_elem;
   };
-  
+
 struct list opened_files;
 struct list used_fds;
 int next_avail_fd;

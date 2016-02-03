@@ -38,9 +38,8 @@ syscall_handler (struct intr_frame *f UNUSED)
 {
   int syscall_num = *((int *) (f->esp));
   f->esp = (void *) ((int *) f->esp + 1);
-  
   printf ("syscall_num: %d\n", syscall_num);
-  
+
   char *name;
   int fd, status;
   void *buffer;
@@ -108,7 +107,7 @@ static void
 exit (int status)
 {
   struct thread *t = thread_current ();
-  
+
   /* Close any open file handles */
   struct list_elem *e;
   for (e = list_begin (&t->opened_fds);
@@ -118,7 +117,7 @@ exit (int status)
       int fd = list_entry (e, struct sys_fd, thread_opened_elem);
       close (fd);
     }
-  
+
   printf ("%s: exit(%d)\n", t->name, status);
   thread_exit ();
 }
@@ -142,7 +141,10 @@ wait (pid_t pid)
 static bool
 create (const char *file, unsigned initial_size)
 {
-  return true;
+	if (!check_pointer (file))
+		return false;
+  else
+  	return filesys_create (file, initial_size);
 }
 
 /* Deletes the file.  Returns true if successful, false otherwise.
@@ -150,7 +152,21 @@ create (const char *file, unsigned initial_size)
 static bool
 remove (const char *file)
 {
-  return true;
+	struct list_elem *e;
+	struct sys_file* sf;
+  for (e = list_begin (&opened_files);
+       e != list_end (&opened_files);
+       e = list_next(e))
+    {
+      sf = list_entry (e, struct sys_file, sys_file_elem);
+      if (!strcmp(file, sf->name))
+        {
+          sf->to_be_removed = true;
+          break;
+        }
+    }
+  bool success = filesys_remove(file);
+  return success;
 }
 
 /* Opens the file and returns a file descriptor.  If open fails,
@@ -158,17 +174,9 @@ remove (const char *file)
 static int
 open (const char *file)
 {
-  struct file *f = filesys_open (file);
-  if (!f)
-    return -1;
-  
-  struct sys_file* sf;
-  struct sys_fd *fd = malloc (sizeof (struct sys_fd));
-  fd->value = next_avail_fd++;
-  fd->file = f;
-  
   bool found = false;
   struct list_elem *e;
+  struct sys_file* sf;
   /* Figure out if we have opened this file before */
   for (e = list_begin (&opened_files);
        e != list_end (&opened_files);
@@ -177,10 +185,23 @@ open (const char *file)
       sf = list_entry (e, struct sys_file, sys_file_elem);
       if (!strcmp(file, sf->name))
         {
+        	if (sf->to_be_removed)
+        		return -1;
+
           found = true;
           break;
         }
     }
+
+  struct file *f = filesys_open (file);
+  if (!f)
+    return -1;
+
+  struct sys_fd *fd = malloc (sizeof (struct sys_fd));
+  fd->value = next_avail_fd++;
+  fd->file = f;
+
+
   /* If we have not opened it before, create a new entry */
   if (!found)
     {
@@ -188,19 +209,20 @@ open (const char *file)
       strlcpy (sf->name, file, strlen (file) + 1);
     }
 
-  /* Now that sf points to something useful, add it to the opened_files 
+  /* Now that sf points to something useful, add it to the opened_files
      list, add the fd to sf's list and update fd's sys_file pointer */
   list_push_back (&opened_files, &sf->sys_file_elem);
   list_push_back (&sf->fd_list, &fd->sys_file_elem);
   fd->sys_file = sf;
-   
+  sf->to_be_removed = false;
+
   /* Add to used_fds list */
   list_push_back (&used_fds, &fd->used_fds_elem);
-  
+
   /* Add the fd to the thread's opened_fds list */
   struct thread *t = thread_current ();
   list_push_back (&t->opened_fds, &fd->thread_opened_elem);
-  
+
   return fd->value;
 }
 
@@ -253,7 +275,36 @@ tell (int fd)
 static void
 close (int fd)
 {
+	const char *filename;
 
+	struct list_elem *e;
+	struct sys_fd *fd_instance;
+  for (e = list_begin (&used_fds);
+       e != list_end (&used_fds);
+       e = list_next(e))
+    {
+      fd_instance = list_entry (e, struct sys_fd, used_fds_elem);
+      if (fd == fd_instance->value)
+        {
+        	list_remove (e);
+          break;
+        }
+    }
+
+  list_remove (&fd_instance->thread_opened_elem);
+
+  list_remove (&fd_instance->sys_file_elem);
+
+  if (list_empty (&fd_instance->sys_file->fd_list)
+  			&& fd_instance->sys_file->to_be_removed)
+  	{
+  		filename = fd_instance->sys_file->name;
+  		filesys_remove (filename);
+  		list_remove (&fd_instance->sys_file->sys_file_elem);
+  		free ((void *) fd_instance->sys_file);
+  	}
+
+  free (fd_instance);
 }
 
 static bool
@@ -261,7 +312,7 @@ check_pointer (void *pointer)
 {
 	if (pointer == NULL || is_kernel_vaddr (pointer))
 		return false;
-	else if (lookup_page (active_pd (), pointer, false) == NULL)
+	else if (pagedir_get_page (active_pd (), pointer) == NULL)
 		return false;
 	else
 		return true;
