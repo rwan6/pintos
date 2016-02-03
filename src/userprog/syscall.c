@@ -238,19 +238,11 @@ open (const char *file)
 static int
 filesize (int fd)
 {
-
-  struct list_elem *e;
-  struct sys_fd* fd_instance;
-  for (e = list_begin (&used_fds);
-       e != list_end (&used_fds);
-       e = list_next(e))
-    {
-      fd_instance = list_entry (e, struct sys_fd, used_fds_elem);
-      if (fd == fd_instance->value)
-        {
-          return file_length (fd_instance->file);
-        }
-    }
+  struct sys_fd* fd_instance = get_fd_item (fd);
+  
+/* Should not be NULL unless the fd was invalid. */
+  if (fd_instance != NULL)
+    return file_length (fd_instance->file);
 
   return -1;
 }
@@ -303,9 +295,9 @@ write (int fd, const void *buffer, unsigned size)
         return -1;
       else
         {
-          struct sys_fd *sf = get_fd_item (fd);
-          if (sf != NULL)
-            return file_write (sf->file, buffer, size);
+          struct sys_fd *fd_instance = get_fd_item (fd);
+          if (fd_instance != NULL)
+            return file_write (fd_instance->file, buffer, size);
           else
             return -1;
         }
@@ -317,14 +309,27 @@ write (int fd, const void *buffer, unsigned size)
 static void
 seek (int fd, unsigned position)
 {
-
+  struct sys_fd *fd_instance = get_fd_item (fd);
+  
+  /* Should not be NULL unless the fd was invalid. */
+  if (fd_instance != NULL)
+    file_seek (fd_instance->file, position);
 }
 
 /* Returns the position of the next byte to be read or written. */
 static unsigned
 tell (int fd)
 {
-  return 1;
+  struct sys_fd *fd_instance = get_fd_item (fd);
+  
+  /* Should not be NULL unless the fd was invalid.  Cast off_t to
+     unsigned for return. */
+  if (fd_instance != NULL)
+    return (unsigned) file_tell (fd_instance->file);
+  
+  /* If fd_instance was NULL, then return 0.  This line should
+     rarely (if ever) be reached! */
+  return 0;
 }
 
 /* Closes file descriptor 'fd'.  Exiting or terminating a process
@@ -333,20 +338,12 @@ static void
 close (int fd)
 {
   const char *filename;
-
-  struct list_elem *e;
-  struct sys_fd *fd_instance;
-  for (e = list_begin (&used_fds);
-       e != list_end (&used_fds);
-       e = list_next(e))
-    {
-      fd_instance = list_entry (e, struct sys_fd, used_fds_elem);
-      if (fd == fd_instance->value)
-        {
-          list_remove (e);
-          break;
-        }
-    }
+  struct sys_fd *fd_instance = get_fd_item (fd);
+  
+  /* Should not be NULL unless the fd was invalid.  Remove myself
+     from the list of all the fds. */
+  if (fd_instance != NULL)
+    list_remove(&fd_instance->used_fds_elem);
 
   list_remove (&fd_instance->thread_opened_elem);
 
@@ -364,6 +361,10 @@ close (int fd)
   free (fd_instance);
 }
 
+/* Function to check all pointers that are passed to system calls.
+   Returns false if the pointer is found to be invalid, and true
+   if the pointer is valid.  Note that all pointers are checked
+   in the event that a buffer is passed. */
 static bool
 check_pointer (const void *pointer, unsigned size)
 {
@@ -379,7 +380,12 @@ check_pointer (const void *pointer, unsigned size)
     }
 }
 
-static struct sys_fd*
+/* Function to retrieve the sys_fd struct corresponding to a particular
+   fd.  Since this iterative process is used frequently, making it
+   a function helps to reduce redundancies across the system call
+   functions.  Returns NULL if the fd could not be located in any
+   list member. */
+static struct sys_fd *
 get_fd_item (int fd)
 {
   struct list_elem *e;
