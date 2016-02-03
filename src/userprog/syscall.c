@@ -19,8 +19,9 @@ static void
 syscall_handler (struct intr_frame *f UNUSED) 
 {
   int syscall_num = *(int *) (f->esp);
-  int num_arg = *(int *) (f->esp+4);
+  int num_arg = *(((int *) f->esp)+1);
   
+  /* The possible system calls start at 0. */
   switch (syscall_num)
     {
       case SYS_HALT :
