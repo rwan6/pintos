@@ -6,6 +6,20 @@
 #include "devices/shutdown.h" /* For shutdown_power_off. */
 
 static void syscall_handler (struct intr_frame *);
+static void halt (void);
+static void exit (int);
+static int wait (pid_t);
+static bool create (const char *, unsigned);
+static bool remove (const char *);
+static int open (const char *);
+static int filesize (int);
+static int read (int, void *, unsigned);
+static int write (int, const void *, unsigned);
+static void seek (int, unsigned);
+static unsigned tell (int);
+static void close (int);
+static bool check_pointer (void *);
+
 
 void
 syscall_init (void)
