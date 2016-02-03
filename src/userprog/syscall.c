@@ -1,11 +1,16 @@
 #include "userprog/syscall.h"
+#include "userprog/pagedir.h"
 #include <stdio.h>
 #include <syscall-nr.h>
+#include <string.h>
 #include "threads/interrupt.h"
 #include "threads/thread.h"
-#include "devices/shutdown.h" /* For shutdown_power_off. */
-#include <string.h>
 #include "threads/malloc.h"
+#include "threads/vaddr.h" /* For validating the user address. */
+#include "devices/shutdown.h" /* For shutdown_power_off. */
+#include "devices/input.h" /* For input_putc(). */
+#include "filesys/file.h" /* For file operations. */
+#include "filesys/filesys.h" /* For filesys operations. */
 
 static void syscall_handler (struct intr_frame *);
 static void halt (void);
@@ -20,8 +25,8 @@ static int write (int, const void *, unsigned);
 static void seek (int, unsigned);
 static unsigned tell (int);
 static void close (int);
-static bool check_pointer (void *, unsigned);
-static struct sys_fd* get_fd_item (int)
+static bool check_pointer (const void *, unsigned);
+static struct sys_fd* get_fd_item (int);
 
 void
 syscall_init (void)
@@ -126,14 +131,14 @@ exit (int status)
 /* Runs the executable.  Returns the new process's program id.
    Must return pid = -1. */
 static pid_t
-exec (const char *cmd_line)
+exec (const char *cmd_line UNUSED)
 {
   return -1;
 }
 
 /* Wait for a child process pid and retrieves the child's exit status. */
 static int
-wait (pid_t pid)
+wait (pid_t pid UNUSED)
 {
   return 0;
 }
@@ -142,7 +147,7 @@ wait (pid_t pid)
 static bool
 create (const char *file, unsigned initial_size)
 {
-  if (!check_pointer (file, strlen (file)))
+  if (!check_pointer ((const void *) file, strlen (file)))
     return false;
   else
     return filesys_create (file, initial_size);
@@ -186,6 +191,8 @@ open (const char *file)
       sf = list_entry (e, struct sys_file, sys_file_elem);
       if (!strcmp(file, sf->name))
         {
+          /* If the file was already removed, but other processes
+             are still reading from it, it cannot be opened. */
           if (sf->to_be_removed)
             return -1;
 
@@ -248,36 +255,61 @@ filesize (int fd)
   return -1;
 }
 
-/* Returns the number of bytes actually read,
-   or -1 if the file could not be read.
-   If fd = 0, function reads from the keyboard. */
+/* Returns the number of bytes actually read, or -1 if the file could
+   not be read.  If fd = 0, function reads from the keyboard. */
 static int
 read (int fd, void *buffer, unsigned size)
 {
-  bool success = check_pointer(buffer, size);
-  if (!success)
-    return -1;
+  /* If SDIN_FILENO. */
+  if (fd == 0)
+    {
+      /* Read from the console. */
+      input_getc();
+      return 1;
+    }
   else
     {
-      struct *sys_fd sf = get_fd_item (fd);
-      if (sf != NULL)
-        return file_read (sf->file, buffer, size);
-      else
+      bool success = check_pointer(buffer, size);
+      if (!success)
         return -1;
+      else
+        {
+          struct sys_fd *sf = get_fd_item (fd);
+          if (sf != NULL)
+            return file_read (sf->file, buffer, size);
+          else
+            return -1;
+        }
     }
 }
 
-/* Writes 'size' bytes from 'buffer' to file 'fd'.
-   Returns number of bytes actually written. */
+/* Writes 'size' bytes from 'buffer' to file 'fd'.  Returns number
+   of bytes actually written, or -1 if there was an error in writing
+   to the file. If fd = 1, function write to the console. */
 static int
 write (int fd, const void *buffer, unsigned size)
 {
+  /* If SDOUT_FILENO. */
   if (fd == 1)
     {
-      /* Write to console */
+      /* Write to console. */
       putbuf (buffer, size);
+      return 1;
     }
-  return 1;
+  else
+    {
+      bool success = check_pointer(buffer, size);
+      if (!success)
+        return -1;
+      else
+        {
+          struct sys_fd *sf = get_fd_item (fd);
+          if (sf != NULL)
+            return file_write (sf->file, buffer, size);
+          else
+            return -1;
+        }
+    }
 }
 
 /* Changes the next byte to be read or written in an open file to
@@ -333,9 +365,9 @@ close (int fd)
 }
 
 static bool
-check_pointer (void *pointer, unsigned size)
+check_pointer (const void *pointer, unsigned size)
 {
-  int i;
+  unsigned i;
   for (i = 0; i < size; i++)
     {
       if (pointer + i == NULL || is_kernel_vaddr (pointer + i))
