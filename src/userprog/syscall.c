@@ -8,7 +8,7 @@
 static void syscall_handler (struct intr_frame *);
 
 void
-syscall_init (void) 
+syscall_init (void)
 {
   intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
 }
@@ -16,11 +16,11 @@ syscall_init (void)
 /* Takes the interrupt frame as an argument and traces the stack
    to determine which system call function needs to be invoked. */
 static void
-syscall_handler (struct intr_frame *f UNUSED) 
+syscall_handler (struct intr_frame *f UNUSED)
 {
   int syscall_num = *(int *) (f->esp);
   int num_arg = *(((int *) f->esp)+1);
-  
+
   /* The possible system calls start at 0. */
   switch (syscall_num)
     {
@@ -51,7 +51,7 @@ syscall_handler (struct intr_frame *f UNUSED)
       case SYS_CLOSE :
         break;
     }
-  
+
   //Destined for removal
   printf ("system call!\n");
   thread_exit ();
@@ -140,7 +140,7 @@ write (int fd, const void *buffer, unsigned size)
 static void
 seek (int fd, unsigned position)
 {
-  
+
 }
 
 /* Returns the position of the next byte to be read or written. */
@@ -155,7 +155,17 @@ tell (int fd)
 static void
 close (int fd)
 {
-  
+
 }
 
+static bool
+check_pointer (void *pointer)
+{
+	if (pointer == NULL || is_kernel_vaddr (pointer))
+		return false;
+	else if (lookup_page (active_pd (), pointer, false) == NULL)
+		return false;
+	else
+		return true;
+}
 
