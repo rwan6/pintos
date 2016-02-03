@@ -97,11 +97,15 @@ exit (int status)
 {
   struct thread *t = thread_current ();
   
-  /* Release all held locks */
-  
-  
   /* Close any open file handles */
-  
+  struct list_elem *e;
+  for (e = list_begin (&t->opened_fds);
+       e != list_end (&t->opened_fds);
+       e = list_next(e))
+    {
+      int fd = list_entry (e, struct sys_fd, fd_elem);
+      close (fd);
+    }
   
   thread_exit ();
 }
@@ -180,6 +184,9 @@ open (const char *file)
   /* Add the fd to the thread's opened_fds list */
   struct thread *t = thread_current ();
   list_push_back (&t->opened_fds, &fd->fd_elem);
+  
+  /* Add to used_fds list */
+  list_push_back (&used_fds, &fd->fd_elem);
   
   return fd->value;
 }
