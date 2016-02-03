@@ -144,6 +144,8 @@ create (const char *file, unsigned initial_size)
 static bool
 remove (const char *file)
 {
+	struct list_elem *e;
+	struct sys_file* sf;
   for (e = list_begin (&opened_files);
        e != list_end (&opened_files);
        e = list_next(e))
@@ -164,17 +166,9 @@ remove (const char *file)
 static int
 open (const char *file)
 {
-  struct file *f = filesys_open (file);
-  if (!f)
-    return -1;
-
-  struct sys_file* sf;
-  struct sys_fd *fd = malloc (sizeof (struct sys_fd));
-  fd->value = next_avail_fd++;
-  fd->file = f;
-
   bool found = false;
   struct list_elem *e;
+  struct sys_file* sf;
   /* Figure out if we have opened this file before */
   for (e = list_begin (&opened_files);
        e != list_end (&opened_files);
@@ -183,10 +177,23 @@ open (const char *file)
       sf = list_entry (e, struct sys_file, sys_file_elem);
       if (!strcmp(file, sf->name))
         {
+        	if (sf->to_be_removed)
+        		return -1;
+
           found = true;
           break;
         }
     }
+
+  struct file *f = filesys_open (file);
+  if (!f)
+    return -1;
+
+  struct sys_fd *fd = malloc (sizeof (struct sys_fd));
+  fd->value = next_avail_fd++;
+  fd->file = f;
+
+
   /* If we have not opened it before, create a new entry */
   if (!found)
     {
@@ -260,18 +267,36 @@ tell (int fd)
 static void
 close (int fd)
 {
+	const char *filename;
 
-  for (e = list_begin (&opened_files);
-       e != list_end (&opened_files);
+	struct list_elem *e;
+	struct sys_fd *fd_instance;
+  for (e = list_begin (&used_fds);
+       e != list_end (&used_fds);
        e = list_next(e))
     {
-      sf = list_entry (e, struct sys_file, sys_file_elem);
-      if (!strcmp(file, sf->name))
+      fd_instance = list_entry (e, struct sys_fd, used_fds_elem);
+      if (fd == fd_instance->value)
         {
-          found = true;
+        	list_remove (e);
           break;
         }
     }
+
+  list_remove (&fd_instance->thread_opened_elem);
+
+  list_remove (&fd_instance->sys_file_elem);
+
+  if (list_empty (&fd_instance->sys_file->fd_list)
+  			&& fd_instance->sys_file->to_be_removed)
+  	{
+  		filename = fd_instance->sys_file->name;
+  		filesys_remove (filename);
+  		list_remove (&fd_instance->sys_file->sys_file_elem);
+  		free ((void *) fd_instance->sys_file);
+  	}
+
+  free (fd_instance);
 }
 
 static bool
