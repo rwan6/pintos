@@ -36,13 +36,15 @@ syscall_init (void)
 static void
 syscall_handler (struct intr_frame *f UNUSED)
 {
-  int syscall_num = *((int *) (f->esp)++);
-  int num_arg = *((int *) (f->esp)++);
+  int syscall_num = *((int *) (f->esp));
+  f->esp = (void *) ((int *) f->esp + 1);
   
   printf ("syscall_num: %d\n", syscall_num);
   
   char *name;
-  int *status;
+  int fd, status;
+  void *buffer;
+  unsigned size;
   /* The possible system calls start at 0. */
   switch (syscall_num)
     {
@@ -69,6 +71,13 @@ syscall_handler (struct intr_frame *f UNUSED)
       case SYS_READ :
         break;
       case SYS_WRITE :
+        fd = *((int *) (f->esp));
+        f->esp = (void *) ((int *) f->esp + 1);
+        buffer = *((void **) (f->esp));
+        f->esp = (void *) ((void **) f->esp + 1);
+        size = *((unsigned *) (f->esp));
+        f->esp = (void *) ((unsigned *) f->esp + 1);
+        write (fd, buffer, size);
         break;
       case SYS_SEEK :
         break;
@@ -219,7 +228,7 @@ write (int fd, const void *buffer, unsigned size)
   if (fd == 1)
     {
       /* Write to console */
-      
+      putbuf (buffer, size);
     }
   return 1;
 }
