@@ -120,6 +120,7 @@ struct thread
        waiting on */
     struct list donated_list;           /* List of threads that donated to
        this thread */
+    struct list opened_fds;             /* List of opened file descriptors */
 
 
 #ifdef USERPROG

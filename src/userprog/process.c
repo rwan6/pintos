@@ -20,7 +20,7 @@
 
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
-#define MAX_ARG_NUM 128
+#define MAX_ARG_NUM 128  /* Assume there are at most 128 arguments. */
 
 /* Starts a new thread running a user program loaded from
    FILENAME.  The new thread may be scheduled (and may even exit)
@@ -85,7 +85,7 @@ start_process (void *file_name_)
     }
 
   /* Populate the stack with arguments */
-  char *argv[MAX_ARG_NUM]; /* Assume there are at most 128 arguments. */
+  char *argv[MAX_ARG_NUM];
   char *token;
   argv[0] = file_name;
   int argc = 1, i;
