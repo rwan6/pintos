@@ -20,7 +20,8 @@ static int write (int, const void *, unsigned);
 static void seek (int, unsigned);
 static unsigned tell (int);
 static void close (int);
-static bool check_pointer (void *);
+static bool check_pointer (void *, unsigned);
+static struct sys_fd* get_fd_item (int)
 
 void
 syscall_init (void)
@@ -141,10 +142,10 @@ wait (pid_t pid)
 static bool
 create (const char *file, unsigned initial_size)
 {
-	if (!check_pointer (file))
-		return false;
+  if (!check_pointer (file, strlen (file)))
+    return false;
   else
-  	return filesys_create (file, initial_size);
+    return filesys_create (file, initial_size);
 }
 
 /* Deletes the file.  Returns true if successful, false otherwise.
@@ -152,8 +153,8 @@ create (const char *file, unsigned initial_size)
 static bool
 remove (const char *file)
 {
-	struct list_elem *e;
-	struct sys_file* sf;
+  struct list_elem *e;
+  struct sys_file* sf;
   for (e = list_begin (&opened_files);
        e != list_end (&opened_files);
        e = list_next(e))
@@ -185,8 +186,8 @@ open (const char *file)
       sf = list_entry (e, struct sys_file, sys_file_elem);
       if (!strcmp(file, sf->name))
         {
-        	if (sf->to_be_removed)
-        		return -1;
+          if (sf->to_be_removed)
+            return -1;
 
           found = true;
           break;
@@ -230,7 +231,21 @@ open (const char *file)
 static int
 filesize (int fd)
 {
-  return 1;
+
+  struct list_elem *e;
+  struct sys_fd* fd_instance;
+  for (e = list_begin (&used_fds);
+       e != list_end (&used_fds);
+       e = list_next(e))
+    {
+      fd_instance = list_entry (e, struct sys_fd, used_fds_elem);
+      if (fd == fd_instance->value)
+        {
+          return file_length (fd_instance->file);
+        }
+    }
+
+  return -1;
 }
 
 /* Returns the number of bytes actually read,
@@ -239,7 +254,17 @@ filesize (int fd)
 static int
 read (int fd, void *buffer, unsigned size)
 {
-  return 1;
+  bool success = check_pointer(buffer, size);
+  if (!success)
+    return -1;
+  else
+    {
+      struct *sys_fd sf = get_fd_item (fd);
+      if (sf != NULL)
+        return file_read (sf->file, buffer, size);
+      else
+        return -1;
+    }
 }
 
 /* Writes 'size' bytes from 'buffer' to file 'fd'.
@@ -275,10 +300,10 @@ tell (int fd)
 static void
 close (int fd)
 {
-	const char *filename;
+  const char *filename;
 
-	struct list_elem *e;
-	struct sys_fd *fd_instance;
+  struct list_elem *e;
+  struct sys_fd *fd_instance;
   for (e = list_begin (&used_fds);
        e != list_end (&used_fds);
        e = list_next(e))
@@ -286,7 +311,7 @@ close (int fd)
       fd_instance = list_entry (e, struct sys_fd, used_fds_elem);
       if (fd == fd_instance->value)
         {
-        	list_remove (e);
+          list_remove (e);
           break;
         }
     }
@@ -296,25 +321,46 @@ close (int fd)
   list_remove (&fd_instance->sys_file_elem);
 
   if (list_empty (&fd_instance->sys_file->fd_list)
-  			&& fd_instance->sys_file->to_be_removed)
-  	{
-  		filename = fd_instance->sys_file->name;
-  		filesys_remove (filename);
-  		list_remove (&fd_instance->sys_file->sys_file_elem);
-  		free ((void *) fd_instance->sys_file);
-  	}
+        && fd_instance->sys_file->to_be_removed)
+    {
+      filename = fd_instance->sys_file->name;
+      filesys_remove (filename);
+      list_remove (&fd_instance->sys_file->sys_file_elem);
+      free ((void *) fd_instance->sys_file);
+    }
 
   free (fd_instance);
 }
 
 static bool
-check_pointer (void *pointer)
+check_pointer (void *pointer, unsigned size)
 {
-	if (pointer == NULL || is_kernel_vaddr (pointer))
-		return false;
-	else if (pagedir_get_page (active_pd (), pointer) == NULL)
-		return false;
-	else
-		return true;
+  int i;
+  for (i = 0; i < size; i++)
+    {
+      if (pointer + i == NULL || is_kernel_vaddr (pointer + i))
+        return false;
+      else if (pagedir_get_page (active_pd (), pointer + i) == NULL)
+        return false;
+      else
+        return true;
+    }
 }
 
+static struct sys_fd*
+get_fd_item (int fd)
+{
+  struct list_elem *e;
+  struct sys_fd* fd_instance;
+  for (e = list_begin (&used_fds);
+        e != list_end (&used_fds);
+       e = list_next(e))
+    {
+      fd_instance = list_entry (e, struct sys_fd, used_fds_elem);
+      if (fd == fd_instance->value)
+        {
+          return fd_instance;
+        }
+    }
+  return NULL;
+}
