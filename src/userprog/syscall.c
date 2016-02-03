@@ -42,12 +42,15 @@ syscall_handler (struct intr_frame *f UNUSED)
   printf ("syscall_num: %d\n", syscall_num);
   
   char *name;
+  int *status;
   /* The possible system calls start at 0. */
   switch (syscall_num)
     {
       case SYS_HALT :
         break;
       case SYS_EXIT :
+        status = *((int *) (f->esp)++);
+        exit (status);
         break;
       case SYS_EXEC :
         break;
@@ -103,10 +106,11 @@ exit (int status)
        e != list_end (&t->opened_fds);
        e = list_next(e))
     {
-      int fd = list_entry (e, struct sys_fd, fd_elem);
+      int fd = list_entry (e, struct sys_fd, thread_opened_elem);
       close (fd);
     }
   
+  printf ("%s: exit(%d)\n", t->name, status);
   thread_exit ();
 }
 
@@ -171,22 +175,22 @@ open (const char *file)
   /* If we have not opened it before, create a new entry */
   if (!found)
     {
-      sf = (struct sys_file*) malloc (sizeof (struct sys_file));
+      sf = malloc (sizeof (struct sys_file));
       strlcpy (sf->name, file, strlen (file) + 1);
     }
 
   /* Now that sf points to something useful, add it to the opened_files 
      list, add the fd to sf's list and update fd's sys_file pointer */
   list_push_back (&opened_files, &sf->sys_file_elem);
-  list_push_back (&sf->fd_list, &fd->fd_elem);
+  list_push_back (&sf->fd_list, &fd->sys_file_elem);
   fd->sys_file = sf;
+   
+  /* Add to used_fds list */
+  list_push_back (&used_fds, &fd->used_fds_elem);
   
   /* Add the fd to the thread's opened_fds list */
   struct thread *t = thread_current ();
-  list_push_back (&t->opened_fds, &fd->fd_elem);
-  
-  /* Add to used_fds list */
-  list_push_back (&used_fds, &fd->fd_elem);
+  list_push_back (&t->opened_fds, &fd->thread_opened_elem);
   
   return fd->value;
 }
@@ -212,6 +216,11 @@ read (int fd, void *buffer, unsigned size)
 static int
 write (int fd, const void *buffer, unsigned size)
 {
+  if (fd == 1)
+    {
+      /* Write to console */
+      
+    }
   return 1;
 }
 
