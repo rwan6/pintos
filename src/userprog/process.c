@@ -153,7 +153,7 @@ start_process (void *file_name_)
   palloc_free_page (file_name);
   free (ptrs);
   
-  hex_dump(if_.esp, if_.esp, 256, true);
+  //hex_dump(if_.esp, if_.esp, 256, true);
     
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in
@@ -172,9 +172,40 @@ start_process (void *file_name_)
    been successfully called for the given TID, returns -1
    immediately, without waiting. */
 int
-process_wait (tid_t child_tid UNUSED) 
+process_wait (tid_t child_tid) 
 {
-  while(1);
+  struct thread *t = thread_current ();
+  struct list_elem *e;
+  struct child_process *cp;
+  
+/* Free my children from my list and update each of their
+   parents to NULL */
+  for (e = list_begin (&t->children);
+       e != list_end (&t->children);
+       e = list_next(e))
+    {
+      cp = list_entry (e, struct child_process,
+        child_elem);
+      if (cp->child->tid == child_tid)
+        {
+          if (cp->waited_on)
+            return -1;
+          else if (cp->terminated)
+            {
+              cp->waited_on = true;
+              return cp->status;
+            }
+          else
+            {
+              cp->waited_on = true;
+              /* Wait on my child. */
+              lock_acquire (&cp->child->wait_lock);
+              cond_wait (&cp->child->wait_cond, &cp->child->wait_lock);
+              lock_release (&cp->child->wait_lock);
+            }
+        }
+    }
+  
   return -1;
 }
 

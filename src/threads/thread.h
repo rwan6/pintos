@@ -128,8 +128,21 @@ struct thread
     uint32_t *pagedir;                  /* Page directory. */
     struct thread *parent;              /* Thread that spawned me. */
     struct list children;               /* List of children I spawned. */
-    struct list_elem child_elem;        /* List element. */
+    struct lock wait_lock;              /* Lock held by child thread. */
+    struct condition wait_cond;         /* Condition to wait on
+      by parent process. */
 #endif
+  };
+  
+  /* Holds the child thread, the child's status, and an element the
+     parent can use to track these values. */
+struct child_process
+  {
+    struct thread *child;
+    int status;
+    bool terminated;
+    bool waited_on;
+    struct list_elem child_elem;        /* List element. */
   };
 
 /* Condition primitive used by by the exec function in syscall.c and

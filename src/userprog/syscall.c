@@ -48,7 +48,7 @@ static void
 syscall_handler (struct intr_frame *f)
 {
   printf("\n\n");
-  hex_dump(f->esp, f->esp, 512, true);
+  //hex_dump(f->esp, f->esp, 512, true);
   
   int *sp = (int *) (f->esp);
   int syscall_num = *sp;
@@ -119,9 +119,41 @@ static void
 exit (int status)
 {
   struct thread *t = thread_current ();
-
-  /* Close any open file handles */
   struct list_elem *e;
+  struct child_process *cp;
+  
+  /* Free my children from my list and update each of their
+     parents to NULL */
+  for (e = list_begin (&t->children);
+       e != list_end (&t->children);
+       e = list_next(e))
+    {
+      cp = list_entry (e, struct child_process,
+        child_elem);
+      cp->child->parent = NULL;
+      free (cp);  
+    }
+    
+  /* If my parent is still alive, update my status and
+     notify them that I am being terminated. */
+  if (t->parent != NULL)
+    {
+      for (e = list_begin (&t->parent->children);
+           e != list_end (&t->parent->children);
+           e = list_next(e))
+        {
+          cp = list_entry (e, struct child_process,
+            child_elem);
+          /* If this child_process corresponds to me. */
+          if (t == cp->child)
+            {
+              cp->terminated = true;
+              cp->status = status;
+            }
+        }
+    } 
+  
+  /* Close any open file handles */
   for (e = list_begin (&t->opened_fds);
        e != list_end (&t->opened_fds);
        e = list_next(e))
@@ -129,6 +161,11 @@ exit (int status)
       int fd = list_entry (e, struct sys_fd, thread_opened_elem)->value;
       close (fd);
     }
+
+  /* Signal my parent to resume execution from process_wait. */
+  lock_acquire (&t->parent->wait_lock);
+  cond_signal (&t->parent->wait_cond, &t->parent->wait_lock);
+  lock_acquire (&t->parent->wait_lock);
 
   printf ("%s: exit(%d)\n", t->name, status);
   thread_exit ();
@@ -159,8 +196,14 @@ exec (const char *cmd_line)
       if (new_process_pid != -1)
         {
           struct thread *child_thread = get_caller_child (new_process_pid);
+          struct child_process *cp = malloc (sizeof (struct child_process));
+          if (cp == NULL)
+            return -1;
+          cp->child = child_thread;
+          cp->terminated = false;
+          cp->waited_on = false;
           list_push_back (&thread_current ()->children,
-            &child_thread->child_elem);
+            &cp->child_elem);
         }
       return (pid_t) new_process_pid;
     }
@@ -168,9 +211,9 @@ exec (const char *cmd_line)
 
 /* Wait for a child process pid and retrieves the child's exit status. */
 static int
-wait (pid_t pid UNUSED)
+wait (pid_t pid)
 {
-  return 0;
+  return process_wait ((tid_t) pid);
 }
 
 /* Creates a new file.  Returns true if successful, false otherwise.
@@ -180,7 +223,10 @@ create (const char *file, unsigned initial_size)
 {
   bool success;
   if (!check_pointer ((const void *) file, strlen (file)))
-    return false;
+    {
+      exit (-1);
+      return false;
+    }
   else
     {
       lock_acquire (&file_lock);
@@ -198,7 +244,10 @@ remove (const char *file)
 {
   bool success;
   if (!check_pointer ((const void *) file, strlen (file)))
-    return false;
+    {
+      exit (-1);
+      return false;
+    }
   else
     {
       lock_acquire (&file_lock);
@@ -214,6 +263,13 @@ remove (const char *file)
 static int
 open (const char *file)
 {
+  
+  if (!check_pointer ((const void *) file, strlen (file)))
+    {
+      exit (-1);
+      return -1;
+    }
+  
   bool found = false;
   struct list_elem *e;
   struct sys_file* sf = NULL;
@@ -298,6 +354,11 @@ filesize (int fd)
 static int
 read (int fd, void *buffer, unsigned size)
 {
+  if (!check_pointer(buffer, size))
+    {
+      exit (-1);
+      return -1;
+    }
   int num_read;
   /* If SDIN_FILENO. */
   if (fd == 0)
@@ -308,22 +369,16 @@ read (int fd, void *buffer, unsigned size)
     }
   else
     {
-      bool success = check_pointer(buffer, size);
-      if (!success)
-        return -1;
-      else
+      struct sys_fd *fd_instance = get_fd_item (fd);
+      if (fd_instance != NULL)
         {
-          struct sys_fd *fd_instance = get_fd_item (fd);
-          if (fd_instance != NULL)
-            {
-              lock_acquire (&file_lock);
-              num_read = file_read (fd_instance->file, buffer, size);
-              lock_release (&file_lock);
-              return num_read;
-            }
-          else
-            return -1;
+          lock_acquire (&file_lock);
+          num_read = file_read (fd_instance->file, buffer, size);
+          lock_release (&file_lock);
+          return num_read;
         }
+        else
+          return -1;
     }
 }
 
@@ -334,6 +389,12 @@ read (int fd, void *buffer, unsigned size)
 static int
 write (int fd, const void *buffer, unsigned size)
 {
+  if (!check_pointer(buffer, size))
+    {
+      exit (-1);
+      return -1;
+    }
+    
   int num_written;
   /* If SDOUT_FILENO. */
   if (fd == 1)
@@ -344,22 +405,16 @@ write (int fd, const void *buffer, unsigned size)
     }
   else
     {
-      bool success = check_pointer(buffer, size);
-      if (!success)
-        return -1;
-      else
+      struct sys_fd *fd_instance = get_fd_item (fd);
+      if (fd_instance != NULL)
         {
-          struct sys_fd *fd_instance = get_fd_item (fd);
-          if (fd_instance != NULL)
-            {
-              lock_acquire (&file_lock);
-              num_written = file_write (fd_instance->file, buffer, size);
-              lock_release (&file_lock);
-              return num_written;
-            }
-          else
-            return -1;
+          lock_acquire (&file_lock);
+          num_written = file_write (fd_instance->file, buffer, size);
+          lock_release (&file_lock);
+          return num_written;
         }
+      else
+          return -1;
     }
 }
 
