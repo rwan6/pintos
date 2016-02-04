@@ -46,19 +46,16 @@ syscall_init (void)
    to determine which system call function needs to be invoked. */
 static void
 syscall_handler (struct intr_frame *f)
-{  
-  void *buffer;
-  char *name, *cmd_line;
-  int fd, status;
-  unsigned initial_size, size, position;
-  pid_t pid;
-  
+{
   printf("\n\n");
   hex_dump(f->esp, f->esp, 512, true);
   
-  int syscall_num = *((int *) (f->esp));
-  f->esp = (void *) ((int *) f->esp + 1);
-  printf ("syscall_num: %d\n", syscall_num);  
+  int *sp = (int *) (f->esp);
+  int syscall_num = *sp;
+  int arg1 = *(sp + 1);
+  int arg2 = *(sp + 2);
+  int arg3 = *(sp + 3);
+  printf ("syscall_num: %d\n", syscall_num);
 
   switch (syscall_num)
     {
@@ -66,76 +63,40 @@ syscall_handler (struct intr_frame *f)
         halt();
         break;
       case SYS_EXIT :
-        status = *((int *) (f->esp));
-        f->esp = (void *) ((int *) f->esp + 1);
-        exit (status);
+        exit (arg1);
         break;
       case SYS_EXEC :
-        cmd_line = *((char **) (f->esp));
-        f->esp = (void *) ((char **) f->esp + 1);
-        exec (cmd_line);
+        exec ((char *) arg1);
         break;
       case SYS_WAIT :
-        pid = *((pid_t *) (f->esp));
-        f->esp = (void *) ((pid_t *) f->esp + 1);
-        wait (pid);
+        wait (arg1);
         break;
       case SYS_CREATE :
-        name = *((char **) (f->esp));
-        f->esp = (void *) ((char **) f->esp + 1);
-        initial_size = *((unsigned *) (f->esp));
-        f->esp = (void *) ((unsigned *) f->esp + 1);
-        create (name, initial_size);
+        create ((char *) arg1, arg2);
         break;
       case SYS_REMOVE :
-        name = *((char **) (f->esp));
-        f->esp = (void *) ((char **) f->esp + 1);
-        remove (name);
+        remove ((char *) arg1);
         break;
       case SYS_OPEN :
-        name = *((char **) (f->esp));
-        f->esp = (void *) ((char **) f->esp + 1);
-        open (name);
+        open ((char *) arg1);
         break;
       case SYS_FILESIZE :
-        fd = *((int *) (f->esp));
-        f->esp = (void *) ((int *) f->esp + 1);
-        filesize (fd);
+        filesize (arg1);
         break;
       case SYS_READ :
-        fd = *((int *) (f->esp));
-        f->esp = (void *) ((int *) f->esp + 1);
-        buffer = *((void **) (f->esp));
-        f->esp = (void *) ((void **) f->esp + 1);
-        size = *((unsigned *) (f->esp));
-        f->esp = (void *) ((unsigned *) f->esp + 1);
-        read (fd, buffer, size);
+        read (arg1, (void *) arg2, arg3);
         break;
       case SYS_WRITE :
-        fd = *((int *) (f->esp));
-        f->esp = (void *) ((int *) f->esp + 1);
-        buffer = *((void **) (f->esp));
-        f->esp = (void *) ((void **) f->esp + 1);
-        size = *((unsigned *) (f->esp));
-        f->esp = (void *) ((unsigned *) f->esp + 1);
-        write (fd, buffer, size);
+        write (arg1, (void *) arg2, arg3);
         break;
       case SYS_SEEK :
-        fd = *((int *) (f->esp));
-        f->esp = (void *) ((int *) f->esp + 1);
-        position = *((unsigned *) (f->esp));
-        f->esp = (void *) ((unsigned *) f->esp + 1);
-        seek (fd, position);
+        seek (arg1, arg2);
         break;
       case SYS_TELL :
-        fd = *((int *) (f->esp));
-        f->esp = (void *) ((int *) f->esp + 1);
-        tell (fd);
+        tell (arg1);
         break;
       case SYS_CLOSE :
-        fd = *((int *) (f->esp));
-        f->esp = (void *) ((int *) f->esp + 1);
-        close (fd);
+        close (arg1);
         break;
     }
 
