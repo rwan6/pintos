@@ -39,7 +39,7 @@ syscall_init (void)
   intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
   list_init (&opened_files);
   list_init (&used_fds);
-  next_avail_fd = 2; /* 0 and 1 are reserved */
+  next_avail_fd = 2; /* 0 and 1 are reserved. */
 }
 
 /* Takes the interrupt frame as an argument and traces the stack
@@ -47,12 +47,14 @@ syscall_init (void)
 static void
 syscall_handler (struct intr_frame *f)
 {
+  //printf ("\n\n");
+  //hex_dump (f->esp, f->esp, 256, true);
   int *sp = (int *) (f->esp);
   int syscall_num = *sp;
   int arg1 = *(sp + 1);
   int arg2 = *(sp + 2);
   int arg3 = *(sp + 3);
-  printf ("syscall_num: %d\n", syscall_num);
+  //printf ("syscall_num: %d\n", syscall_num);
 
   switch (syscall_num)
     {
@@ -97,10 +99,6 @@ syscall_handler (struct intr_frame *f)
         break;
     }
 
-  //Destined for removal
-  printf ("\nsystem call!\n");
-  exit(0);
-  //thread_exit ();
 }
 
 /* Terminates Pintos. */
@@ -161,9 +159,9 @@ exit (int status)
     }
 
   /* Signal my parent to resume execution from process_wait. */
-  lock_acquire (&t->parent->wait_lock);
-  cond_signal (&t->parent->wait_cond, &t->parent->wait_lock);
-  lock_release (&t->parent->wait_lock);
+  lock_acquire (&t->wait_lock);
+  cond_signal (&t->wait_cond, &t->wait_lock);
+  lock_release (&t->wait_lock);
 
   printf ("%s: exit(%d)\n", t->name, status);
   thread_exit ();

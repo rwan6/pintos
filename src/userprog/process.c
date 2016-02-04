@@ -169,7 +169,7 @@ start_process (void *file_name_)
   palloc_free_page (file_name);
   free (ptrs);
   
-  //hex_dump(if_.esp, if_.esp, 256, true);
+  //hex_dump (if_.esp, if_.esp, 64, true);
     
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in
