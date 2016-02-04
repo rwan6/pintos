@@ -268,6 +268,8 @@ open (const char *file)
     return -1;
 
   struct sys_fd *fd = malloc (sizeof (struct sys_fd));
+  if (!fd)
+    return -1;
   fd->value = next_avail_fd++;
   fd->file = f;
 
@@ -276,6 +278,11 @@ open (const char *file)
   if (!found)
     {
       sf = malloc (sizeof (struct sys_file));
+      if (!sf)
+        {
+          free (fd);
+          return -1;
+        }
       strlcpy (sf->name, file, strlen (file) + 1);
     }
 
