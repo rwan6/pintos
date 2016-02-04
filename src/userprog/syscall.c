@@ -12,9 +12,11 @@
 #include "filesys/file.h" /* For file operations. */
 #include "filesys/filesys.h" /* For filesys operations. */
 
+/* Prototypes for system call functions and helper functions. */
 static void syscall_handler (struct intr_frame *);
 static void halt (void);
 static void exit (int);
+static pid_t exec (const char *);
 static int wait (pid_t);
 static bool create (const char *, unsigned);
 static bool remove (const char *);
@@ -28,6 +30,7 @@ static void close (int);
 static bool check_pointer (const void *, unsigned);
 static struct sys_fd* get_fd_item (int);
 
+/* Initialize the system call interrupt. */
 void
 syscall_init (void)
 {
@@ -46,34 +49,55 @@ syscall_handler (struct intr_frame *f UNUSED)
   f->esp = (void *) ((int *) f->esp + 1);
   printf ("syscall_num: %d\n", syscall_num);
 
-  char *name;
-  int fd, status;
   void *buffer;
-  unsigned size;
-  /* The possible system calls start at 0. */
+  char *name, *cmd_line;
+  int fd, status;
+  unsigned initial_size, size, position;
+  pid_t pid;
+
   switch (syscall_num)
     {
       case SYS_HALT :
+        halt();
         break;
       case SYS_EXIT :
         status = *((int *) (f->esp)++);
         exit (status);
         break;
       case SYS_EXEC :
+        cmd_line = *((char **) (f->esp)++);
+        exec (cmd_line);
         break;
       case SYS_WAIT :
+        pid = *((pid_t *) (f->esp)++);
+        wait (pid);
         break;
       case SYS_CREATE :
+        name = *((char **) (f->esp)++);
+        initial_size = *((unsigned *) (f->esp)++);
+        f->esp = (void *) ((unsigned *) f->esp + 1);
+        create (name, initial_size);
         break;
       case SYS_REMOVE :
+        name = *((char **) (f->esp)++);
+        remove (name);
         break;
       case SYS_OPEN :
         name = *((char **) (f->esp)++);
         open (name);
         break;
       case SYS_FILESIZE :
+        fd = *((int *) (f->esp));
+        filesize (fd);
         break;
       case SYS_READ :
+        fd = *((int *) (f->esp));
+        f->esp = (void *) ((int *) f->esp + 1);
+        buffer = *((void **) (f->esp));
+        f->esp = (void *) ((void **) f->esp + 1);
+        size = *((unsigned *) (f->esp));
+        f->esp = (void *) ((unsigned *) f->esp + 1);
+        read (fd, buffer, size);
         break;
       case SYS_WRITE :
         fd = *((int *) (f->esp));
@@ -85,17 +109,24 @@ syscall_handler (struct intr_frame *f UNUSED)
         write (fd, buffer, size);
         break;
       case SYS_SEEK :
+        fd = *((int *) (f->esp));
+        f->esp = (void *) ((int *) f->esp + 1);
+        position = *((unsigned *) (f->esp));
+        f->esp = (void *) ((unsigned *) f->esp + 1);
+        seek (fd, position);
         break;
       case SYS_TELL :
+        fd = *((int *) (f->esp));
+        tell (fd);
         break;
       case SYS_CLOSE :
-        break;
-      default:
+        fd = *((int *) (f->esp));
+        close (fd);
         break;
     }
 
   //Destined for removal
-  printf ("system call!\n");
+  printf ("\nsystem call!\n");
   thread_exit ();
 }
 
@@ -131,14 +162,14 @@ exit (int status)
 /* Runs the executable.  Returns the new process's program id.
    Must return pid = -1. */
 static pid_t
-exec (const char *cmd_line UNUSED)
+exec (const char *cmd_line)
 {
-  return -1;
+  return (pid_t) process_execute (cmd_line);
 }
 
 /* Wait for a child process pid and retrieves the child's exit status. */
 static int
-wait (pid_t pid UNUSED)
+wait (pid_t pid)
 {
   return 0;
 }
