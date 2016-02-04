@@ -203,29 +203,44 @@ wait (pid_t pid UNUSED)
   return 0;
 }
 
-/* Creates a new file.  Returns true if successful, false otherwise. */
+/* Creates a new file.  Returns true if successful, false otherwise.
+   File system gets locked down with a coarse-grain lock. */
 static bool
 create (const char *file, unsigned initial_size)
 {
+  bool success;
   if (!check_pointer ((const void *) file, strlen (file)))
     return false;
   else
-    return filesys_create (file, initial_size);
+    {
+      lock_acquire (&file_lock);
+      success = filesys_create (file, initial_size);
+      lock_release (&file_lock);
+      return success;
+    }
 }
 
 /* Deletes the file.  Returns true if successful, false otherwise.
-   File can be removed while it is open or closed. */
+   File can be removed while it is open or closed.  File system
+   gets locked down with a coarse-grain lock. */
 static bool
 remove (const char *file)
 {
+  bool success;
   if (!check_pointer ((const void *) file, strlen (file)))
     return false;
   else
-    return filesys_remove (file);
+    {
+      lock_acquire (&file_lock);
+      success = filesys_remove (file);
+      lock_release (&file_lock);
+      return success;
+    }
 }
 
 /* Opens the file and returns a file descriptor.  If open fails,
-   -1 is returned. */
+   -1 is returned.  File system gets locked down with a coarse-
+   grain lock. */
 static int
 open (const char *file)
 {
@@ -244,8 +259,11 @@ open (const char *file)
           break;
         }
     }
-
+    
+  lock_acquire (&file_lock);  
   struct file *f = filesys_open (file);
+  lock_release (&file_lock); 
+  
   if (!f)
     return -1;
 
@@ -277,24 +295,33 @@ open (const char *file)
   return fd->value;
 }
 
-/* Returns the file size (in bytes) of the file open. */
+/* Returns the file size (in bytes) of the file open.  File
+   system gets locked down with a coarse-grain lock. */
 static int
 filesize (int fd)
 {
+  int file_size;
   struct sys_fd* fd_instance = get_fd_item (fd);
   
 /* Should not be NULL unless the fd was invalid. */
   if (fd_instance != NULL)
-    return file_length (fd_instance->file);
+    {
+      lock_acquire (&file_lock);
+      file_size = file_length (fd_instance->file);
+      lock_release (&file_lock);
+      return file_size;
+    }
 
   return -1;
 }
 
 /* Returns the number of bytes actually read, or -1 if the file could
-   not be read.  If fd = 0, function reads from the keyboard. */
+   not be read.  If fd = 0, function reads from the keyboard.
+   File system gets locked down with a coarse-grain lock. */
 static int
 read (int fd, void *buffer, unsigned size)
 {
+  int num_read;
   /* If SDIN_FILENO. */
   if (fd == 0)
     {
@@ -309,9 +336,14 @@ read (int fd, void *buffer, unsigned size)
         return -1;
       else
         {
-          struct sys_fd *sf = get_fd_item (fd);
-          if (sf != NULL)
-            return file_read (sf->file, buffer, size);
+          struct sys_fd *fd_instance = get_fd_item (fd);
+          if (fd_instance != NULL)
+            {
+              lock_acquire (&file_lock);
+              num_read = file_read (fd_instance->file, buffer, size);
+              lock_release (&file_lock);
+              return num_read;
+            }
           else
             return -1;
         }
@@ -320,10 +352,12 @@ read (int fd, void *buffer, unsigned size)
 
 /* Writes 'size' bytes from 'buffer' to file 'fd'.  Returns number
    of bytes actually written, or -1 if there was an error in writing
-   to the file. If fd = 1, function write to the console. */
+   to the file. If fd = 1, function write to the console.  File
+   system gets locked down with a coarse-grain lock. */
 static int
 write (int fd, const void *buffer, unsigned size)
 {
+  int num_written;
   /* If SDOUT_FILENO. */
   if (fd == 1)
     {
@@ -340,7 +374,12 @@ write (int fd, const void *buffer, unsigned size)
         {
           struct sys_fd *fd_instance = get_fd_item (fd);
           if (fd_instance != NULL)
-            return file_write (fd_instance->file, buffer, size);
+            {
+              lock_acquire (&file_lock);
+              num_written = file_write (fd_instance->file, buffer, size);
+              lock_release (&file_lock);
+              return num_written;
+            }
           else
             return -1;
         }
@@ -348,7 +387,8 @@ write (int fd, const void *buffer, unsigned size)
 }
 
 /* Changes the next byte to be read or written in an open file to
-   'position'.  Seeking past the end of a file is not an error. */
+   'position'.  Seeking past the end of a file is not an error.
+   File system gets locked down with coarse-grain lock. */
 static void
 seek (int fd, unsigned position)
 {
@@ -356,19 +396,30 @@ seek (int fd, unsigned position)
   
   /* Should not be NULL unless the fd was invalid. */
   if (fd_instance != NULL)
-    file_seek (fd_instance->file, position);
+    {
+      lock_acquire (&file_lock);
+      file_seek (fd_instance->file, position);
+      lock_release (&file_lock);
+    }
 }
 
-/* Returns the position of the next byte to be read or written. */
+/* Returns the position of the next byte to be read or written.
+   File system gets locked down with coarse-grain lock. */
 static unsigned
 tell (int fd)
 {
+  unsigned position;
   struct sys_fd *fd_instance = get_fd_item (fd);
   
   /* Should not be NULL unless the fd was invalid.  Cast off_t to
      unsigned for return. */
   if (fd_instance != NULL)
-    return (unsigned) file_tell (fd_instance->file);
+    {
+      lock_acquire (&file_lock);
+      position = (unsigned) file_tell (fd_instance->file);
+      lock_release (&file_lock);
+      return position;
+    }
   
   /* If fd_instance was NULL, then return 0.  This line should
      rarely (if ever) be reached! */
@@ -376,11 +427,20 @@ tell (int fd)
 }
 
 /* Closes file descriptor 'fd'.  Exiting or terminating a process
-   will close all open file descriptors. */
+   will close all open file descriptors.  File system gets locked
+   down with a coarse-grain lock. */
 static void
 close (int fd)
 {
   struct sys_fd *fd_instance = get_fd_item (fd);
+  
+/* Should not be NULL unless the fd was invalid. */
+if (fd_instance != NULL)
+  {
+    lock_acquire (&file_lock);
+    file_close (fd_instance->file);
+    lock_release (&file_lock);
+  }
   
   /* Should not be NULL unless the fd was invalid.  Remove myself
      from the list of all the fds. */

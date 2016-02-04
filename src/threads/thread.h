@@ -139,6 +139,10 @@ struct condition exec_cond;
    Owned by userprog/process.c and userprog/syscall.c. */
 struct lock exec_lock;
 
+/* Lock used to lock down the entire file system (coarse-grain lock).
+   Owned by userprog/process.c and userprog/syscall.c. */
+struct lock file_lock;
+
 /* If false (default), use round-robin scheduler.
    If true, use multi-level feedback queue scheduler.
    Controlled by kernel command-line option "-o mlfqs". */

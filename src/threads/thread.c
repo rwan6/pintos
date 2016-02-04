@@ -103,6 +103,7 @@ thread_init (void)
   
   cond_init (&exec_cond);
   lock_init (&exec_lock);
+  lock_init (&file_lock);
 
   if (thread_mlfqs)
     {
