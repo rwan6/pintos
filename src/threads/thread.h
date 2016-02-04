@@ -138,10 +138,12 @@ struct thread
      parent can use to track these values. */
 struct child_process
   {
-    struct thread *child;
-    int status;
-    bool terminated;
-    bool waited_on;
+    struct thread *child;               /* A single child thread. */
+    int status;                         /* Child's status. */
+    bool terminated;                    /* Denotes whether child has
+      terminated/exited. */
+    bool waited_on;                     /* Denotes if this child has
+      already been waited on. */
     struct list_elem child_elem;        /* List element. */
   };
 
