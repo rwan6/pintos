@@ -190,21 +190,6 @@ exec (const char *cmd_line)
          when this function terminates. */
       cond_wait(&exec_cond, &exec_lock);
       lock_release(&exec_lock);
-      
-      /* If the child was spawned successfully, add it to the caller's
-         list of children. */
-      if (new_process_pid != -1)
-        {
-          struct thread *child_thread = get_caller_child (new_process_pid);
-          struct child_process *cp = malloc (sizeof (struct child_process));
-          if (cp == NULL)
-            return -1;
-          cp->child = child_thread;
-          cp->terminated = false;
-          cp->waited_on = false;
-          list_push_back (&thread_current ()->children,
-            &cp->child_elem);
-        }
       return (pid_t) new_process_pid;
     }
 }

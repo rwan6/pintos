@@ -59,6 +59,23 @@ process_execute (const char *file_name)
 
   /* Create a new thread to execute FILE_NAME. */
   tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
+  
+  
+  /* If the child was spawned successfully, add it to the caller's
+     list of children. */
+  if (tid != TID_ERROR)
+    {
+      struct thread *child_thread = get_caller_child (tid);
+      struct child_process *cp = malloc (sizeof (struct child_process));
+      if (cp == NULL)
+        return -1;
+      cp->child = child_thread;
+      cp->terminated = false;
+      cp->waited_on = false;
+      list_push_back (&thread_current ()->children,
+        &cp->child_elem);
+    }
+  
   palloc_free_page (fn_copy2);
   if (tid == TID_ERROR)
     {
