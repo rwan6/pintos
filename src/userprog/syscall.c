@@ -1,5 +1,6 @@
 #include "userprog/syscall.h"
 #include "userprog/pagedir.h"
+#include "userprog/process.h"
 #include <stdio.h>
 #include <syscall-nr.h>
 #include <string.h>
@@ -151,7 +152,7 @@ exit (int status)
        e != list_end (&t->opened_fds);
        e = list_next(e))
     {
-      int fd = list_entry (e, struct sys_fd, thread_opened_elem);
+      int fd = list_entry (e, struct sys_fd, thread_opened_elem)->value;
       close (fd);
     }
 
@@ -169,7 +170,7 @@ exec (const char *cmd_line)
 
 /* Wait for a child process pid and retrieves the child's exit status. */
 static int
-wait (pid_t pid)
+wait (pid_t pid UNUSED)
 {
   return 0;
 }
@@ -351,7 +352,6 @@ tell (int fd)
 static void
 close (int fd)
 {
-  const char *filename;
   struct sys_fd *fd_instance = get_fd_item (fd);
   
   /* Should not be NULL unless the fd was invalid.  Remove myself

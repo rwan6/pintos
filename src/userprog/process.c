@@ -15,6 +15,7 @@
 #include "threads/init.h"
 #include "threads/interrupt.h"
 #include "threads/palloc.h"
+#include "threads/malloc.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
 
@@ -89,14 +90,14 @@ start_process (void *file_name_)
   char *token;
   argv[0] = file_name;
   int argc = 1, i;
-  while ((token = strtok_r (NULL, " ", &save_ptr)))
+  while ((token = strtok_r (NULL," ", &save_ptr)))
     {
       argv[argc] = token;
       argc++;
     }
     
   /* Push each argument in reverse order. */
-  char *ptrs[MAX_ARG_NUM];
+  char **ptrs = (char **) malloc (sizeof (char*) * argc);
   for (i = argc - 1; i >= 0; i--)
     {
       size_t len = strlen (argv[i]) + 1;
@@ -133,6 +134,7 @@ start_process (void *file_name_)
   *((void **) if_.esp) = 0;
   
   palloc_free_page (file_name);
+  free (ptrs);
   
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in
