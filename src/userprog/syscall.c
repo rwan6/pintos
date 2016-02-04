@@ -368,12 +368,12 @@ close (int fd)
 static bool
 check_pointer (const void *pointer, unsigned size)
 {
+  struct thread *t = thread_current ();
   unsigned i;
   for (i = 0; i < size; i++)
     {
-      if (pointer + i == NULL || is_kernel_vaddr (pointer + i))
-        return false;
-      else if (pagedir_get_page (active_pd (), pointer + i) == NULL)
+      if (pointer + i == NULL || is_kernel_vaddr (pointer + i) ||
+        pagedir_get_page (t->pagedir, pointer + i) == NULL)
         return false;
       else
         return true;
