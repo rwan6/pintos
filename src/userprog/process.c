@@ -109,6 +109,12 @@ start_process (void *file_name_)
 
   /* Push each argument in reverse order. */
   char **ptrs = (char **) malloc (sizeof (char*) * argc);
+  if (ptrs == NULL)
+    {
+      palloc_free_page (file_name);
+      thread_exit ();
+    }
+    
   for (i = argc - 1; i >= 0; i--)
     {
       size_t len = strlen (argv[i]) + 1;
