@@ -43,17 +43,17 @@ syscall_init (void)
 /* Takes the interrupt frame as an argument and traces the stack
    to determine which system call function needs to be invoked. */
 static void
-syscall_handler (struct intr_frame *f UNUSED)
+syscall_handler (struct intr_frame *f)
 {
-  int syscall_num = *((int *) (f->esp));
-  f->esp = (void *) ((int *) f->esp + 1);
-  printf ("syscall_num: %d\n", syscall_num);
-
   void *buffer;
   char *name, *cmd_line;
   int fd, status;
   unsigned initial_size, size, position;
   pid_t pid;
+  
+  int syscall_num = *((int *) (f->esp));
+  f->esp = (void *) ((int *) f->esp + 1);
+  printf ("syscall_num: %d\n", syscall_num);
 
   switch (syscall_num)
     {
@@ -189,21 +189,10 @@ create (const char *file, unsigned initial_size)
 static bool
 remove (const char *file)
 {
-  struct list_elem *e;
-  struct sys_file* sf;
-  for (e = list_begin (&opened_files);
-       e != list_end (&opened_files);
-       e = list_next(e))
-    {
-      sf = list_entry (e, struct sys_file, sys_file_elem);
-      if (!strcmp(file, sf->name))
-        {
-          sf->to_be_removed = true;
-          break;
-        }
-    }
-  bool success = filesys_remove(file);
-  return success;
+  if (!check_pointer ((const void *) file, strlen (file)))
+    return false;
+  else
+    return filesys_remove (file);
 }
 
 /* Opens the file and returns a file descriptor.  If open fails,
@@ -213,7 +202,7 @@ open (const char *file)
 {
   bool found = false;
   struct list_elem *e;
-  struct sys_file* sf;
+  struct sys_file* sf = NULL;
   /* Figure out if we have opened this file before */
   for (e = list_begin (&opened_files);
        e != list_end (&opened_files);
@@ -222,11 +211,6 @@ open (const char *file)
       sf = list_entry (e, struct sys_file, sys_file_elem);
       if (!strcmp(file, sf->name))
         {
-          /* If the file was already removed, but other processes
-             are still reading from it, it cannot be opened. */
-          if (sf->to_be_removed)
-            return -1;
-
           found = true;
           break;
         }
@@ -253,7 +237,6 @@ open (const char *file)
   list_push_back (&opened_files, &sf->sys_file_elem);
   list_push_back (&sf->fd_list, &fd->sys_file_elem);
   fd->sys_file = sf;
-  sf->to_be_removed = false;
 
   /* Add to used_fds list */
   list_push_back (&used_fds, &fd->used_fds_elem);
@@ -380,11 +363,8 @@ close (int fd)
 
   list_remove (&fd_instance->sys_file_elem);
 
-  if (list_empty (&fd_instance->sys_file->fd_list)
-        && fd_instance->sys_file->to_be_removed)
+  if (list_empty (&fd_instance->sys_file->fd_list))
     {
-      filename = fd_instance->sys_file->name;
-      filesys_remove (filename);
       list_remove (&fd_instance->sys_file->sys_file_elem);
       free ((void *) fd_instance->sys_file);
     }
@@ -406,9 +386,8 @@ check_pointer (const void *pointer, unsigned size)
       if (pointer + i == NULL || is_kernel_vaddr (pointer + i) ||
         pagedir_get_page (t->pagedir, pointer + i) == NULL)
         return false;
-      else
-        return true;
     }
+    return true;
 }
 
 /* Function to retrieve the sys_fd struct corresponding to a particular
