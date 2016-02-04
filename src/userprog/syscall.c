@@ -47,9 +47,6 @@ syscall_init (void)
 static void
 syscall_handler (struct intr_frame *f)
 {
-  printf("\n\n");
-  //hex_dump(f->esp, f->esp, 512, true);
-  
   int *sp = (int *) (f->esp);
   int syscall_num = *sp;
   int arg1 = *(sp + 1);
@@ -102,7 +99,8 @@ syscall_handler (struct intr_frame *f)
 
   //Destined for removal
   printf ("\nsystem call!\n");
-  thread_exit ();
+  exit(0);
+  //thread_exit ();
 }
 
 /* Terminates Pintos. */
@@ -165,7 +163,7 @@ exit (int status)
   /* Signal my parent to resume execution from process_wait. */
   lock_acquire (&t->parent->wait_lock);
   cond_signal (&t->parent->wait_cond, &t->parent->wait_lock);
-  lock_acquire (&t->parent->wait_lock);
+  lock_release (&t->parent->wait_lock);
 
   printf ("%s: exit(%d)\n", t->name, status);
   thread_exit ();

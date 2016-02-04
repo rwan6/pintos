@@ -60,7 +60,6 @@ process_execute (const char *file_name)
   /* Create a new thread to execute FILE_NAME. */
   tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
   
-  
   /* If the child was spawned successfully, add it to the caller's
      list of children. */
   if (tid != TID_ERROR)
