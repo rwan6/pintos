@@ -32,30 +32,41 @@ process_execute (const char *file_name)
 {
   char *fn_copy, *fn_copy2, *save_ptr;
   tid_t tid;
+  
+  lock_acquire(&exec_lock);
 
   /* Make a copy of FILE_NAME.
      Otherwise there's a race between the caller and load(). */
   fn_copy = palloc_get_page (0);
   if (fn_copy == NULL)
-    return TID_ERROR;
+    {
+      cond_signal(&exec_cond, &exec_lock);
+      lock_release(&exec_lock);
+      return TID_ERROR;
+    }
   strlcpy (fn_copy, file_name, PGSIZE);
   
   fn_copy2 = palloc_get_page (0);
   if (fn_copy2 == NULL)
     {
       palloc_free_page (fn_copy);
+      cond_signal(&exec_cond, &exec_lock);
+      lock_release(&exec_lock);
       return TID_ERROR;
     }
   strlcpy (fn_copy2, file_name, PGSIZE);
-  file_name = strtok_r (fn_copy2, " ", &save_ptr);
+  file_name = strtok_r (fn_copy2," ", &save_ptr);
 
   /* Create a new thread to execute FILE_NAME. */
   tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
   if (tid == TID_ERROR)
     {
       palloc_free_page (fn_copy); 
-      palloc_free_page (fn_copy2); 
+      palloc_free_page (fn_copy2);
     }
+  cond_signal(&exec_cond, &exec_lock);
+  lock_release(&exec_lock);  
+  
   return tid;
 }
 
@@ -69,7 +80,7 @@ start_process (void *file_name_)
   struct intr_frame if_;
   bool success;
   
-  file_name = strtok_r(file_name, " ", &save_ptr);
+  file_name = strtok_r (file_name, " ", &save_ptr);
 
   /* Initialize interrupt frame and load executable. */
   memset (&if_, 0, sizeof if_);
@@ -77,9 +88,9 @@ start_process (void *file_name_)
   if_.cs = SEL_UCSEG;
   if_.eflags = FLAG_IF | FLAG_MBS;
   success = load (file_name, &if_.eip, &if_.esp);
-
+  
   /* If load failed, quit. */
-  if (!success) 
+  if (!success)
     {
       palloc_free_page (file_name);
       thread_exit ();
@@ -95,7 +106,7 @@ start_process (void *file_name_)
       argv[argc] = token;
       argc++;
     }
-    
+
   /* Push each argument in reverse order. */
   char **ptrs = (char **) malloc (sizeof (char*) * argc);
   for (i = argc - 1; i >= 0; i--)
@@ -105,37 +116,39 @@ start_process (void *file_name_)
       strlcpy ((char *) if_.esp, argv[i], len);
       ptrs[i] = (char *) if_.esp;
     }
-    
+
   /* Word align the stack pointer to a multiple of 4. */
   if_.esp = (void *) ((unsigned int) if_.esp & 0xfffffffc);
-    
+
   /* Push null pointer sentinel. */
   if_.esp = (void *) ((char **) if_.esp - 1);
   *((char **) if_.esp) = 0;
-  
+
   /* Push addresses of each argument in reverse order. */
   for (i = argc - 1; i >= 0; i--)
     {
       if_.esp = (void *) ((char **) if_.esp - 1);
       *((char **) if_.esp) = ptrs[i];
     }
-    
+
   /* Push argv. */
   char **argv0_ptr = (char **) if_.esp;
   if_.esp = (void *) ((char **) if_.esp - 1);
   *((char ***) if_.esp) = argv0_ptr;
-  
+
   /* Push argc. */
   if_.esp = (void *) ((int *) if_.esp - 1);
   *((int *) if_.esp) = argc;
-  
+
   /* Push return address. */
   if_.esp = ((void **) if_.esp - 1);
   *((void **) if_.esp) = 0;
-  
+
   palloc_free_page (file_name);
   free (ptrs);
   
+  hex_dump(if_.esp, if_.esp, 256, true);
+    
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in
      threads/intr-stubs.S).  Because intr_exit takes all of its

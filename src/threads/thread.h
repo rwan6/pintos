@@ -129,6 +129,16 @@ struct thread
 #endif
   };
 
+/* Condition primitive used by by the exec function in syscall.c and
+   the process_execute in process.c for the child to inform the parent
+   of a successful executable load.
+   Owned by userprog/process.c and userprog/syscall.c. */
+struct condition exec_cond;
+
+/* Lock used in conjunction with exec_cond condition variable.
+   Owned by userprog/process.c and userprog/syscall.c. */
+struct lock exec_lock;
+
 /* If false (default), use round-robin scheduler.
    If true, use multi-level feedback queue scheduler.
    Controlled by kernel command-line option "-o mlfqs". */

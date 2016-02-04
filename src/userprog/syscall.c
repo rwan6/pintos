@@ -7,6 +7,7 @@
 #include "threads/interrupt.h"
 #include "threads/thread.h"
 #include "threads/malloc.h"
+#include "threads/synch.h" /* For synching in exec and with files */
 #include "threads/vaddr.h" /* For validating the user address. */
 #include "devices/shutdown.h" /* For shutdown_power_off. */
 #include "devices/input.h" /* For input_putc(). */
@@ -45,16 +46,19 @@ syscall_init (void)
    to determine which system call function needs to be invoked. */
 static void
 syscall_handler (struct intr_frame *f)
-{
+{  
   void *buffer;
   char *name, *cmd_line;
   int fd, status;
   unsigned initial_size, size, position;
   pid_t pid;
   
+  printf("\n\n");
+  hex_dump(f->esp, f->esp, 512, true);
+  
   int syscall_num = *((int *) (f->esp));
   f->esp = (void *) ((int *) f->esp + 1);
-  printf ("syscall_num: %d\n", syscall_num);
+  printf ("syscall_num: %d\n", syscall_num);  
 
   switch (syscall_num)
     {
@@ -165,7 +169,22 @@ exit (int status)
 static pid_t
 exec (const char *cmd_line)
 {
-  return (pid_t) process_execute (cmd_line);
+  pid_t new_process_pid;
+  if (!check_pointer ((const void *) cmd_line, strlen (cmd_line)))
+    return -1;
+  else
+    {
+      lock_acquire(&exec_lock);
+      new_process_pid = (pid_t) process_execute (cmd_line);
+      
+      /* Wait until child process completes its initialization.  Note
+         that the child will return -1 in the event that it failed to
+         load its executable or initialize, which can then be return
+         when this function terminates. */
+      cond_wait(&exec_cond, &exec_lock);
+      lock_release(&exec_lock);
+      return new_process_pid;
+    }
 }
 
 /* Wait for a child process pid and retrieves the child's exit status. */

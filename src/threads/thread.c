@@ -100,6 +100,9 @@ thread_init (void)
   lock_init (&tid_lock);
   list_init (&ready_list);
   list_init (&all_list);
+  
+  cond_init (&exec_cond);
+  lock_init (&exec_lock);
 
   if (thread_mlfqs)
     {
