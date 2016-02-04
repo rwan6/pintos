@@ -135,17 +135,17 @@ exit (int status)
 }
 
 /* Runs the executable.  Returns the new process's program id.
-   Must return pid = -1. */
+   Must return pid = -1 if the child process failed to load. */
 static pid_t
 exec (const char *cmd_line)
 {
-  pid_t new_process_pid;
+  tid_t new_process_pid;
   if (!check_pointer ((const void *) cmd_line, strlen (cmd_line)))
     return -1;
   else
     {
       lock_acquire(&exec_lock);
-      new_process_pid = (pid_t) process_execute (cmd_line);
+      new_process_pid = process_execute (cmd_line);
       
       /* Wait until child process completes its initialization.  Note
          that the child will return -1 in the event that it failed to
@@ -153,7 +153,16 @@ exec (const char *cmd_line)
          when this function terminates. */
       cond_wait(&exec_cond, &exec_lock);
       lock_release(&exec_lock);
-      return new_process_pid;
+      
+      /* If the child was spawned successfully, add it to the caller's
+         list of children. */
+      if (new_process_pid != -1)
+        {
+          struct thread *child_thread = get_caller_child (new_process_pid);
+          list_push_back (&thread_current ()->children,
+            &child_thread->child_elem);
+        }
+      return (pid_t) new_process_pid;
     }
 }
 
@@ -269,7 +278,7 @@ static int
 filesize (int fd)
 {
   int file_size;
-  struct sys_fd* fd_instance = get_fd_item (fd);
+  struct sys_fd *fd_instance = get_fd_item (fd);
   
 /* Should not be NULL unless the fd was invalid. */
   if (fd_instance != NULL)
@@ -455,7 +464,7 @@ static struct sys_fd *
 get_fd_item (int fd)
 {
   struct list_elem *e;
-  struct sys_fd* fd_instance;
+  struct sys_fd *fd_instance;
   for (e = list_begin (&used_fds);
         e != list_end (&used_fds);
        e = list_next(e))

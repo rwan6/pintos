@@ -603,11 +603,13 @@ init_thread (struct thread *t, const char *name, int priority)
   t->nice = NICE_DEFAULT;
   t->recent_cpu = fix_int (0);
   t->mlfqs_priority = priority;
+  t->parent = NULL;
 
   t->magic = THREAD_MAGIC;
 
   list_init (&t->donated_list);
   list_init (&t->opened_fds);
+  list_init (&t->children);
   old_level = intr_disable ();
   list_push_back (&all_list, &t->allelem);
   intr_set_level (old_level);
@@ -807,6 +809,30 @@ update_mlfqs_every_second (struct thread *t)
       /* Update mlfqs_priority */
       thread_foreach (update_mlfqs_priority, NULL);
     }
+}
+
+/* Iterate through all_list to find the child process associated
+   with a caller.  Child was already checked to have a valid pid
+   and, thus, must be in the all_list. */
+struct thread *
+get_caller_child (tid_t child_tid)
+{
+  struct list_elem *e;
+  struct thread *t;
+  for (e = list_begin (&all_list);
+       e != list_end (&all_list);
+       e = list_next(e))
+    {
+      t = list_entry (e, struct thread, child_elem);
+      if (t->tid == child_tid)
+        {
+          t->parent = thread_current ();
+          return t;
+        }
+    }
+
+  /* This line should never be reached! */
+  return NULL;
 }
 
 /* Offset of `stack' member within `struct thread'.

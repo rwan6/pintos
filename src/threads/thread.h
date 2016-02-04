@@ -126,6 +126,9 @@ struct thread
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
     uint32_t *pagedir;                  /* Page directory. */
+    struct thread *parent;              /* Thread that spawned me. */
+    struct list children;               /* List of children I spawned. */
+    struct list_elem child_elem;        /* List element. */
 #endif
   };
 
@@ -151,6 +154,10 @@ extern bool thread_mlfqs;
 /* Used by thread.c and synch.c. See comments related to this less_list_func in thread.c.  */
 bool priority_less (const struct list_elem *thread_a_, const struct list_elem *thread_b_,
             void *aux UNUSED);
+            
+/* Used by syscall.c. See comments related to this function
+   in thread.c. */
+struct thread *get_caller_child (tid_t);
 
 /* List of processes in THREAD_READY state, that is, processes
    that are ready to run but not actually running. */
