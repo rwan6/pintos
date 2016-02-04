@@ -66,33 +66,40 @@ syscall_handler (struct intr_frame *f)
         halt();
         break;
       case SYS_EXIT :
-        status = *((int *) (f->esp)++);
+        status = *((int *) (f->esp));
+        f->esp = (void *) ((int *) f->esp + 1);
         exit (status);
         break;
       case SYS_EXEC :
-        cmd_line = *((char **) (f->esp)++);
+        cmd_line = *((char **) (f->esp));
+        f->esp = (void *) ((char **) f->esp + 1);
         exec (cmd_line);
         break;
       case SYS_WAIT :
-        pid = *((pid_t *) (f->esp)++);
+        pid = *((pid_t *) (f->esp));
+        f->esp = (void *) ((pid_t *) f->esp + 1);
         wait (pid);
         break;
       case SYS_CREATE :
-        name = *((char **) (f->esp)++);
-        initial_size = *((unsigned *) (f->esp)++);
+        name = *((char **) (f->esp));
+        f->esp = (void *) ((char **) f->esp + 1);
+        initial_size = *((unsigned *) (f->esp));
         f->esp = (void *) ((unsigned *) f->esp + 1);
         create (name, initial_size);
         break;
       case SYS_REMOVE :
-        name = *((char **) (f->esp)++);
+        name = *((char **) (f->esp));
+        f->esp = (void *) ((char **) f->esp + 1);
         remove (name);
         break;
       case SYS_OPEN :
-        name = *((char **) (f->esp)++);
+        name = *((char **) (f->esp));
+        f->esp = (void *) ((char **) f->esp + 1);
         open (name);
         break;
       case SYS_FILESIZE :
         fd = *((int *) (f->esp));
+        f->esp = (void *) ((int *) f->esp + 1);
         filesize (fd);
         break;
       case SYS_READ :
@@ -122,10 +129,12 @@ syscall_handler (struct intr_frame *f)
         break;
       case SYS_TELL :
         fd = *((int *) (f->esp));
+        f->esp = (void *) ((int *) f->esp + 1);
         tell (fd);
         break;
       case SYS_CLOSE :
         fd = *((int *) (f->esp));
+        f->esp = (void *) ((int *) f->esp + 1);
         close (fd);
         break;
     }
@@ -406,7 +415,7 @@ check_pointer (const void *pointer, unsigned size)
         pagedir_get_page (t->pagedir, pointer + i) == NULL)
         return false;
     }
-    return true;
+  return true;
 }
 
 /* Function to retrieve the sys_fd struct corresponding to a particular
