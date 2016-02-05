@@ -36,11 +36,6 @@ process_execute (const char *file_name)
   
   lock_acquire(&exec_lock);
   
-  /* Obtain the file struct for the given executable and deny writes
-     to it. */
-  struct sys_file* sf = NULL;
-  struct list_elem *e;
-  
   /* Make a copy of FILE_NAME.
      Otherwise there's a race between the caller and load(). */
   fn_copy = palloc_get_page (0);
