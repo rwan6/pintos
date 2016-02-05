@@ -240,7 +240,8 @@ process_exit (void)
   uint32_t *pd;
   
   /* Reallow writes to executable. */
-  file_allow_write (cur->executable);
+  if (cur->executable != NULL)
+    file_allow_write (cur->executable);
 
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */

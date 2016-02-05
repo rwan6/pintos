@@ -133,11 +133,11 @@ sema_up (struct semaphore *sema)
 
       /* Check the appropriate priority, depending on which scheduler
          is being used */
-      if ((!thread_mlfqs && thread_max->priority >
+      /*if ((!thread_mlfqs && thread_max->priority >
          thread_current ()->priority) ||
          (thread_mlfqs && thread_max->mlfqs_priority >
          thread_current ()->mlfqs_priority))
-        yield = true;
+        yield = true;*/
     }
 
   sema->value++;
