@@ -149,20 +149,12 @@ exit (int status)
     } 
   
   /* Close any open file handles.  Closing a file also reenables writes. */
-  for (e = list_begin (&t->opened_fds);
-       e != list_end (&t->opened_fds);
-       e = list_next(e))
+  e = list_begin (&t->opened_fds);
+  while (list_size (&t->opened_fds) > 0 && e != list_end (&t->opened_fds))
     {
-      /* Since list size changes in close, we do not want to call close
-         when the list is empty.  This protects the system against
-         exceptions related to the iterating value 'e'. */
-      if (list_size(&t->opened_fds) > 0)
-        {
-          int fd = list_entry (e, struct sys_fd, thread_opened_elem)->value;
-          close (fd);
-        }
-      else
-        break;
+      int fd = list_entry (e, struct sys_fd, thread_opened_elem)->value;
+      close (fd);
+      e = list_next (e);
     }
 
   /* Signal my parent to resume execution from process_wait. */
@@ -355,7 +347,7 @@ read (int fd, void *buffer, unsigned size)
     {
       /* Read from the console. */
       input_getc();
-      return 1;
+      return size;
     }
   else
     {
