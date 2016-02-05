@@ -153,8 +153,16 @@ exit (int status)
        e != list_end (&t->opened_fds);
        e = list_next(e))
     {
-      int fd = list_entry (e, struct sys_fd, thread_opened_elem)->value;
-      close (fd);
+      /* Since list size changes in close, we do not want to call close
+         when the list is empty.  This protects the system against
+         exceptions related to the iterating value 'e'. */
+      if (list_size(&t->opened_fds) > 0)
+        {
+          int fd = list_entry (e, struct sys_fd, thread_opened_elem)->value;
+          close (fd);
+        }
+      else
+        break;
     }
 
   /* Signal my parent to resume execution from process_wait. */
@@ -289,14 +297,15 @@ open (const char *file)
           free (fd);
           return -1;
         }
-      strlcpy (sf->name, file, strlen (file) + 1);
+      list_init (&sf->fd_list);
+      strlcpy (sf->name, file, strlen (file)+1);
       sf->file = f;
     }
 
   /* Now that sf points to something useful, add it to the opened_files
      list, add the fd to sf's list and update fd's sys_file pointer */
   list_push_back (&opened_files, &sf->sys_file_elem);
-  list_push_back (&sf->fd_list, &fd->sys_file_elem);
+  list_push_back (&sf->fd_list, &fd->sys_fd_elem);
   fd->sys_file = sf;
 
   /* Add to used_fds list */
@@ -462,7 +471,7 @@ if (fd_instance != NULL)
 
   list_remove (&fd_instance->thread_opened_elem);
 
-  list_remove (&fd_instance->sys_file_elem);
+  list_remove (&fd_instance->sys_fd_elem);
 
   if (list_empty (&fd_instance->sys_file->fd_list))
     {
