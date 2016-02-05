@@ -46,7 +46,8 @@ process_execute (const char *file_name)
       return TID_ERROR;
     }
   strlcpy (fn_copy, file_name, PGSIZE);
-  
+
+  /*
   fn_copy2 = palloc_get_page (0);
   if (fn_copy2 == NULL)
     {
@@ -57,6 +58,7 @@ process_execute (const char *file_name)
     }
   strlcpy (fn_copy2, file_name, PGSIZE);
   file_name = strtok_r (fn_copy2," ", &save_ptr);
+  */
 
   /* Create a new thread to execute FILE_NAME. */
   tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
@@ -73,7 +75,8 @@ process_execute (const char *file_name)
       cp->child->executable = filesys_open (file_name);
       
       /* Deny writes to executable. */
-      file_deny_write (cp->child->executable);
+      if (cp->child->executable != NULL) 
+        file_deny_write (cp->child->executable);
       
       cp->terminated = false;
       cp->waited_on = false;
@@ -81,7 +84,7 @@ process_execute (const char *file_name)
         &cp->child_elem);
     }
   
-  palloc_free_page (fn_copy2);
+  //palloc_free_page (fn_copy2);
   if (tid == TID_ERROR)
     {
       palloc_free_page (fn_copy); 

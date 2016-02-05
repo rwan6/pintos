@@ -98,7 +98,6 @@ syscall_handler (struct intr_frame *f)
         close (arg1);
         break;
     }
-
 }
 
 /* Terminates Pintos. */
