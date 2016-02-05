@@ -274,7 +274,7 @@ open (const char *file)
         }
     }
     
-  lock_acquire (&file_lock);  
+  lock_acquire (&file_lock);
   struct file *f = filesys_open (file);
   lock_release (&file_lock); 
   
@@ -298,7 +298,7 @@ open (const char *file)
           return -1;
         }
       list_init (&sf->fd_list);
-      strlcpy (sf->name, file, strlen (file)+1);
+      strlcpy (sf->name, file, strlen (file) + 1);
       sf->file = f;
     }
 

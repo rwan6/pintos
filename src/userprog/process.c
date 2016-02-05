@@ -72,7 +72,9 @@ process_execute (const char *file_name)
       if (cp == NULL)
         return -1;
       cp->child = child_thread;
+      lock_acquire (&file_lock);
       cp->child->executable = filesys_open (file_name);
+      lock_release (&file_lock);
       
       /* Deny writes to executable. */
       if (cp->child->executable != NULL) 
@@ -370,7 +372,9 @@ load (const char *file_name, void (**eip) (void), void **esp)
   process_activate ();
 
   /* Open executable file. */
+  lock_acquire (&file_lock);
   file = filesys_open (file_name);
+  lock_release (&file_lock);
   if (file == NULL) 
     {
       printf ("load: %s: open failed\n", file_name);
