@@ -604,6 +604,7 @@ init_thread (struct thread *t, const char *name, int priority)
   t->recent_cpu = fix_int (0);
   t->mlfqs_priority = priority;
   t->parent = NULL;
+  t->executable = NULL;
 
   t->magic = THREAD_MAGIC;
 

@@ -7,6 +7,7 @@
 #include <string.h>
 #include "userprog/gdt.h"
 #include "userprog/pagedir.h"
+#include "userprog/syscall.h"
 #include "userprog/tss.h"
 #include "filesys/directory.h"
 #include "filesys/file.h"
@@ -34,7 +35,12 @@ process_execute (const char *file_name)
   tid_t tid;
   
   lock_acquire(&exec_lock);
-
+  
+  /* Obtain the file struct for the given executable and deny writes
+     to it. */
+  struct sys_file* sf = NULL;
+  struct list_elem *e;
+  
   /* Make a copy of FILE_NAME.
      Otherwise there's a race between the caller and load(). */
   fn_copy = palloc_get_page (0);
@@ -69,6 +75,11 @@ process_execute (const char *file_name)
       if (cp == NULL)
         return -1;
       cp->child = child_thread;
+      cp->child->executable = filesys_open (file_name);
+      
+      /* Deny writes to executable. */
+      file_deny_write (cp->child->executable);
+      
       cp->terminated = false;
       cp->waited_on = false;
       list_push_back (&thread_current ()->children,
@@ -91,6 +102,7 @@ process_execute (const char *file_name)
 static void
 start_process (void *file_name_)
 {
+  
   char *file_name = file_name_;
   char *save_ptr;
   struct intr_frame if_;
@@ -231,6 +243,9 @@ process_exit (void)
 {
   struct thread *cur = thread_current ();
   uint32_t *pd;
+  
+  /* Reallow writes to executable. */
+  file_allow_write (cur->executable);
 
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */

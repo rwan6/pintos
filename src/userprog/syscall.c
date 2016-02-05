@@ -119,7 +119,7 @@ exit (int status)
   struct child_process *cp;
   
   /* Free my children from my list and update each of their
-     parents to NULL */
+     parents to NULL. */
   for (e = list_begin (&t->children);
        e != list_end (&t->children);
        e = list_next(e))
@@ -149,7 +149,7 @@ exit (int status)
         }
     } 
   
-  /* Close any open file handles */
+  /* Close any open file handles.  Closing a file also reenables writes. */
   for (e = list_begin (&t->opened_fds);
        e != list_end (&t->opened_fds);
        e = list_next(e))
@@ -291,6 +291,7 @@ open (const char *file)
           return -1;
         }
       strlcpy (sf->name, file, strlen (file) + 1);
+      sf->file = f;
     }
 
   /* Now that sf points to something useful, add it to the opened_files

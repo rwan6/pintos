@@ -131,6 +131,7 @@ struct thread
     struct lock wait_lock;              /* Lock held by child thread. */
     struct condition wait_cond;         /* Condition to wait on
       by parent process. */
+    struct file *executable;            /* Executable file. */
 #endif
   };
   
