@@ -47,7 +47,6 @@ process_execute (const char *file_name)
     }
   strlcpy (fn_copy, file_name, PGSIZE);
 
-  /*
   fn_copy2 = palloc_get_page (0);
   if (fn_copy2 == NULL)
     {
@@ -57,8 +56,7 @@ process_execute (const char *file_name)
       return TID_ERROR;
     }
   strlcpy (fn_copy2, file_name, PGSIZE);
-  file_name = strtok_r (fn_copy2," ", &save_ptr);
-  */
+  file_name = strtok_r (fn_copy2," ", &save_ptr);  
 
   /* Create a new thread to execute FILE_NAME. */
   tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
@@ -227,9 +225,9 @@ process_wait (tid_t child_tid)
             {
               cp->waited_on = true;
               /* Wait on my child. */
-              lock_acquire (&cp->child->wait_lock);
-              cond_wait (&cp->child->wait_cond, &cp->child->wait_lock);
-              lock_release (&cp->child->wait_lock);
+              lock_acquire (&t->wait_lock);
+              cond_wait (&t->wait_cond, &t->wait_lock);
+              lock_release (&t->wait_lock);
             }
         }
     }

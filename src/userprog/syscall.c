@@ -158,9 +158,9 @@ exit (int status)
     }
 
   /* Signal my parent to resume execution from process_wait. */
-  lock_acquire (&t->wait_lock);
-  cond_signal (&t->wait_cond, &t->wait_lock);
-  lock_release (&t->wait_lock);
+  lock_acquire (&t->parent->wait_lock);
+  cond_signal (&t->parent->wait_cond, &t->parent->wait_lock);
+  lock_release (&t->parent->wait_lock);
 
   printf ("%s: exit(%d)\n", t->name, status);
   thread_exit ();
