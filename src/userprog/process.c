@@ -100,7 +100,6 @@ process_execute (const char *file_name)
 static void
 start_process (void *file_name_)
 {
-  
   char *file_name = file_name_;
   char *save_ptr;
   struct intr_frame if_;

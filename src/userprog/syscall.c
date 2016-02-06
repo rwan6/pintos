@@ -47,15 +47,23 @@ syscall_init (void)
 static void
 syscall_handler (struct intr_frame *f)
 {
-  //printf ("\n\n");
-  //hex_dump (f->esp, f->esp, 256, true);
+  /* If esp is a bad address, kill the process immediately. */
+  if (!check_pointer ((const void *) (f->esp), 1))
+    {
+      f->eax = -1;
+      exit (-1);
+      return;
+    }
+    
+  // printf ("\n\n");
+  // hex_dump (f->esp, f->esp, 256, true);
   int *sp = (int *) (f->esp);
   int syscall_num = *sp;
   int arg1 = *(sp + 1);
   int arg2 = *(sp + 2);
   int arg3 = *(sp + 3);
   //printf ("syscall_num: %d\n", syscall_num);
-
+  
   switch (syscall_num)
     {
       case SYS_HALT :
