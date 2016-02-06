@@ -34,15 +34,15 @@ process_execute (const char *file_name)
   char *fn_copy, *fn_copy2, *save_ptr;
   tid_t tid;
   
-  lock_acquire(&exec_lock);
+  lock_acquire (&exec_lock);
   
   /* Make a copy of FILE_NAME.
      Otherwise there's a race between the caller and load(). */
   fn_copy = palloc_get_page (0);
   if (fn_copy == NULL)
     {
-      cond_signal(&exec_cond, &exec_lock);
-      lock_release(&exec_lock);
+      cond_signal (&exec_cond, &exec_lock);
+      lock_release (&exec_lock);
       return TID_ERROR;
     }
   strlcpy (fn_copy, file_name, PGSIZE);
@@ -51,8 +51,8 @@ process_execute (const char *file_name)
   if (fn_copy2 == NULL)
     {
       palloc_free_page (fn_copy);
-      cond_signal(&exec_cond, &exec_lock);
-      lock_release(&exec_lock);
+      cond_signal (&exec_cond, &exec_lock);
+      lock_release (&exec_lock);
       return TID_ERROR;
     }
   strlcpy (fn_copy2, file_name, PGSIZE);
@@ -240,6 +240,15 @@ process_exit (void)
 {
   struct thread *cur = thread_current ();
   uint32_t *pd;
+  
+  /* If my parent is still alive, make sure they are not
+     caught in a deadlock. */
+  if (cur->parent != NULL)
+    {
+      lock_acquire (&cur->parent->wait_lock);
+      cond_signal (&cur->parent->wait_cond, &cur->parent->wait_lock);
+      lock_release (&cur->parent->wait_lock);
+    }
   
   /* Reallow writes to executable. */
   if (cur->executable != NULL)
