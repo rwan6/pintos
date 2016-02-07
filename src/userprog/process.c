@@ -78,6 +78,7 @@ process_execute (const char *file_name)
       if (cp->child->executable != NULL)
         file_deny_write (cp->child->executable);
 
+      cp->status = -1;
       cp->terminated = false;
       cp->waited_on = false;
       list_push_back (&thread_current ()->children,
@@ -241,7 +242,7 @@ process_exit (void)
   struct thread *cur = thread_current ();
   uint32_t *pd;
 // printf("process_exit 1: %d\n", cur->tid);
-  printf ("%s: exit(%d)\n", cur->name, cur->status);
+
   /* If my parent is still alive, make sure they are not
      caught in a deadlock. */
   if (cur->parent != NULL)
