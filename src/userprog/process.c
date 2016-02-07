@@ -104,6 +104,7 @@ start_process (void *file_name_)
   char *save_ptr;
   struct intr_frame if_;
   bool success;
+  struct thread *cur = thread_current ();
 
   file_name = strtok_r (file_name, " ", &save_ptr);
 // printf("start_process2\n");
@@ -118,6 +119,7 @@ start_process (void *file_name_)
   if (!success)
     {
       palloc_free_page (file_name);
+      cur->return_status = -1;
       thread_exit ();
     }
 // printf("start_process4\n");
@@ -137,6 +139,7 @@ start_process (void *file_name_)
   if (ptrs == NULL)
     {
       palloc_free_page (file_name);
+      cur->return_status = -1;
       thread_exit ();
     }
 // printf("start_process6\n");
@@ -203,8 +206,8 @@ process_wait (tid_t child_tid)
   struct list_elem *e;
   struct child_process *cp;
 
-/* Free my children from my list and update each of their
-   parents to NULL */
+  /* Free my children from my list and update each of their
+     parents to NULL */
   for (e = list_begin (&t->children);
        e != list_end (&t->children);
        e = list_next(e))
@@ -223,6 +226,7 @@ process_wait (tid_t child_tid)
           else
             {
               cp->waited_on = true;
+              t->child_wait_tid = child_tid;
               /* Wait on my child. */
               lock_acquire (&t->wait_lock);
               cond_wait (&t->wait_cond, &t->wait_lock);
@@ -241,10 +245,10 @@ process_exit (void)
   struct thread *cur = thread_current ();
   uint32_t *pd;
 // printf("process_exit 1: %d\n", cur->tid);
-  printf ("%s: exit(%d)\n", cur->name, cur->status);
+  printf ("%s: exit(%d)\n", cur->name, cur->return_status);
   /* If my parent is still alive, make sure they are not
      caught in a deadlock. */
-  if (cur->parent != NULL)
+  if (cur->parent != NULL && cur->parent->child_wait_tid == cur->tid)
     {
       lock_acquire (&cur->parent->wait_lock);
       cond_signal (&cur->parent->wait_cond, &cur->parent->wait_lock);

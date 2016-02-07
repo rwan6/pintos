@@ -48,14 +48,14 @@ static void
 syscall_handler (struct intr_frame *f)
 {
   /* If esp is a bad address, kill the process immediately. */
-  printf ("Before check\n");
+  //printf ("Before check\n");
   if (!check_pointer ((const void *) (f->esp), 1))
     {
       f->eax = -1;
       exit (-1);
       return;
     }
-  printf ("After check\n");
+  //printf ("After check\n");
 
 
   // printf ("\n\n");
@@ -65,7 +65,7 @@ syscall_handler (struct intr_frame *f)
   int arg1 = *(sp + 1);
   int arg2 = *(sp + 2);
   int arg3 = *(sp + 3);
-  printf ("syscall_num: %d\n", syscall_num);
+  //printf ("syscall_num: %d\n", syscall_num);
 
   switch (syscall_num)
     {
@@ -169,11 +169,15 @@ exit (int status)
     }
 
   /* Signal my parent to resume execution from process_wait. */
-  lock_acquire (&t->parent->wait_lock);
-  cond_signal (&t->parent->wait_cond, &t->parent->wait_lock);
-  lock_release (&t->parent->wait_lock);
+  if (t->parent->child_wait_tid == t->tid)
+    {
+      lock_acquire (&t->parent->wait_lock);
+      cond_signal (&t->parent->wait_cond, &t->parent->wait_lock);
+      lock_release (&t->parent->wait_lock);
+    }
 
-  // printf ("%s: exit(%d)\n", t->name, status);
+  printf ("%s: exit(%d)\n", t->name, status);
+  t->return_status = status;
   thread_exit ();
 }
 
