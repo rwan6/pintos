@@ -56,8 +56,8 @@ syscall_handler (struct intr_frame *f)
       return;
     }
   printf ("After check\n");
-    
-    
+
+
   // printf ("\n\n");
   // hex_dump (f->esp, f->esp, 256, true);
   int *sp = (int *) (f->esp);
@@ -66,7 +66,7 @@ syscall_handler (struct intr_frame *f)
   int arg2 = *(sp + 2);
   int arg3 = *(sp + 3);
   printf ("syscall_num: %d\n", syscall_num);
-  
+
   switch (syscall_num)
     {
       case SYS_HALT :
@@ -127,7 +127,7 @@ exit (int status)
   struct thread *t = thread_current ();
   struct list_elem *e;
   struct child_process *cp;
-  
+
   /* Free my children from my list and update each of their
      parents to NULL. */
   for (e = list_begin (&t->children);
@@ -137,9 +137,9 @@ exit (int status)
       cp = list_entry (e, struct child_process,
         child_elem);
       cp->child->parent = NULL;
-      free (cp);  
+      free (cp);
     }
-    
+
   /* If my parent is still alive, update my status and
      notify them that I am being terminated. */
   if (t->parent != NULL)
@@ -158,7 +158,7 @@ exit (int status)
             }
         }
     }
-  
+
   /* Close any open file handles.  Closing a file also reenables writes. */
   e = list_begin (&t->opened_fds);
   while (list_size (&t->opened_fds) > 0 && e != list_end (&t->opened_fds))
@@ -173,7 +173,7 @@ exit (int status)
   cond_signal (&t->parent->wait_cond, &t->parent->wait_lock);
   lock_release (&t->parent->wait_lock);
 
-  printf ("%s: exit(%d)\n", t->name, status);
+  // printf ("%s: exit(%d)\n", t->name, status);
   thread_exit ();
 }
 
@@ -189,7 +189,7 @@ exec (const char *cmd_line)
     {
       lock_acquire(&exec_lock);
       new_process_pid = process_execute (cmd_line);
-      
+
       /* Wait until child process completes its initialization.  Note
          that the child will return -1 in the event that it failed to
          load its executable or initialize, which can then be return
@@ -254,13 +254,13 @@ remove (const char *file)
 static int
 open (const char *file)
 {
-  
+
   if (!check_pointer ((const void *) file, strlen (file)))
     {
       exit (-1);
       return -1;
     }
-  
+
   bool found = false;
   struct list_elem *e;
   struct sys_file* sf = NULL;
@@ -276,11 +276,11 @@ open (const char *file)
           break;
         }
     }
-    
+
   lock_acquire (&file_lock);
   struct file *f = filesys_open (file);
-  lock_release (&file_lock); 
-  
+  lock_release (&file_lock);
+
   if (!f)
     return -1;
 
@@ -328,7 +328,7 @@ filesize (int fd)
 {
   int file_size;
   struct sys_fd *fd_instance = get_fd_item (fd);
-  
+
 /* Should not be NULL unless the fd was invalid. */
   if (fd_instance != NULL)
     {
@@ -383,18 +383,18 @@ read (int fd, void *buffer, unsigned size)
 static int
 write (int fd, const void *buffer, unsigned size)
 {
-  printf ("In write\n");
+  // printf ("In write\n");
   if (!check_pointer(buffer, size))
     {
       exit (-1);
       return -1;
     }
-    
+
   int num_written;
   /* If SDOUT_FILENO. */
   if (fd == 1)
     {
-      printf ("fd = 1\n");
+      // printf ("fd = 1\n");
       /* Write to console. */
       putbuf (buffer, size);
       return size;
@@ -421,7 +421,7 @@ static void
 seek (int fd, unsigned position)
 {
   struct sys_fd *fd_instance = get_fd_item (fd);
-  
+
   /* Should not be NULL unless the fd was invalid. */
   if (fd_instance != NULL)
     {
@@ -438,7 +438,7 @@ tell (int fd)
 {
   unsigned position;
   struct sys_fd *fd_instance = get_fd_item (fd);
-  
+
   /* Should not be NULL unless the fd was invalid.  Cast off_t to
      unsigned for return. */
   if (fd_instance != NULL)
@@ -448,7 +448,7 @@ tell (int fd)
       lock_release (&file_lock);
       return position;
     }
-  
+
   /* If fd_instance was NULL, then return 0.  This line should
      rarely (if ever) be reached! */
   return 0;
@@ -461,7 +461,7 @@ static void
 close (int fd)
 {
   struct sys_fd *fd_instance = get_fd_item (fd);
-  
+
 /* Should not be NULL unless the fd was invalid. */
 if (fd_instance != NULL)
   {
@@ -469,7 +469,7 @@ if (fd_instance != NULL)
     file_close (fd_instance->file);
     lock_release (&file_lock);
   }
-  
+
   /* Should not be NULL unless the fd was invalid.  Remove myself
      from the list of all the fds. */
   if (fd_instance != NULL)
