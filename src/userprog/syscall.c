@@ -206,16 +206,16 @@ exec (const char *cmd_line)
   else
     {
       new_process_pid = process_execute (cmd_line);
-      int success = process_wait (new_process_pid);
-
-      return (pid_t) (success < 0) ? -1 : new_process_pid;
+      // int success = process_wait (new_process_pid);
+return new_process_pid;
+      // return (pid_t) (success < 0) ? -1 : new_process_pid;
     }
 }
 
 /* Wait for a child process pid and retrieves the child's exit status. */
 static int
 wait (pid_t pid)
-{
+{//printf("waiting...\n");
   return process_wait ((tid_t) pid);
 }
 

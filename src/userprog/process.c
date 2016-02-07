@@ -82,6 +82,7 @@ process_execute (const char *file_name)
       cp->status = -1;
       cp->terminated = false;
       cp->waited_on = false;
+      // cp->executed = false;
       list_push_back (&thread_current ()->children,
         &cp->child_elem);
     }
@@ -125,6 +126,9 @@ start_process (void *file_name_)
       thread_exit ();
     }
 
+  lock_acquire(&exec_lock);
+  cond_signal(&exec_cond, &exec_lock);
+  lock_release(&exec_lock);
   /* Populate the stack with arguments */
   char *argv[MAX_ARG_NUM];
   char *token;
@@ -203,7 +207,7 @@ start_process (void *file_name_)
    immediately, without waiting. */
 int
 process_wait (tid_t child_tid)
-{
+{//printf("process_wait %d\n", child_tid);
   struct thread *t = thread_current ();
   struct list_elem *e;
   struct child_process *cp;
@@ -215,29 +219,34 @@ process_wait (tid_t child_tid)
        e = list_next(e))
     {
       cp = list_entry (e, struct child_process,
-        child_elem);
+        child_elem);//printf("0 %x\n", cp->child->tid);
       if (cp->child->tid == child_tid)
-        {
+        {//printf("1\n");
           if (cp->waited_on)
             return -1;
           else if (cp->terminated)
-            {
+            {//printf("2\n");
               cp->waited_on = true;
             }
           else
-            {
-              cp->waited_on = true;
+            {//printf("3\n");
+              // if (cp->executed)
+                cp->waited_on = true;
               t->child_wait_tid = child_tid;
               /* Wait on my child. */
               lock_acquire (&t->wait_lock);
               cond_wait (&t->wait_cond, &t->wait_lock);
               lock_release (&t->wait_lock);
             }
-          break;
+          // break;
+          // printf("%d\n", cp->status);
+          // if (!cp->executed)
+          //   cp->executed = true;
+          return cp->status;
         }
     }
 
-  return cp->status;
+  return -1;//cp->status;
 }
 
 /* Free the current process's resources. */
@@ -246,7 +255,7 @@ process_exit (void)
 {
   struct thread *cur = thread_current ();
   uint32_t *pd;
-
+  cur->my_process->terminated = true;
   printf ("%s: exit(%d)\n", cur->name, cur->return_status);
 
   /* If my parent is still alive, make sure they are not
