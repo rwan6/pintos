@@ -150,7 +150,6 @@ exit (int status)
       cp = list_entry (e, struct child_process,
         child_elem);
       cp->child->parent = NULL;
-      // free (cp);
     }
 
   /* If my parent is still alive, update my status and

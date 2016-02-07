@@ -607,6 +607,7 @@ init_thread (struct thread *t, const char *name, int priority)
   t->mlfqs_priority = priority;
   t->parent = NULL;
   t->executable = NULL;
+  t->my_process = NULL;
 
   t->magic = THREAD_MAGIC;
 

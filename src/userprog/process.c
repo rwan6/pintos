@@ -70,6 +70,7 @@ process_execute (const char *file_name)
       if (cp == NULL)
         return -1;
       cp->child = child_thread;
+      cp->child->my_process = cp;
       lock_acquire (&file_lock);
       cp->child->executable = filesys_open (file_name);
       lock_release (&file_lock);
@@ -249,13 +250,16 @@ process_exit (void)
   printf ("%s: exit(%d)\n", cur->name, cur->return_status);
   
   /* If my parent is still alive, make sure they are not
-     caught in a deadlock. */
+     caught in a deadlock.  Otherwise, deallocate my child_process
+     from my parent's list. */
   if (cur->parent != NULL && cur->parent->child_wait_tid == cur->tid)
     {
       lock_acquire (&cur->parent->wait_lock);
       cond_signal (&cur->parent->wait_cond, &cur->parent->wait_lock);
       lock_release (&cur->parent->wait_lock);
     }
+  else if (cur->parent == NULL)
+    free (cur->my_process);
 
   /* Reallow writes to executable. */
   if (cur->executable != NULL)
@@ -480,7 +484,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
   file_close (file);
   return success;
 }
-
+
 /* load() helpers. */
 
 static bool install_page (void *upage, void *kpage, bool writable);

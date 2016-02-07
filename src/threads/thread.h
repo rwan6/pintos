@@ -131,6 +131,8 @@ struct thread
     struct lock wait_lock;              /* Lock held by child thread. */
     struct condition wait_cond;         /* Condition to wait on
       by parent process. */
+    struct child_process *my_process;   /* Copy of child_process in my  
+      parent's children list. */
     tid_t child_wait_tid;               /* tid of child I am waiting on */
     int return_status;                  /* Return status of this thread */
     struct file *executable;            /* Executable file. */
