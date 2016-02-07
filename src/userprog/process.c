@@ -100,7 +100,7 @@ process_execute (const char *file_name)
    running. */
 static void
 start_process (void *file_name_)
-{//printf("start_process1\n");
+{
   char *file_name = file_name_;
   char *save_ptr;
   struct intr_frame if_;
@@ -108,14 +108,14 @@ start_process (void *file_name_)
   struct thread *cur = thread_current ();
 
   file_name = strtok_r (file_name, " ", &save_ptr);
-// printf("start_process2\n");
+
   /* Initialize interrupt frame and load executable. */
   memset (&if_, 0, sizeof if_);
   if_.gs = if_.fs = if_.es = if_.ds = if_.ss = SEL_UDSEG;
   if_.cs = SEL_UCSEG;
   if_.eflags = FLAG_IF | FLAG_MBS;
   success = load (file_name, &if_.eip, &if_.esp);
-// printf("start_process3\n");
+
   /* If load failed, quit. */
   if (!success)
     {
@@ -123,7 +123,7 @@ start_process (void *file_name_)
       cur->return_status = -1;
       thread_exit ();
     }
-// printf("start_process4\n");
+
   /* Populate the stack with arguments */
   char *argv[MAX_ARG_NUM];
   char *token;
@@ -134,7 +134,7 @@ start_process (void *file_name_)
       argv[argc] = token;
       argc++;
     }
-// printf("start_process5\n");
+
   /* Push each argument in reverse order. */
   char **ptrs = (char **) malloc (sizeof (char*) * argc);
   if (ptrs == NULL)
@@ -143,7 +143,7 @@ start_process (void *file_name_)
       cur->return_status = -1;
       thread_exit ();
     }
-// printf("start_process6\n");
+
   for (i = argc - 1; i >= 0; i--)
     {
       size_t len = strlen (argv[i]) + 1;
@@ -151,7 +151,7 @@ start_process (void *file_name_)
       strlcpy ((char *) if_.esp, argv[i], len);
       ptrs[i] = (char *) if_.esp;
     }
-// printf("start_process7\n");
+
   /* Word align the stack pointer to a multiple of 4. */
   if_.esp = (void *) ((unsigned int) if_.esp & 0xfffffffc);
 
@@ -178,7 +178,7 @@ start_process (void *file_name_)
   /* Push return address. */
   if_.esp = ((void **) if_.esp - 1);
   *((void **) if_.esp) = 0;
-// printf("start_process8\n");
+
   palloc_free_page (file_name);
   free (ptrs);
 

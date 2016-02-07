@@ -54,7 +54,6 @@ syscall_handler (struct intr_frame *f)
       exit (-1);
       return;
     }
-  //printf ("After check\n");
 
   // printf ("\n\n");
   // hex_dump (f->esp, f->esp, 256, true);
@@ -64,6 +63,8 @@ syscall_handler (struct intr_frame *f)
   int arg2 = *(sp + 2);
   int arg3 = *(sp + 3);
   //printf ("syscall_num: %d\n", syscall_num);
+  
+  /* check if arg1 is valid (unless halt is called). */
 
   switch (syscall_num)
     {
@@ -86,6 +87,14 @@ syscall_handler (struct intr_frame *f)
         f->eax = remove ((char *) arg1);
         break;
       case SYS_OPEN :
+        /* If the file name is NULL, we should not even enter
+           the open function. */
+        if ((void *) arg1 == NULL)
+          {
+            f->eax = -1;
+            exit (-1);
+            return;
+          }
         f->eax = open ((char *) arg1);
         break;
       case SYS_FILESIZE :
@@ -255,7 +264,6 @@ remove (const char *file)
 static int
 open (const char *file)
 {
-
   if (!check_pointer ((const void *) file, strlen (file)))
     {
       exit (-1);
@@ -348,7 +356,6 @@ filesize (int fd)
 static int
 read (int fd, void *buffer, unsigned size)
 {
-  printf ("In read\n");
   if (!check_pointer(buffer, size))
     {
       exit (-1);
@@ -384,7 +391,6 @@ read (int fd, void *buffer, unsigned size)
 static int
 write (int fd, const void *buffer, unsigned size)
 {
-  // printf ("In write\n");
   if (!check_pointer(buffer, size))
     {
       exit (-1);
@@ -395,7 +401,6 @@ write (int fd, const void *buffer, unsigned size)
   /* If SDOUT_FILENO. */
   if (fd == 1)
     {
-      // printf ("fd = 1\n");
       /* Write to console. */
       putbuf (buffer, size);
       return size;
