@@ -427,18 +427,18 @@ close (int fd)
 {
   struct sys_fd *fd_instance = get_fd_item (fd);
 
-/* Should not be NULL unless the fd was invalid. */
-if (fd_instance != NULL)
-  {
-    lock_acquire (&file_lock);
-    file_close (fd_instance->file);
-    lock_release (&file_lock);
-  }
+  /* If the pointer returned to fd_instance is NULL, the fd was not
+     found in the file list.  Thus, we should exit immediately. */
+  if (fd_instance == NULL)
+    exit (-1);
 
-  /* Should not be NULL unless the fd was invalid.  Remove myself
-     from the list of all the fds. */
-  if (fd_instance != NULL)
-    list_remove(&fd_instance->used_fds_elem);
+  /* Close the file and remove it from all lists if fd_instance
+     is valid. */
+  lock_acquire (&file_lock);
+  file_close (fd_instance->file);
+  lock_release (&file_lock);
+      
+  list_remove(&fd_instance->used_fds_elem);
 
   list_remove (&fd_instance->thread_opened_elem);
 
