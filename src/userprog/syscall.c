@@ -428,7 +428,9 @@ close (int fd)
   struct sys_fd *fd_instance = get_fd_item (fd);
 
   /* If the pointer returned to fd_instance is NULL, the fd was not
-     found in the file list.  Thus, we should exit immediately. */
+     found in the file list.  Thus, we should exit immediately.
+     Note that this also takes care of the case when stdin or stdout
+     are passed as fd (0 and 1, respectively). */
   if (fd_instance == NULL)
     exit (-1);
 
