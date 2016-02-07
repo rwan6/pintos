@@ -141,7 +141,7 @@ exit (int status)
   struct list_elem *e;
   struct child_process *cp;
 
-  /* Free my children from my list and update each of their
+  /* Remove my children from my list and update each of their
      parents to NULL. */
   for (e = list_begin (&t->children);
        e != list_end (&t->children);
@@ -317,17 +317,16 @@ filesize (int fd)
 {
   int file_size;
   struct sys_fd *fd_instance = get_fd_item (fd);
+  
+  /* If the pointer returned to fd_instance is NULL, the fd was not
+     found in the file list.  Thus, we should exit immediately. */
+  if (fd_instance == NULL)
+    exit (-1);
 
-/* Should not be NULL unless the fd was invalid. */
-  if (fd_instance != NULL)
-    {
-      lock_acquire (&file_lock);
-      file_size = file_length (fd_instance->file);
-      lock_release (&file_lock);
-      return file_size;
-    }
-
-  return -1;
+  lock_acquire (&file_lock);
+  file_size = file_length (fd_instance->file);
+  lock_release (&file_lock);
+  return file_size;
 }
 
 /* Returns the number of bytes actually read, or -1 if the file could
