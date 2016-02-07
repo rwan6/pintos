@@ -134,7 +134,8 @@ halt (void)
 /* Terminates the current user program.
    Status = 0 indicates success.
    Status != 0 indicates errors. */
-static void
+//static void
+void
 exit (int status)
 {
   struct thread *t = thread_current ();
@@ -207,13 +208,7 @@ exec (const char *cmd_line)
     {
       new_process_pid = process_execute (cmd_line);
       int success = process_wait (new_process_pid);
-      /* Wait until child process completes its initialization.  Note
-         that the child will return -1 in the event that it failed to
-         load its executable or initialize, which can then be return
-         when this function terminates. */
-      // lock_acquire(&exec_lock);
-      // cond_wait(&exec_cond, &exec_lock);
-      // lock_release(&exec_lock);
+
       return (pid_t) (success < 0) ? -1 : new_process_pid;
     }
 }
