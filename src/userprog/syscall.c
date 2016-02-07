@@ -134,8 +134,7 @@ halt (void)
 /* Terminates the current user program.
    Status = 0 indicates success.
    Status != 0 indicates errors. */
-//static void
-void
+static void
 exit (int status)
 {
   struct thread *t = thread_current ();
@@ -174,11 +173,11 @@ exit (int status)
 
   /* Close any open file handles.  Closing a file also reenables writes. */
   e = list_begin (&t->opened_fds);
-  while (list_size (&t->opened_fds) > 0 && e != list_end (&t->opened_fds))
+  while (!list_empty (&t->opened_fds) && e != list_end (&t->opened_fds))
     {
       int fd = list_entry (e, struct sys_fd, thread_opened_elem)->value;
       close (fd);
-      e = list_next (e);
+      e = list_begin (&t->opened_fds);
     }
 
   /* Signal my parent to resume execution from process_wait. */
@@ -254,7 +253,7 @@ open (const char *file)
   bool found = false;
   struct list_elem *e;
   struct sys_file* sf = NULL;
-  /* Figure out if we have opened this file before */
+  /* Figure out if we have opened this file before. */
   for (e = list_begin (&opened_files);
        e != list_end (&opened_files);
        e = list_next(e))
@@ -276,19 +275,19 @@ open (const char *file)
 
   struct sys_fd *fd = malloc (sizeof (struct sys_fd));
   if (!fd)
-    return -1;
+    exit (-1);
   fd->value = next_avail_fd++;
   fd->file = f;
 
 
-  /* If we have not opened it before, create a new entry */
+  /* If we have not opened it before, create a new entry. */
   if (!found)
     {
       sf = malloc (sizeof (struct sys_file));
       if (!sf)
         {
           free (fd);
-          return -1;
+          exit (-1);
         }
       list_init (&sf->fd_list);
       strlcpy (sf->name, file, strlen (file) + 1);
@@ -296,15 +295,15 @@ open (const char *file)
     }
 
   /* Now that sf points to something useful, add it to the opened_files
-     list, add the fd to sf's list and update fd's sys_file pointer */
+     list, add the fd to sf's list and update fd's sys_file pointer. */
   list_push_back (&opened_files, &sf->sys_file_elem);
   list_push_back (&sf->fd_list, &fd->sys_fd_elem);
   fd->sys_file = sf;
 
-  /* Add to used_fds list */
+  /* Add to used_fds list. */
   list_push_back (&used_fds, &fd->used_fds_elem);
 
-  /* Add the fd to the thread's opened_fds list */
+  /* Add the fd to the thread's opened_fds list. */
   struct thread *t = thread_current ();
   list_push_back (&t->opened_fds, &fd->thread_opened_elem);
 
@@ -451,7 +450,7 @@ close (int fd)
   file_close (fd_instance->file);
   lock_release (&file_lock);
 
-  list_remove(&fd_instance->used_fds_elem);
+  list_remove (&fd_instance->used_fds_elem);
 
   list_remove (&fd_instance->thread_opened_elem);
 
@@ -470,8 +469,7 @@ close (int fd)
    Returns false if the pointer is found to be invalid, and true
    if the pointer is valid.  Note that all pointers are checked
    in the event that a buffer is passed. */
-//static bool
-bool
+static bool
 check_pointer (const void *pointer, unsigned size)
 {
   struct thread *t = thread_current ();
