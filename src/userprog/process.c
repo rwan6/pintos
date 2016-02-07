@@ -204,8 +204,6 @@ process_wait (tid_t child_tid)
   struct list_elem *e;
   struct child_process *cp;
 
-/* Free my children from my list and update each of their
-   parents to NULL */
   for (e = list_begin (&t->children);
        e != list_end (&t->children);
        e = list_next(e))
@@ -219,7 +217,6 @@ process_wait (tid_t child_tid)
           else if (cp->terminated)
             {
               cp->waited_on = true;
-              return cp->status;
             }
           else
             {
@@ -227,12 +224,13 @@ process_wait (tid_t child_tid)
               /* Wait on my child. */
               lock_acquire (&t->wait_lock);
               cond_wait (&t->wait_cond, &t->wait_lock);
-              lock_release (&t->wait_lock);//printf("woken up\n");
+              lock_release (&t->wait_lock);
             }
+          break;
         }
     }
 
-  return -1;
+  return cp->status;
 }
 
 /* Free the current process's resources. */
