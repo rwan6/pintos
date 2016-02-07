@@ -48,7 +48,6 @@ static void
 syscall_handler (struct intr_frame *f)
 {
   /* If esp is a bad address, kill the process immediately. */
-  //printf ("Before check\n");
   if (!check_pointer ((const void *) (f->esp), 1))
     {
       f->eax = -1;
@@ -56,7 +55,6 @@ syscall_handler (struct intr_frame *f)
       return;
     }
   //printf ("After check\n");
-
 
   // printf ("\n\n");
   // hex_dump (f->esp, f->esp, 256, true);

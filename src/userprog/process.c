@@ -78,6 +78,7 @@ process_execute (const char *file_name)
       if (cp->child->executable != NULL)
         file_deny_write (cp->child->executable);
 
+      cp->status = -1;
       cp->terminated = false;
       cp->waited_on = false;
       list_push_back (&thread_current ()->children,
@@ -221,7 +222,6 @@ process_wait (tid_t child_tid)
           else if (cp->terminated)
             {
               cp->waited_on = true;
-              return cp->status;
             }
           else
             {
@@ -230,12 +230,13 @@ process_wait (tid_t child_tid)
               /* Wait on my child. */
               lock_acquire (&t->wait_lock);
               cond_wait (&t->wait_cond, &t->wait_lock);
-              lock_release (&t->wait_lock);//printf("woken up\n");
+              lock_release (&t->wait_lock);
             }
+          break;
         }
     }
 
-  return -1;
+  return cp->status;
 }
 
 /* Free the current process's resources. */
@@ -246,6 +247,7 @@ process_exit (void)
   uint32_t *pd;
 // printf("process_exit 1: %d\n", cur->tid);
   printf ("%s: exit(%d)\n", cur->name, cur->return_status);
+  
   /* If my parent is still alive, make sure they are not
      caught in a deadlock. */
   if (cur->parent != NULL && cur->parent->child_wait_tid == cur->tid)
