@@ -173,8 +173,7 @@ exit (int status)
       cond_signal (&t->parent->wait_cond, &t->parent->wait_lock);
       lock_release (&t->parent->wait_lock);
     }
-
-  printf ("%s: exit(%d)\n", t->name, status);
+    
   t->return_status = status;
   thread_exit ();
 }
