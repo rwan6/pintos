@@ -30,7 +30,7 @@ static bool load (const char *cmdline, void (**eip) (void), void **esp);
    thread id, or TID_ERROR if the thread cannot be created. */
 tid_t
 process_execute (const char *file_name)
-{
+{//printf("process_executing %s\n", file_name);
   char *fn_copy, *fn_copy2, *save_ptr;
   tid_t tid;
 
@@ -248,7 +248,7 @@ process_exit (void)
   uint32_t *pd;
 
   printf ("%s: exit(%d)\n", cur->name, cur->return_status);
-  
+
   /* If my parent is still alive, make sure they are not
      caught in a deadlock.  Otherwise, deallocate my child_process
      from my parent's list. */
@@ -390,7 +390,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
 
   /* Open executable file. */
   lock_acquire (&file_lock);
-  file = filesys_open (file_name);
+  file = filesys_open (file_name);//printf("%s\n", file_name);
   lock_release (&file_lock);
   if (file == NULL)
     {

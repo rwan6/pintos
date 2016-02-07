@@ -79,7 +79,6 @@ syscall_handler (struct intr_frame *f)
       if (!check_pointer ((const void *) arg2, 1))
         exit (-1);
     }
-  
   switch (syscall_num)
     {
       case SYS_HALT :
@@ -89,7 +88,8 @@ syscall_handler (struct intr_frame *f)
         exit (arg1);
         break;
       case SYS_EXEC :
-        f->eax = exec ((char *) arg1);
+      // printf("cmd line len = %d\n", strlen((const char *) arg1));
+        f->eax = exec ((const char *) arg1);
         break;
       case SYS_WAIT :
         f->eax = wait (arg1);
@@ -198,13 +198,15 @@ static pid_t
 exec (const char *cmd_line)
 {
   tid_t new_process_pid;
-  if (!check_pointer ((const void *) cmd_line, strlen (cmd_line)))
-    // exit (-1);
-    return -1;
+  if (!check_pointer ((const void *) cmd_line, 14))
+    {//printf("haha\n");
+      exit (-1);
+      return -1;
+    }
   else
     {
       new_process_pid = process_execute (cmd_line);
-
+      int success = process_wait (new_process_pid);
       /* Wait until child process completes its initialization.  Note
          that the child will return -1 in the event that it failed to
          load its executable or initialize, which can then be return
@@ -212,7 +214,7 @@ exec (const char *cmd_line)
       // lock_acquire(&exec_lock);
       // cond_wait(&exec_cond, &exec_lock);
       // lock_release(&exec_lock);
-      return (pid_t) new_process_pid;
+      return (pid_t) (success < 0) ? -1 : new_process_pid;
     }
 }
 
@@ -351,7 +353,7 @@ read (int fd, void *buffer, unsigned size)
   else
     {
       struct sys_fd *fd_instance = get_fd_item (fd);
-      
+
       /* If the pointer returned to fd_instance is NULL, the fd was not
          found in the file list.  Thus, we should exit immediately. */
       if (fd_instance == NULL)
@@ -382,12 +384,12 @@ write (int fd, const void *buffer, unsigned size)
   else
     {
       struct sys_fd *fd_instance = get_fd_item (fd);
-      
+
       /* If the pointer returned to fd_instance is NULL, the fd was not
          found in the file list.  Thus, we should exit immediately. */
       if (fd_instance == NULL)
         exit (-1);
-      
+
       lock_acquire (&file_lock);
       num_written = file_write (fd_instance->file, buffer, size);
       lock_release (&file_lock);
@@ -402,7 +404,7 @@ static void
 seek (int fd, unsigned position)
 {
   struct sys_fd *fd_instance = get_fd_item (fd);
-  
+
   /* If the pointer returned to fd_instance is NULL, the fd was not
      found in the file list.  Thus, we should exit immediately. */
   if (fd_instance == NULL)
@@ -421,7 +423,7 @@ tell (int fd)
 {
   unsigned position;
   struct sys_fd *fd_instance = get_fd_item (fd);
-  
+
   /* If the pointer returned to fd_instance is NULL, the fd was not
      found in the file list.  Thus, we should exit immediately. */
   if (fd_instance == NULL)
