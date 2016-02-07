@@ -245,7 +245,7 @@ process_exit (void)
 {
   struct thread *cur = thread_current ();
   uint32_t *pd;
-// printf("process_exit 1: %d\n", cur->tid);
+
   printf ("%s: exit(%d)\n", cur->name, cur->return_status);
   
   /* If my parent is still alive, make sure they are not
