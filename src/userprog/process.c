@@ -87,10 +87,10 @@ process_execute (const char *file_name)
         &cp->child_elem);
     }
 
-  //palloc_free_page (fn_copy2);
   if (tid == TID_ERROR)
     {
       palloc_free_page (fn_copy);
+      palloc_free_page (fn_copy2);
     }
   cond_signal(&exec_cond, &exec_lock);
   lock_release(&exec_lock);
