@@ -131,14 +131,14 @@ struct thread
     struct lock wait_lock;              /* Lock held by child thread. */
     struct condition wait_cond;         /* Condition to wait on
       by parent process. */
-    struct child_process *my_process;   /* Copy of child_process in my  
+    struct child_process *my_process;   /* Copy of child_process in my
       parent's children list. */
     tid_t child_wait_tid;               /* tid of child I am waiting on */
     int return_status;                  /* Return status of this thread */
     struct file *executable;            /* Executable file. */
 #endif
   };
-  
+
   /* Holds the child thread, the child's status, and an element the
      parent can use to track these values. */
 struct child_process
@@ -174,7 +174,7 @@ extern bool thread_mlfqs;
 /* Used by thread.c and synch.c. See comments related to this less_list_func in thread.c.  */
 bool priority_less (const struct list_elem *thread_a_, const struct list_elem *thread_b_,
             void *aux UNUSED);
-            
+
 /* Used by syscall.c. See comments related to this function
    in thread.c. */
 struct thread *get_caller_child (tid_t);
