@@ -139,8 +139,7 @@ exit (int status)
   struct list_elem *e;
   struct child_process *cp;
 
-  /* Remove my children from my list and update each of their
-     parents to NULL. */
+  /* Update each of my children's parents to NULL. */
   for (e = list_begin (&t->children);
        e != list_end (&t->children);
        e = list_next(e))
@@ -274,6 +273,7 @@ open (const char *file)
     exit (-1);
   fd->value = next_avail_fd++;
   fd->file = f;
+  fd->owner_tid = (int) thread_current ()->tid;
 
 
   /* If we have not opened it before, create a new entry. */
@@ -482,7 +482,8 @@ check_pointer (const void *pointer, unsigned size)
    fd.  Since this iterative process is used frequently, making it
    a function helps to reduce redundancies across the system call
    functions.  Returns NULL if the fd could not be located in any
-   list member. */
+   list member or if it was found but the calling process is not the
+   owner. */
 static struct sys_fd *
 get_fd_item (int fd)
 {
@@ -495,7 +496,11 @@ get_fd_item (int fd)
       fd_instance = list_entry (e, struct sys_fd, used_fds_elem);
       if (fd == fd_instance->value)
         {
-          return fd_instance;
+          /* Check that I am the owner of this pid. */
+          if ((int) thread_current ()->tid == fd_instance->owner_tid)
+            return fd_instance;
+          else
+            break;
         }
     }
   return NULL;

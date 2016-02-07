@@ -17,6 +17,7 @@ struct sys_file
 struct sys_fd
   {
     int value;
+    int owner_tid;
     struct sys_file *sys_file;
     struct file *file;
     struct list_elem sys_fd_elem;
