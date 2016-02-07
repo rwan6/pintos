@@ -66,11 +66,20 @@ syscall_handler (struct intr_frame *f)
   //printf ("syscall_num: %d\n", syscall_num);
 
   /* Check that arg1 (file name for exec, create, remove, and open)
-     are valid separate from the above check. */
+     are valid separate from the above check.  In the second check,
+     arg2 is evaluated for the read and write functions. */
   if (syscall_num == SYS_EXEC || syscall_num == SYS_CREATE ||
       syscall_num == SYS_REMOVE || syscall_num == SYS_OPEN)
-    if (!check_pointer ((const void *) *(sp + 1), 1))
-      exit (-1);
+    {
+      if (!check_pointer ((const void *) arg1, 1))
+        exit (-1);
+    }
+  else if (syscall_num == SYS_READ || syscall_num == SYS_WRITE)
+    {
+      if (!check_pointer ((const void *) arg2, 1))
+        exit (-1);
+    }
+  
   switch (syscall_num)
     {
       case SYS_HALT :
@@ -343,15 +352,16 @@ read (int fd, void *buffer, unsigned size)
   else
     {
       struct sys_fd *fd_instance = get_fd_item (fd);
-      if (fd_instance != NULL)
-        {
-          lock_acquire (&file_lock);
-          num_read = file_read (fd_instance->file, buffer, size);
-          lock_release (&file_lock);
-          return num_read;
-        }
-        else
-          return -1;
+      
+      /* If the pointer returned to fd_instance is NULL, the fd was not
+         found in the file list.  Thus, we should exit immediately. */
+      if (fd_instance == NULL)
+        exit (-1);
+
+      lock_acquire (&file_lock);
+      num_read = file_read (fd_instance->file, buffer, size);
+      lock_release (&file_lock);
+      return num_read;
     }
 }
 
@@ -373,15 +383,16 @@ write (int fd, const void *buffer, unsigned size)
   else
     {
       struct sys_fd *fd_instance = get_fd_item (fd);
-      if (fd_instance != NULL)
-        {
-          lock_acquire (&file_lock);
-          num_written = file_write (fd_instance->file, buffer, size);
-          lock_release (&file_lock);
-          return num_written;
-        }
-      else
-        return -1;
+      
+      /* If the pointer returned to fd_instance is NULL, the fd was not
+         found in the file list.  Thus, we should exit immediately. */
+      if (fd_instance == NULL)
+        exit (-1);
+      
+      lock_acquire (&file_lock);
+      num_written = file_write (fd_instance->file, buffer, size);
+      lock_release (&file_lock);
+      return num_written;
     }
 }
 
@@ -392,14 +403,16 @@ static void
 seek (int fd, unsigned position)
 {
   struct sys_fd *fd_instance = get_fd_item (fd);
+  
+  /* If the pointer returned to fd_instance is NULL, the fd was not
+     found in the file list.  Thus, we should exit immediately. */
+  if (fd_instance == NULL)
+    exit (-1);
 
-  /* Should not be NULL unless the fd was invalid. */
-  if (fd_instance != NULL)
-    {
-      lock_acquire (&file_lock);
-      file_seek (fd_instance->file, position);
-      lock_release (&file_lock);
-    }
+  lock_acquire (&file_lock);
+  file_seek (fd_instance->file, position);
+  lock_release (&file_lock);
+
 }
 
 /* Returns the position of the next byte to be read or written.
@@ -409,20 +422,16 @@ tell (int fd)
 {
   unsigned position;
   struct sys_fd *fd_instance = get_fd_item (fd);
+  
+  /* If the pointer returned to fd_instance is NULL, the fd was not
+     found in the file list.  Thus, we should exit immediately. */
+  if (fd_instance == NULL)
+    exit (-1);
 
-  /* Should not be NULL unless the fd was invalid.  Cast off_t to
-     unsigned for return. */
-  if (fd_instance != NULL)
-    {
-      lock_acquire (&file_lock);
-      position = (unsigned) file_tell (fd_instance->file);
-      lock_release (&file_lock);
-      return position;
-    }
-
-  /* If fd_instance was NULL, then return 0.  This line should
-     rarely (if ever) be reached! */
-  return 0;
+  lock_acquire (&file_lock);
+  position = (unsigned) file_tell (fd_instance->file);
+  lock_release (&file_lock);
+  return position;
 }
 
 /* Closes file descriptor 'fd'.  Exiting or terminating a process
@@ -465,7 +474,8 @@ close (int fd)
    Returns false if the pointer is found to be invalid, and true
    if the pointer is valid.  Note that all pointers are checked
    in the event that a buffer is passed. */
-static bool
+//static bool
+bool
 check_pointer (const void *pointer, unsigned size)
 {
   struct thread *t = thread_current ();
