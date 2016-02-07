@@ -58,6 +58,9 @@ syscall_handler (struct intr_frame *f)
   // printf ("\n\n");
   // hex_dump (f->esp, f->esp, 256, true);
   int *sp = (int *) (f->esp);
+  if (!check_pointer (sp, 1) || !check_pointer (sp + 1, 1) || 
+      !check_pointer (sp + 2, 1) || !check_pointer (sp + 3, 1))
+    exit (-1);
   int syscall_num = *sp;
   int arg1 = *(sp + 1);
   int arg2 = *(sp + 2);
@@ -182,7 +185,7 @@ exit (int status)
       cond_signal (&t->parent->wait_cond, &t->parent->wait_lock);
       lock_release (&t->parent->wait_lock);
     }
-    
+  
   t->return_status = status;
   thread_exit ();
 }
