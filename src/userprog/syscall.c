@@ -49,26 +49,28 @@ syscall_handler (struct intr_frame *f)
 {
   /* If esp is a bad address, kill the process immediately. */
   if (!check_pointer ((const void *) (f->esp), 1))
-    {
-      f->eax = -1;
-      exit (-1);
-      return;
-    }
-
-  // printf ("\n\n");
-  // hex_dump (f->esp, f->esp, 256, true);
-  int *sp = (int *) (f->esp);
-  if (!check_pointer (sp, 1) || !check_pointer (sp + 1, 1) || 
-      !check_pointer (sp + 2, 1) || !check_pointer (sp + 3, 1))
     exit (-1);
+
+  int *sp = (int *) (f->esp);
+  /* Check if the argument pointers are valid. */
+  if (!check_pointer (sp, 1) ||
+    !check_pointer ((sp + 1), 1) ||
+    !check_pointer ((sp + 2), 1) ||
+    !check_pointer ((sp + 3), 1))
+    exit (-1);
+  
   int syscall_num = *sp;
   int arg1 = *(sp + 1);
   int arg2 = *(sp + 2);
   int arg3 = *(sp + 3);
   //printf ("syscall_num: %d\n", syscall_num);
   
-  /* check if arg1 is valid (unless halt is called). */
-
+  /* Check that arg1 (file name for exec, create, remove, and open)
+     are valid separate from the above check. */
+  if (syscall_num == SYS_EXEC || syscall_num == SYS_CREATE ||
+      syscall_num == SYS_REMOVE || syscall_num == SYS_OPEN)
+    if (!check_pointer ((const void *) *(sp + 1), 1))
+      exit (-1);
   switch (syscall_num)
     {
       case SYS_HALT :
@@ -90,14 +92,6 @@ syscall_handler (struct intr_frame *f)
         f->eax = remove ((char *) arg1);
         break;
       case SYS_OPEN :
-        /* If the file name is NULL, we should not even enter
-           the open function. */
-        if ((void *) arg1 == NULL)
-          {
-            f->eax = -1;
-            exit (-1);
-            return;
-          }
         f->eax = open ((char *) arg1);
         break;
       case SYS_FILESIZE :
@@ -196,21 +190,16 @@ static pid_t
 exec (const char *cmd_line)
 {
   tid_t new_process_pid;
-  if (!check_pointer ((const void *) cmd_line, strlen (cmd_line)))
-    return -1;
-  else
-    {
-      lock_acquire(&exec_lock);
-      new_process_pid = process_execute (cmd_line);
+  lock_acquire(&exec_lock);
+  new_process_pid = process_execute (cmd_line);
 
-      /* Wait until child process completes its initialization.  Note
-         that the child will return -1 in the event that it failed to
-         load its executable or initialize, which can then be return
-         when this function terminates. */
-      cond_wait(&exec_cond, &exec_lock);
-      lock_release(&exec_lock);
-      return (pid_t) new_process_pid;
-    }
+  /* Wait until child process completes its initialization.  Note
+     that the child will return -1 in the event that it failed to
+     load its executable or initialize, which can then be return
+     when this function terminates. */
+  cond_wait(&exec_cond, &exec_lock);
+  lock_release(&exec_lock);
+  return (pid_t) new_process_pid;
 }
 
 /* Wait for a child process pid and retrieves the child's exit status. */
@@ -226,18 +215,10 @@ static bool
 create (const char *file, unsigned initial_size)
 {
   bool success;
-  if (!check_pointer ((const void *) file, strlen (file)))
-    {
-      exit (-1);
-      return false;
-    }
-  else
-    {
-      lock_acquire (&file_lock);
-      success = filesys_create (file, initial_size);
-      lock_release (&file_lock);
-      return success;
-    }
+  lock_acquire (&file_lock);
+  success = filesys_create (file, initial_size);
+  lock_release (&file_lock);
+  return success;
 }
 
 /* Deletes the file.  Returns true if successful, false otherwise.
@@ -247,18 +228,10 @@ static bool
 remove (const char *file)
 {
   bool success;
-  if (!check_pointer ((const void *) file, strlen (file)))
-    {
-      exit (-1);
-      return false;
-    }
-  else
-    {
-      lock_acquire (&file_lock);
-      success = filesys_remove (file);
-      lock_release (&file_lock);
-      return success;
-    }
+  lock_acquire (&file_lock);
+  success = filesys_remove (file);
+  lock_release (&file_lock);
+  return success;
 }
 
 /* Opens the file and returns a file descriptor.  If open fails,
@@ -267,12 +240,6 @@ remove (const char *file)
 static int
 open (const char *file)
 {
-  if (!check_pointer ((const void *) file, strlen (file)))
-    {
-      exit (-1);
-      return -1;
-    }
-
   bool found = false;
   struct list_elem *e;
   struct sys_file* sf = NULL;
@@ -359,11 +326,6 @@ filesize (int fd)
 static int
 read (int fd, void *buffer, unsigned size)
 {
-  if (!check_pointer(buffer, size))
-    {
-      exit (-1);
-      return -1;
-    }
   int num_read;
   /* If SDIN_FILENO. */
   if (fd == 0)
@@ -394,12 +356,6 @@ read (int fd, void *buffer, unsigned size)
 static int
 write (int fd, const void *buffer, unsigned size)
 {
-  if (!check_pointer(buffer, size))
-    {
-      exit (-1);
-      return -1;
-    }
-
   int num_written;
   /* If SDOUT_FILENO. */
   if (fd == 1)
