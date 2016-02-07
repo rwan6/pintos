@@ -63,7 +63,6 @@ syscall_handler (struct intr_frame *f)
   int arg1 = *(sp + 1);
   int arg2 = *(sp + 2);
   int arg3 = *(sp + 3);
-  //printf ("syscall_num: %d\n", syscall_num);
 
   /* Check that arg1 (file name for exec, create, remove, and open)
      are valid separate from the above check.  In the second check,
@@ -88,7 +87,6 @@ syscall_handler (struct intr_frame *f)
         exit (arg1);
         break;
       case SYS_EXEC :
-      // printf("cmd line len = %d\n", strlen((const char *) arg1));
         f->eax = exec ((const char *) arg1);
         break;
       case SYS_WAIT :
@@ -199,23 +197,21 @@ exec (const char *cmd_line)
 {
   tid_t new_process_pid;
   if (!check_pointer ((const void *) cmd_line, 14))
-    {//printf("haha\n");
+    {
       exit (-1);
       return -1;
     }
   else
     {
       new_process_pid = process_execute (cmd_line);
-      // int success = process_wait (new_process_pid);
-return new_process_pid;
-      // return (pid_t) (success < 0) ? -1 : new_process_pid;
+      return new_process_pid;
     }
 }
 
 /* Wait for a child process pid and retrieves the child's exit status. */
 static int
 wait (pid_t pid)
-{//printf("waiting...\n");
+{
   return process_wait ((tid_t) pid);
 }
 

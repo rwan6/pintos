@@ -150,6 +150,7 @@ struct child_process
     bool waited_on;                     /* Denotes if this child has
       already been waited on. */
     struct list_elem child_elem;        /* List element. */
+    tid_t child_tid;                    /* tid of child process */
   };
 
 /* Condition primitive used by by the exec function in syscall.c and

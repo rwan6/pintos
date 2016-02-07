@@ -30,7 +30,7 @@ static bool load (const char *cmdline, void (**eip) (void), void **esp);
    thread id, or TID_ERROR if the thread cannot be created. */
 tid_t
 process_execute (const char *file_name)
-{//printf("process_executing %s\n", file_name);
+{
   char *fn_copy, *fn_copy2, *save_ptr;
   tid_t tid;
 
@@ -71,6 +71,7 @@ process_execute (const char *file_name)
         return -1;
       cp->child = child_thread;
       cp->child->my_process = cp;
+      cp->child_tid = tid;
       lock_acquire (&file_lock);
       cp->child->executable = filesys_open (file_name);
       lock_release (&file_lock);
@@ -82,7 +83,6 @@ process_execute (const char *file_name)
       cp->status = -1;
       cp->terminated = false;
       cp->waited_on = false;
-      // cp->executed = false;
       list_push_back (&thread_current ()->children,
         &cp->child_elem);
     }
@@ -187,8 +187,6 @@ start_process (void *file_name_)
   palloc_free_page (file_name);
   free (ptrs);
 
-  //hex_dump (if_.esp, if_.esp, 64, true);
-
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in
      threads/intr-stubs.S).  Because intr_exit takes all of its
@@ -207,7 +205,7 @@ start_process (void *file_name_)
    immediately, without waiting. */
 int
 process_wait (tid_t child_tid)
-{//printf("process_wait %d\n", child_tid);
+{
   struct thread *t = thread_current ();
   struct list_elem *e;
   struct child_process *cp;
@@ -219,34 +217,29 @@ process_wait (tid_t child_tid)
        e = list_next(e))
     {
       cp = list_entry (e, struct child_process,
-        child_elem);//printf("0 %x\n", cp->child->tid);
-      if (cp->child->tid == child_tid)
-        {//printf("1\n");
+        child_elem);
+      if (cp->child_tid == child_tid)
+        {
           if (cp->waited_on)
             return -1;
           else if (cp->terminated)
-            {//printf("2\n");
+            {
               cp->waited_on = true;
             }
           else
-            {//printf("3\n");
-              // if (cp->executed)
-                cp->waited_on = true;
+            {
+              cp->waited_on = true;
               t->child_wait_tid = child_tid;
               /* Wait on my child. */
               lock_acquire (&t->wait_lock);
               cond_wait (&t->wait_cond, &t->wait_lock);
               lock_release (&t->wait_lock);
             }
-          // break;
-          // printf("%d\n", cp->status);
-          // if (!cp->executed)
-          //   cp->executed = true;
           return cp->status;
         }
     }
 
-  return -1;//cp->status;
+  return -1;
 }
 
 /* Free the current process's resources. */
@@ -289,7 +282,7 @@ process_exit (void)
       cur->pagedir = NULL;
       pagedir_activate (NULL);
       pagedir_destroy (pd);
-    }//printf("process_exit 2\n");
+    }
 }
 
 /* Sets up the CPU for running user code in the current
@@ -399,7 +392,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
 
   /* Open executable file. */
   lock_acquire (&file_lock);
-  file = filesys_open (file_name);//printf("%s\n", file_name);
+  file = filesys_open (file_name);
   lock_release (&file_lock);
   if (file == NULL)
     {
