@@ -58,7 +58,7 @@ syscall_handler (struct intr_frame *f)
   // printf ("\n\n");
   // hex_dump (f->esp, f->esp, 256, true);
   int *sp = (int *) (f->esp);
-  if (!check_pointer (sp, 1) || !check_pointer (sp + 1, 1) || 
+  if (!check_pointer (sp, 1) || !check_pointer (sp + 1, 1) ||
       !check_pointer (sp + 2, 1) || !check_pointer (sp + 3, 1))
     exit (-1);
   int syscall_num = *sp;
@@ -66,7 +66,7 @@ syscall_handler (struct intr_frame *f)
   int arg2 = *(sp + 2);
   int arg3 = *(sp + 3);
   //printf ("syscall_num: %d\n", syscall_num);
-  
+
   /* check if arg1 is valid (unless halt is called). */
 
   switch (syscall_num)
@@ -147,7 +147,7 @@ exit (int status)
       cp = list_entry (e, struct child_process,
         child_elem);
       cp->child->parent = NULL;
-      free (cp);
+      // free (cp);
     }
 
   /* If my parent is still alive, update my status and
@@ -185,7 +185,7 @@ exit (int status)
       cond_signal (&t->parent->wait_cond, &t->parent->wait_lock);
       lock_release (&t->parent->wait_lock);
     }
-  
+
   t->return_status = status;
   thread_exit ();
 }
@@ -200,15 +200,15 @@ exec (const char *cmd_line)
     return -1;
   else
     {
-      lock_acquire(&exec_lock);
       new_process_pid = process_execute (cmd_line);
 
       /* Wait until child process completes its initialization.  Note
          that the child will return -1 in the event that it failed to
          load its executable or initialize, which can then be return
          when this function terminates. */
-      cond_wait(&exec_cond, &exec_lock);
-      lock_release(&exec_lock);
+      // lock_acquire(&exec_lock);
+      // cond_wait(&exec_cond, &exec_lock);
+      // lock_release(&exec_lock);
       return (pid_t) new_process_pid;
     }
 }
