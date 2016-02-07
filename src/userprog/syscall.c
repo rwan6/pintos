@@ -32,6 +32,8 @@ static void close (int);
 static bool check_pointer (const void *, unsigned);
 static struct sys_fd* get_fd_item (int);
 
+#define MAX_ARG_LENGTH 14  /* Maximum file name length. */
+
 /* Initialize the system call interrupt. */
 void
 syscall_init (void)
@@ -195,11 +197,8 @@ static pid_t
 exec (const char *cmd_line)
 {
   tid_t new_process_pid;
-  if (!check_pointer ((const void *) cmd_line, 14))
-    {
-      exit (-1);
-      return -1;
-    }
+  if (!check_pointer ((const void *) cmd_line, MAX_ARG_LENGTH))
+    exit (-1);
   else
     {
       new_process_pid = process_execute (cmd_line);
