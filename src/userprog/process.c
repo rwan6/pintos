@@ -24,6 +24,12 @@ static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
 #define MAX_ARG_NUM 128  /* Assume there are at most 128 arguments. */
 
+struct load
+{
+  char *file_name;
+  bool load_success;
+  struct semaphore s;
+};
 /* Starts a new thread running a user program loaded from
    FILENAME.  The new thread may be scheduled (and may even exit)
    before process_execute() returns.  Returns the new process's
@@ -34,38 +40,67 @@ process_execute (const char *file_name)
   char *fn_copy, *fn_copy2, *save_ptr;
   tid_t tid;
 
-  lock_acquire (&exec_lock);
-
+  // lock_acquire (&exec_lock);
   /* Make a copy of FILE_NAME.
      Otherwise there's a race between the caller and load(). */
   fn_copy = palloc_get_page (0);
   if (fn_copy == NULL)
     {
-      cond_signal (&exec_cond, &exec_lock);
-      lock_release (&exec_lock);
+      palloc_free_page (fn_copy);
+      // cond_signal (&exec_cond, &exec_lock);
+      // lock_release (&exec_lock);
       return TID_ERROR;
     }
-  strlcpy (fn_copy, file_name, PGSIZE);
+  strlcpy (fn_copy, file_name, PGSIZE/8);
+
+  struct load exec_info;//= malloc (sizeof (struct load));
+  // strlcpy (exec_info.file_name, fn_copy, strlen(fn_copy));
+  exec_info.load_success = false;
+  // memcpy (exec_info.file_name, fn_copy, MAX_ARG_NUM);
+  exec_info.file_name = fn_copy;
+  // memcpy (exec_info.file_name, fn_copy, 128);
+  // lock_init (&exec_info.load_lock);
+  // cond_init (&exec_info.load_cond);
+  sema_init (&exec_info.s, 0);
+  // printf(" %x %xm\n", fn_copy, exec_info.file_name);
 
   fn_copy2 = palloc_get_page (0);
   if (fn_copy2 == NULL)
     {
       palloc_free_page (fn_copy);
-      cond_signal (&exec_cond, &exec_lock);
-      lock_release (&exec_lock);
+      // cond_signal (&exec_cond, &exec_lock);
+      // lock_release (&exec_lock);
       return TID_ERROR;
     }
   strlcpy (fn_copy2, file_name, PGSIZE);
   file_name = strtok_r (fn_copy2," ", &save_ptr);
 
+  // lock_acquire (&exec_info.load_lock);
   /* Create a new thread to execute FILE_NAME. */
-  tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
+  tid = thread_create (file_name, PRI_DEFAULT, start_process, &exec_info);
 
-  /* If the child was spawned successfully, add it to the caller's
+  // printf("waiting\n");
+  // cond_wait (&exec_info.load_cond, &exec_info.load_lock);
+  // lock_release (&exec_info.load_lock);
+  // sema_down (&exec_info.s);
+  sema_down (&exec_info.s);
+  // printf("loaded\n");
+
+// printf("here\n");
+// free (exec_info);
+  // if (!exec_info.load_success) {
+      // palloc_free_page (fn_copy);
+      // palloc_free_page (fn_copy2);
+      // return -1;
+  // }
+    // return -1;
+  /* If the child wa spawned successfully, add it to the caller's
      list of children. */
   if (tid != TID_ERROR)
-    {
+    {//printf("here\n");
       struct thread *child_thread = get_caller_child (tid);
+      if (child_thread == NULL)
+        return -1;
       struct child_process *cp = malloc (sizeof (struct child_process));
       if (cp == NULL)
         return -1;
@@ -87,14 +122,16 @@ process_execute (const char *file_name)
         &cp->child_elem);
     }
 
+// printf("here2\n");
   if (tid == TID_ERROR)
     {
       palloc_free_page (fn_copy);
       palloc_free_page (fn_copy2);
     }
-  cond_signal(&exec_cond, &exec_lock);
-  lock_release(&exec_lock);
+  // cond_signal(&exec_cond, &exec_lock);
+  // lock_release(&exec_lock);
 
+// printf("here3\n");
   return tid;
 }
 
@@ -103,7 +140,9 @@ process_execute (const char *file_name)
 static void
 start_process (void *file_name_)
 {
-  char *file_name = file_name_;
+  struct load *info = (struct load *) file_name_;
+  char *file_name = info->file_name;
+  // char *file_name = file_name_;
   char *save_ptr;
   struct intr_frame if_;
   bool success;
@@ -111,6 +150,7 @@ start_process (void *file_name_)
 
   file_name = strtok_r (file_name, " ", &save_ptr);
 
+// printf("haha2\n");
   /* Initialize interrupt frame and load executable. */
   memset (&if_, 0, sizeof if_);
   if_.gs = if_.fs = if_.es = if_.ds = if_.ss = SEL_UDSEG;
@@ -118,6 +158,13 @@ start_process (void *file_name_)
   if_.eflags = FLAG_IF | FLAG_MBS;
   success = load (file_name, &if_.eip, &if_.esp);
 
+  info->load_success = success;
+  // lock_acquire (&info->load_lock);
+  // cond_signal (&info->load_cond, &info->load_lock);
+  // lock_release (&info->load_lock);
+  sema_up (&info->s);
+
+  // printf("released..\n");
   /* If load failed, quit. */
   if (!success)
     {
@@ -126,9 +173,9 @@ start_process (void *file_name_)
       thread_exit ();
     }
 
-  lock_acquire(&exec_lock);
-  cond_signal(&exec_cond, &exec_lock);
-  lock_release(&exec_lock);
+  // lock_acquire(&exec_lock);
+  // cond_signal(&exec_cond, &exec_lock);
+  // lock_release(&exec_lock);
   /* Populate the stack with arguments */
   char *argv[MAX_ARG_NUM];
   char *token;
@@ -248,7 +295,7 @@ process_exit (void)
 {
   struct thread *cur = thread_current ();
   uint32_t *pd;
-  cur->my_process->terminated = true;
+  // cur->my_process->terminated = true;
   printf ("%s: exit(%d)\n", cur->name, cur->return_status);
 
   /* If my parent is still alive, make sure they are not
