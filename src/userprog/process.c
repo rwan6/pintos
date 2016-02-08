@@ -84,7 +84,6 @@ process_execute (const char *file_name)
   // lock_release (&exec_info.load_lock);
   // sema_down (&exec_info.s);
   // sema_down (&exec_info.s);
-  // printf("loaded\n");
 
 // printf("here\n");
 // free (exec_info);
@@ -105,6 +104,7 @@ process_execute (const char *file_name)
           // printf("ct is null...\n");
         return -1;
         }
+        // sema_down (&exec_info.s);
       cp = malloc (sizeof (struct child_process));
       if (cp == NULL)
         return -1;
@@ -127,7 +127,9 @@ process_execute (const char *file_name)
 
     }
 
-      sema_down (&exec_info.s);
+    sema_down (&exec_info.s);
+    // printf("loaded\n");
+
       if (!exec_info.load_success)
         {
           cp->status = -1;
@@ -180,9 +182,10 @@ start_process (void *file_name_)
     {
       palloc_free_page (file_name);
       cur->return_status = -1;
+      sema_up (&info->s);
       thread_exit ();
     }
-  sema_up (&info->s);
+  else sema_up (&info->s);
 
   // lock_acquire(&exec_lock);
   // cond_signal(&exec_cond, &exec_lock);
@@ -263,7 +266,7 @@ start_process (void *file_name_)
    immediately, without waiting. */
 int
 process_wait (tid_t child_tid)
-{
+{//printf("process_wait\n");
   struct thread *t = thread_current ();
   struct list_elem *e;
   struct child_process *cp;
@@ -308,11 +311,11 @@ process_exit (void)
   uint32_t *pd;
   // cur->my_process->terminated = true;
   printf ("%s: exit(%d)\n", cur->name, cur->return_status);
-
+// printf("process_exit\n");
   /* If my parent is still alive, make sure they are not
      caught in a deadlock.  Otherwise, deallocate my child_process
      from my parent's list. */
-     if (cur->my_process != NULL)
+     if (cur->parent != NULL)
       {
         cur->my_process->terminated = true;
       }
