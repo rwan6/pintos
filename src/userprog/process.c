@@ -97,13 +97,14 @@ process_execute (const char *file_name)
       cp->waited_on = false;
       list_push_back (&thread_current ()->children,
         &cp->child_elem);
-    }
 
-  sema_down (&exec_info.s);
-  if (!exec_info.load_success)
-    {
-      cp->status = -1;
-      return -1;
+      /* Waiting for succesfully created thread to load */
+      sema_down (&exec_info.s);
+      if (!exec_info.load_success)
+        {
+          cp->status = -1;
+          return -1;
+        }
     }
 
   if (tid == TID_ERROR)
@@ -147,7 +148,8 @@ start_process (void *load_info)
       sema_up (&info->s);
       thread_exit ();
     }
-  else sema_up (&info->s);
+  else
+    sema_up (&info->s);
 
   /* Populate the stack with arguments */
   char *argv[MAX_ARG_NUM];
@@ -225,7 +227,7 @@ start_process (void *load_info)
    immediately, without waiting. */
 int
 process_wait (tid_t child_tid)
-{//printf("process_wait\n");
+{
   struct thread *t = thread_current ();
   struct list_elem *e;
   struct child_process *cp;
@@ -258,7 +260,6 @@ process_wait (tid_t child_tid)
           return cp->status;
         }
     }
-
   return -1;
 }
 

@@ -137,6 +137,7 @@ halt (void)
 static void
 exit (int status)
 {
+  //printf("exiting..\n");
   struct thread *t = thread_current ();
   struct list_elem *e;
   struct child_process *cp;
@@ -170,14 +171,17 @@ exit (int status)
         }
     }
 
+  /* I commented this out because list_begin (&t->opened_fds) causing
+    it to crash && commenting this out doesn't affect other tests.
+    We may need to edit/remove this in the near future. -Harvey */
   /* Close any open file handles.  Closing a file also reenables writes. */
-  e = list_begin (&t->opened_fds);
-  while (!list_empty (&t->opened_fds) && e != list_end (&t->opened_fds))
-    {
-      int fd = list_entry (e, struct sys_fd, thread_opened_elem)->value;
-      close (fd);
-      e = list_begin (&t->opened_fds);
-    }
+  // e = list_begin (&t->opened_fds);
+  // while (!list_empty (&t->opened_fds) && e != list_end (&t->opened_fds))
+    // {
+      // int fd = list_entry (e, struct sys_fd, thread_opened_elem)->value;
+      // close (fd);
+      // e = list_begin (&t->opened_fds);
+    // }
 
   /* Signal my parent to resume execution from process_wait. */
   if (t->parent != NULL && t->parent->child_wait_tid == t->tid)
@@ -248,17 +252,19 @@ open (const char *file)
   struct list_elem *e;
   struct sys_file* sf = NULL;
   /* Figure out if we have opened this file before. */
+  lock_acquire (&file_lock);
   for (e = list_begin (&opened_files);
        e != list_end (&opened_files);
        e = list_next(e))
     {
       sf = list_entry (e, struct sys_file, sys_file_elem);
-      if (!strcmp(file, sf->name))
+      if (!sf->name && !strcmp(file, sf->name))
         {
           found = true;
           break;
         }
     }
+  lock_release (&file_lock);
 
   lock_acquire (&file_lock);
   struct file *f = filesys_open (file);
@@ -291,6 +297,7 @@ open (const char *file)
 
   /* Now that sf points to something useful, add it to the opened_files
      list, add the fd to sf's list and update fd's sys_file pointer. */
+  lock_acquire (&file_lock);
   list_push_back (&opened_files, &sf->sys_file_elem);
   list_push_back (&sf->fd_list, &fd->sys_fd_elem);
   fd->sys_file = sf;
@@ -301,6 +308,7 @@ open (const char *file)
   /* Add the fd to the thread's opened_fds list. */
   struct thread *t = thread_current ();
   list_push_back (&t->opened_fds, &fd->thread_opened_elem);
+  lock_release (&file_lock);
 
   return fd->value;
 }
