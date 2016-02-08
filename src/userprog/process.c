@@ -83,7 +83,7 @@ process_execute (const char *file_name)
   // cond_wait (&exec_info.load_cond, &exec_info.load_lock);
   // lock_release (&exec_info.load_lock);
   // sema_down (&exec_info.s);
-  sema_down (&exec_info.s);
+  // sema_down (&exec_info.s);
   // printf("loaded\n");
 
 // printf("here\n");
@@ -94,14 +94,18 @@ process_execute (const char *file_name)
       // return -1;
   // }
     // return -1;
+  struct child_process *cp = NULL;
   /* If the child wa spawned successfully, add it to the caller's
      list of children. */
   if (tid != TID_ERROR)
     {//printf("here\n");
       struct thread *child_thread = get_caller_child (tid);
       if (child_thread == NULL)
+        {
+          // printf("ct is null...\n");
         return -1;
-      struct child_process *cp = malloc (sizeof (struct child_process));
+        }
+      cp = malloc (sizeof (struct child_process));
       if (cp == NULL)
         return -1;
       cp->child = child_thread;
@@ -120,8 +124,15 @@ process_execute (const char *file_name)
       cp->waited_on = false;
       list_push_back (&thread_current ()->children,
         &cp->child_elem);
+
     }
 
+      sema_down (&exec_info.s);
+      if (!exec_info.load_success)
+        {
+          cp->status = -1;
+          return -1;
+        }
 // printf("here2\n");
   if (tid == TID_ERROR)
     {
@@ -162,7 +173,6 @@ start_process (void *file_name_)
   // lock_acquire (&info->load_lock);
   // cond_signal (&info->load_cond, &info->load_lock);
   // lock_release (&info->load_lock);
-  sema_up (&info->s);
 
   // printf("released..\n");
   /* If load failed, quit. */
@@ -172,6 +182,7 @@ start_process (void *file_name_)
       cur->return_status = -1;
       thread_exit ();
     }
+  sema_up (&info->s);
 
   // lock_acquire(&exec_lock);
   // cond_signal(&exec_cond, &exec_lock);
@@ -306,6 +317,7 @@ process_exit (void)
       lock_acquire (&cur->parent->wait_lock);
       cond_signal (&cur->parent->wait_cond, &cur->parent->wait_lock);
       lock_release (&cur->parent->wait_lock);
+      printf("store\n");
     }
   else if (cur->parent == NULL)
     free (cur->my_process);
