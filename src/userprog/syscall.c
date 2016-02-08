@@ -137,7 +137,6 @@ halt (void)
 static void
 exit (int status)
 {
-  //printf("exiting..\n");
   struct thread *t = thread_current ();
   struct list_elem *e;
   struct child_process *cp;
@@ -175,20 +174,15 @@ exit (int status)
     it to crash && commenting this out doesn't affect other tests.
     We may need to edit/remove this in the near future. -Harvey */
   /* Close any open file handles.  Closing a file also reenables writes. */
-  // e = list_begin (&t->opened_fds);
-  // while (!list_empty (&t->opened_fds) && e != list_end (&t->opened_fds))
-    // {
-      // int fd = list_entry (e, struct sys_fd, thread_opened_elem)->value;
-      // close (fd);
-      // e = list_begin (&t->opened_fds);
-    // }
-
-  /* Signal my parent to resume execution from process_wait. */
-  if (t->parent != NULL && t->parent->child_wait_tid == t->tid)
+  e = list_begin (&t->opened_fds);
+  while (!list_empty (&t->opened_fds) && e != list_end (&t->opened_fds))
     {
-      lock_acquire (&t->parent->wait_lock);
-      cond_signal (&t->parent->wait_cond, &t->parent->wait_lock);
-      lock_release (&t->parent->wait_lock);
+      /* Since we're deleting an item, we need to save the next pointer,
+         since otherwise we might page fault. */
+      struct list_elem *next = list_next (e);
+      int fd = list_entry (e, struct sys_fd, thread_opened_elem)->value;
+      close (fd);
+      e = next;
     }
 
   t->return_status = status;
@@ -458,12 +452,12 @@ close (int fd)
 
   list_remove (&fd_instance->sys_fd_elem);
 
-  if (list_empty (&fd_instance->sys_file->fd_list))
-    {
-      list_remove (&fd_instance->sys_file->sys_file_elem);
-      free ((void *) fd_instance->sys_file);
-    }
-
+  // if (list_empty (&fd_instance->sys_file->fd_list))
+  //   {
+  //     list_remove (&fd_instance->sys_file->sys_file_elem);
+  //     free ((void *) fd_instance->sys_file);
+  //   }
+  
   free (fd_instance);
 }
 
