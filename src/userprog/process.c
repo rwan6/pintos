@@ -312,12 +312,16 @@ process_exit (void)
   /* If my parent is still alive, make sure they are not
      caught in a deadlock.  Otherwise, deallocate my child_process
      from my parent's list. */
+     if (cur->my_process != NULL)
+      {
+        cur->my_process->terminated = true;
+      }
   if (cur->parent != NULL && cur->parent->child_wait_tid == cur->tid)
     {
       lock_acquire (&cur->parent->wait_lock);
       cond_signal (&cur->parent->wait_cond, &cur->parent->wait_lock);
       lock_release (&cur->parent->wait_lock);
-      printf("store\n");
+      // printf("store\n");
     }
   else if (cur->parent == NULL)
     free (cur->my_process);
