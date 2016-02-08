@@ -122,7 +122,6 @@ struct thread
        this thread */
     struct list opened_fds;             /* List of opened file descriptors */
 
-
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
     uint32_t *pagedir;                  /* Page directory. */

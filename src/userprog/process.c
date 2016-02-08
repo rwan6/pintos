@@ -24,12 +24,15 @@ static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
 #define MAX_ARG_NUM 128  /* Assume there are at most 128 arguments. */
 
+/* Load struct to track whether a load was successful. */
 struct load
 {
-  char *file_name;
-  bool load_success;
-  struct semaphore s;
+  char *file_name;      /* The file name being loaded. */
+  bool load_success;    /* Denotes whether the load was successful. */
+  struct semaphore s;   /* Semaphore for parent to be alerted if load
+    was successful or not. */
 };
+
 /* Starts a new thread running a user program loaded from
    FILENAME.  The new thread may be scheduled (and may even exit)
    before process_execute() returns.  Returns the new process's
@@ -50,7 +53,7 @@ process_execute (const char *file_name)
     }
   strlcpy (fn_copy, file_name, PGSIZE/8);
 
-  struct load exec_info;//= malloc (sizeof (struct load));
+  struct load exec_info;
   exec_info.load_success = false;
   exec_info.file_name = fn_copy;
   sema_init (&exec_info.s, 0);
@@ -68,15 +71,14 @@ process_execute (const char *file_name)
   tid = thread_create (file_name, PRI_DEFAULT, start_process, &exec_info);
 
   struct child_process *cp = NULL;
+  
   /* If the child wa spawned successfully, add it to the caller's
      list of children. */
   if (tid != TID_ERROR)
     {
       struct thread *child_thread = get_caller_child (tid);
       if (child_thread == NULL)
-        {
-          return -1;
-        }
+        return -1;
 
       cp = malloc (sizeof (struct child_process));
       if (cp == NULL)
@@ -232,8 +234,9 @@ process_wait (tid_t child_tid)
   struct list_elem *e;
   struct child_process *cp;
 
-  /* Free my children from my list and update each of their
-     parents to NULL */
+  /* Wait on the child given by child_tid and return their status.
+     This function covers the case when the child has already been
+     waited on and if the child has already terminated. */
   for (e = list_begin (&t->children);
        e != list_end (&t->children);
        e = list_next(e))
@@ -245,9 +248,7 @@ process_wait (tid_t child_tid)
           if (cp->waited_on)
             return -1;
           else if (cp->terminated)
-            {
-              cp->waited_on = true;
-            }
+            cp->waited_on = true;
           else
             {
               cp->waited_on = true;
@@ -263,13 +264,17 @@ process_wait (tid_t child_tid)
   return -1;
 }
 
-/* Free the current process's resources. */
+/* Free the current process's resources before exiting.  If parent
+   is still alive, also wake them up so they are not caught in a
+   deadlock.  This function covers the case when the thread dies
+   abruptly.  Proper "cleanup" is ensured as well. */
 void
 process_exit (void)
 {
   struct thread *cur = thread_current ();
   uint32_t *pd;
   printf ("%s: exit(%d)\n", cur->name, cur->return_status);
+  
   /* If my parent is still alive, make sure they are not
      caught in a deadlock.  Otherwise, deallocate my child_process
      from my parent's list. */

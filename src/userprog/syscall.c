@@ -170,9 +170,6 @@ exit (int status)
         }
     }
 
-  /* I commented this out because list_begin (&t->opened_fds) causing
-    it to crash && commenting this out doesn't affect other tests.
-    We may need to edit/remove this in the near future. -Harvey */
   /* Close any open file handles.  Closing a file also reenables writes. */
   e = list_begin (&t->opened_fds);
   while (!list_empty (&t->opened_fds) && e != list_end (&t->opened_fds))
