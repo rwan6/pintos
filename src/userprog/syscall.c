@@ -32,6 +32,8 @@ static void close (int);
 static bool check_pointer (const void *, unsigned);
 static struct sys_fd* get_fd_item (int);
 
+static int next_avail_fd;       /* Tracks the next available fd. */
+
 /* Initialize the system call interrupt, as well as the next available
    file descriptor and the file lists. */
 void
@@ -250,7 +252,6 @@ open (const char *file)
         }
       list_init (&sf->fd_list);
       strlcpy (sf->name, file, strlen (file) + 1);
-      sf->file = f;
     }
 
   /* Now that sf points to something useful, add it to the opened_files
