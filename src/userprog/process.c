@@ -26,14 +26,14 @@ static bool load (const char *cmdline, void (**eip) (void), void **esp);
                             length of command-line arguments that the pintos
                             utility can pass to the kernel. */
 
-/* Load struct to track whether a load was successful. */
+/* Struct to track whether a load was successful. */
 struct load
-{
-  char *file_name;      /* The file name being loaded. */
-  bool load_success;    /* Denotes whether the load was successful. */
-  struct semaphore s;   /* Semaphore for parent to be alerted if load
-    was successful or not. */
-};
+  {
+    char *file_name;      /* The file name being loaded. */
+    bool load_success;    /* Denotes whether the load was successful. */
+    struct semaphore s;   /* Semaphore for parent to be alerted if load
+      was successful or not. */
+  };
 
 /* Starts a new thread running a user program loaded from
    FILENAME.  The new thread may be scheduled (and may even exit)
@@ -55,10 +55,11 @@ process_execute (const char *file_name)
     }
   strlcpy (fn_copy, file_name, PGSIZE/8);
 
-  struct load exec_info;
-  exec_info.load_success = false;
-  exec_info.file_name = fn_copy;
-  sema_init (&exec_info.s, 0);
+  /* Initialize the load struct to be passed to child thread. */
+  struct load load_info;
+  load_info.load_success = false;
+  load_info.file_name = fn_copy;
+  sema_init (&load_info.s, 0);
 
   fn_copy2 = palloc_get_page (0);
   if (fn_copy2 == NULL)
@@ -69,12 +70,15 @@ process_execute (const char *file_name)
   strlcpy (fn_copy2, file_name, PGSIZE);
   file_name = strtok_r (fn_copy2," ", &save_ptr);
 
-  /* Create a new thread to execute FILE_NAME. */
+  /* Create a new thread to execute FILE_NAME. Instead of passing
+     the file_name char pointer, we pass the address of load_info,
+     so that the child thread can update the load status and use the
+     semaphore to signal parent to stop waiting.*/
   tid = thread_create (file_name, PRI_DEFAULT, start_process,
-    &exec_info);
+    &load_info);
 
   struct child_process *cp = NULL;
-  
+
   /* If the child wa spawned successfully, add it to the caller's
      list of children. */
   if (tid != TID_ERROR)
@@ -92,7 +96,7 @@ process_execute (const char *file_name)
           palloc_free_page (fn_copy2);
           return -1;
         }
-        
+
       cp->child = child_thread;
       cp->child->my_process = cp;
       cp->child_tid = tid;
@@ -110,9 +114,9 @@ process_execute (const char *file_name)
       list_push_back (&thread_current ()->children,
         &cp->child_elem);
 
-      /* Waiting for succesfully created thread to load */
-      sema_down (&exec_info.s);
-      if (!exec_info.load_success)
+      /* Waiting for succesfully created thread to load. */
+      sema_down (&load_info.s);
+      if (!load_info.load_success)
         {
           cp->status = -1;
           return -1;
@@ -151,7 +155,8 @@ start_process (void *load_info)
 
   info->load_success = success;
 
-  /* If load failed, quit. */
+  /* If load failed, quit. Whether load failed or succeeded,
+     updates the semaphore to inform the parent. */
   if (!success)
     {
       palloc_free_page (file_name);
@@ -181,7 +186,7 @@ start_process (void *load_info)
       cur->return_status = -1;
       thread_exit ();
     }
-  
+
   /* Push each argument in reverse order. */
   for (i = argc - 1; i >= 0; i--)
     {
@@ -251,8 +256,7 @@ process_wait (tid_t child_tid)
        e != list_end (&t->children);
        e = list_next(e))
     {
-      cp = list_entry (e, struct child_process,
-        child_elem);
+      cp = list_entry (e, struct child_process, child_elem);
       if (cp->child_tid == child_tid)
         {
           if (cp->waited_on)
@@ -271,9 +275,9 @@ process_wait (tid_t child_tid)
           return cp->status;
         }
     }
-    
+
   /* If the chld was already waited on or not found in this process'
-     list of children, -1 should be returned. */ 
+     list of children, -1 should be returned. */
   return -1;
 }
 
@@ -287,11 +291,11 @@ process_exit (void)
   struct thread *cur = thread_current ();
   uint32_t *pd;
   printf ("%s: exit(%d)\n", cur->name, cur->return_status);
-  
+
   /* Close any open file handles.  Closing a file also reenables
-     writes. */   
+     writes. */
   close_fd (cur);
-  
+
   /* If my parent is still alive, make sure they are not
      caught in a deadlock.  Otherwise, deallocate my child_process
      from my parent's list. */
@@ -307,7 +311,7 @@ process_exit (void)
     }
   else
     free (cur->my_process);
-    
+
   /* Update each of my children's parents to NULL and free that child
      if they have already been terminated. */
   struct list_elem *e;
@@ -318,14 +322,13 @@ process_exit (void)
       /* Since we're deleting an item, we need to save the next
          pointer, since otherwise we might page fault. */
       struct list_elem *next = list_next (e);
-      cp = list_entry (e, struct child_process,
-        child_elem);
+      cp = list_entry (e, struct child_process, child_elem);
       cp->child->parent = NULL;
       if (cp->terminated)
         free (cp);
       e = next;
     }
-  
+
   /* Reallow writes to executable. */
   if (cur->executable != NULL)
     file_allow_write (cur->executable);

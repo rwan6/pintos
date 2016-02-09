@@ -32,7 +32,7 @@ static void close (int);
 static bool check_pointer (const void *, unsigned);
 static struct sys_fd* get_fd_item (int);
 
-/* Initialize the system call interrupt, as well the next available
+/* Initialize the system call interrupt, as well as the next available
    file descriptor and the file lists. */
 void
 syscall_init (void)
@@ -149,7 +149,7 @@ exit (int status)
 }
 
 /* Runs the executable.  Returns the new process's program id.
-   Must return pid = -1 if the child process failed to load. */
+   Returns pid = -1 if the child process failed to load. */
 static pid_t
 exec (const char *cmd_line)
 {
@@ -163,7 +163,7 @@ exec (const char *cmd_line)
     }
 }
 
-/* Wait for a child process pid and retrieves the child's exit
+/* Waits for a child process pid and retrieves the child's exit
    status. */
 static int
 wait (pid_t pid)
@@ -205,6 +205,7 @@ open (const char *file)
   bool found = false;
   struct list_elem *e;
   struct sys_file* sf = NULL;
+
   /* Figure out if we have opened this file before. */
   lock_acquire (&file_lock);
   for (e = list_begin (&opened_files);
@@ -224,7 +225,7 @@ open (const char *file)
   if (!f)
     {
       lock_release (&file_lock);
-      return -1; 
+      return -1;
     }
 
   struct sys_fd *fd = malloc (sizeof (struct sys_fd));
@@ -264,7 +265,7 @@ open (const char *file)
   /* Add the fd to the thread's opened_fds list. */
   struct thread *t = thread_current ();
   list_push_back (&t->opened_fds, &fd->thread_opened_elem);
-  
+
   lock_release (&file_lock);
 
   return fd->value;
@@ -447,7 +448,7 @@ static bool
 check_pointer (const void *pointer, unsigned size)
 {
   struct thread *t = thread_current ();
-  
+
   /* First validate end-cases.  If these do not fail, check
      everything.  Limits the number of checks that need to
      be made. */
@@ -458,7 +459,7 @@ check_pointer (const void *pointer, unsigned size)
     is_kernel_vaddr (pointer + (size-1)) ||
     pagedir_get_page (t->pagedir, pointer + (size-1)) == NULL)
     return false;
-  
+
   unsigned i;
   for (i = 1; i < (size - 1); i++)
     {
@@ -511,6 +512,5 @@ close_fd (struct thread *t)
       int fd = list_entry (e, struct sys_fd, thread_opened_elem)->value;
       close (fd);
       e = next;
-    } 
+    }
 }
-
