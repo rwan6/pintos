@@ -31,7 +31,7 @@ struct sys_fd
     tid_t owner_tid;                      /* The tid of the owner. */
     struct sys_file *sys_file;            /* Pointer to the system file
       struct. */
-    struct file *file;                    /* Pointer ot the file's 'file'
+    struct file *file;                    /* Pointer to the file's 'file'
        struct. */
     struct list_elem sys_fd_elem;         /* List element for the opened
       files. */
