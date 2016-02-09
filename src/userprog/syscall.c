@@ -139,17 +139,6 @@ exit (int status)
 {
   struct thread *t = thread_current ();
   struct list_elem *e;
-  struct child_process *cp;
-
-  /* Update each of my children's parents to NULL. */
-  for (e = list_begin (&t->children);
-       e != list_end (&t->children);
-       e = list_next(e))
-    {
-      cp = list_entry (e, struct child_process,
-        child_elem);
-      cp->child->parent = NULL;
-    }
 
   /* If my parent is still alive, update my status so it can
      be checked after I am terminated. */

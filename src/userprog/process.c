@@ -258,7 +258,7 @@ process_wait (tid_t child_tid)
               cond_wait (&t->wait_cond, &t->wait_lock);
               lock_release (&t->wait_lock);
             }
-          //printf ("Status returned is: %d for %d by %d\n", cp->status, child_tid, t->tid);
+            //printf ("Status returned is: %d for %d by %d\n", cp->status, child_tid, t->tid);
           return cp->status;
         }
     }
@@ -277,7 +277,7 @@ process_exit (void)
   struct thread *cur = thread_current ();
   uint32_t *pd;
   printf ("%s: exit(%d)\n", cur->name, cur->return_status);
-  
+      
   /* If my parent is still alive, make sure they are not
      caught in a deadlock.  Otherwise, deallocate my child_process
      from my parent's list. */
@@ -292,7 +292,25 @@ process_exit (void)
         }
     }
   else
-    free (cur->my_process);
+    free (cur->my_process); 
+    
+  /* Update each of my children's parents to NULL and free that child
+     if they have already been terminated. */
+  struct list_elem *e;
+  struct child_process *cp;
+  for (e = list_begin (&cur->children);
+       e != list_end (&cur->children);)
+    {
+      /* Since we're deleting an item, we need to save the next
+         pointer, since otherwise we might page fault. */
+      struct list_elem *next = list_next (e);
+      cp = list_entry (e, struct child_process,
+        child_elem);
+      cp->child->parent = NULL;
+      if (cp->terminated)
+        free (cp);
+      e = next;
+    }
 
   /* Reallow writes to executable. */
   if (cur->executable != NULL)
