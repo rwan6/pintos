@@ -132,12 +132,15 @@ sema_up (struct semaphore *sema)
       thread_unblock (thread_max);
 
       /* Check the appropriate priority, depending on which scheduler
-         is being used */
-      /*if ((!thread_mlfqs && thread_max->priority >
+         is being used.  This produces unwanted behavior when
+         interfacing with user programs, but was left in due to
+         functionality in the first project. */
+      
+      /* if ((!thread_mlfqs && thread_max->priority >
          thread_current ()->priority) ||
          (thread_mlfqs && thread_max->mlfqs_priority >
          thread_current ()->mlfqs_priority))
-        yield = true;*/
+          yield = true; */
     }
 
   sema->value++;

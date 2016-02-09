@@ -37,6 +37,6 @@ struct sys_fd
 
 struct list opened_files;       /* Global list of opened files. */
 struct list used_fds;           /* Global list of used fds values. */
-int next_avail_fd;              /* Tracks the next available fd. */
+static int next_avail_fd;       /* Tracks the next available fd. */
 
 #endif /* userprog/syscall.h */
