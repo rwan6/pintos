@@ -220,18 +220,21 @@ open (const char *file)
           break;
         }
     }
-  lock_release (&file_lock);
 
-  lock_acquire (&file_lock);
   struct file *f = filesys_open (file);
-  lock_release (&file_lock);
 
   if (!f)
-    return -1;
+    {
+      lock_release (&file_lock);
+      return -1; 
+    }
 
   struct sys_fd *fd = malloc (sizeof (struct sys_fd));
   if (!fd)
-    exit (-1);
+    {
+      lock_release (&file_lock);
+      exit (-1);
+    }
   fd->value = next_avail_fd++;
   fd->file = f;
   fd->owner_tid = (int) thread_current ()->tid;
@@ -244,6 +247,7 @@ open (const char *file)
       if (!sf)
         {
           free (fd);
+          lock_release (&file_lock);
           exit (-1);
         }
       list_init (&sf->fd_list);
@@ -253,7 +257,6 @@ open (const char *file)
 
   /* Now that sf points to something useful, add it to the opened_files
      list, add the fd to sf's list and update fd's sys_file pointer. */
-  lock_acquire (&file_lock);
   list_push_back (&opened_files, &sf->sys_file_elem);
   list_push_back (&sf->fd_list, &fd->sys_fd_elem);
   fd->sys_file = sf;
@@ -264,6 +267,7 @@ open (const char *file)
   /* Add the fd to the thread's opened_fds list. */
   struct thread *t = thread_current ();
   list_push_back (&t->opened_fds, &fd->thread_opened_elem);
+  
   lock_release (&file_lock);
 
   return fd->value;
@@ -275,14 +279,17 @@ static int
 filesize (int fd)
 {
   int file_size;
+  lock_acquire (&file_lock);
   struct sys_fd *fd_instance = get_fd_item (fd);
 
   /* If the pointer returned to fd_instance is NULL, the fd was not
      found in the file list.  Thus, we should exit immediately. */
   if (fd_instance == NULL)
-    exit (-1);
+    {
+      lock_release (&file_lock);
+      exit (-1);
+    }
 
-  lock_acquire (&file_lock);
   file_size = file_length (fd_instance->file);
   lock_release (&file_lock);
   return file_size;
@@ -304,14 +311,17 @@ read (int fd, void *buffer, unsigned size)
     }
   else
     {
+      lock_acquire (&file_lock);
       struct sys_fd *fd_instance = get_fd_item (fd);
 
       /* If the pointer returned to fd_instance is NULL, the fd was not
          found in the file list.  Thus, we should exit immediately. */
       if (fd_instance == NULL)
-        exit (-1);
+        {
+          lock_release (&file_lock);
+          exit (-1);
+        }
 
-      lock_acquire (&file_lock);
       num_read = file_read (fd_instance->file, buffer, size);
       lock_release (&file_lock);
       return num_read;
@@ -335,14 +345,17 @@ write (int fd, const void *buffer, unsigned size)
     }
   else
     {
+      lock_acquire (&file_lock);
       struct sys_fd *fd_instance = get_fd_item (fd);
 
       /* If the pointer returned to fd_instance is NULL, the fd was not
          found in the file list.  Thus, we should exit immediately. */
       if (fd_instance == NULL)
-        exit (-1);
+        {
+          lock_release (&file_lock);
+          exit (-1);
+        }
 
-      lock_acquire (&file_lock);
       num_written = file_write (fd_instance->file, buffer, size);
       lock_release (&file_lock);
       return num_written;
@@ -355,14 +368,17 @@ write (int fd, const void *buffer, unsigned size)
 static void
 seek (int fd, unsigned position)
 {
+  lock_acquire (&file_lock);
   struct sys_fd *fd_instance = get_fd_item (fd);
 
   /* If the pointer returned to fd_instance is NULL, the fd was not
      found in the file list.  Thus, we should exit immediately. */
   if (fd_instance == NULL)
-    exit (-1);
+    {
+      lock_release (&file_lock);
+      exit (-1);
+    }
 
-  lock_acquire (&file_lock);
   file_seek (fd_instance->file, position);
   lock_release (&file_lock);
 
@@ -373,15 +389,18 @@ seek (int fd, unsigned position)
 static unsigned
 tell (int fd)
 {
+  lock_acquire (&file_lock);
   unsigned position;
   struct sys_fd *fd_instance = get_fd_item (fd);
 
   /* If the pointer returned to fd_instance is NULL, the fd was not
      found in the file list.  Thus, we should exit immediately. */
   if (fd_instance == NULL)
-    exit (-1);
+    {
+      lock_release (&file_lock);
+      exit (-1);
+    }
 
-  lock_acquire (&file_lock);
   position = (unsigned) file_tell (fd_instance->file);
   lock_release (&file_lock);
   return position;
@@ -393,6 +412,7 @@ tell (int fd)
 static void
 close (int fd)
 {
+  lock_acquire (&file_lock);
   struct sys_fd *fd_instance = get_fd_item (fd);
 
   /* If the pointer returned to fd_instance is NULL, the fd was not
@@ -400,14 +420,15 @@ close (int fd)
      Note that this also takes care of the case when stdin or stdout
      are passed as fd (0 and 1, respectively). */
   if (fd_instance == NULL)
-    exit (-1);
+    {
+      lock_release (&file_lock);
+      exit (-1);
+    }
 
   /* Close the file and remove it from all lists if fd_instance
      is valid. */
 
-  lock_acquire (&file_lock);
   file_close (fd_instance->file);
-  lock_release (&file_lock);
 
   list_remove (&fd_instance->used_fds_elem);
 
@@ -421,6 +442,7 @@ close (int fd)
       free (fd_instance->sys_file);
     }
   free (fd_instance);
+  lock_release (&file_lock);
 }
 
 /* Function to check all pointers that are passed to system calls.
