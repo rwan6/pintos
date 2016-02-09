@@ -246,7 +246,7 @@ process_wait (tid_t child_tid)
       if (cp->child_tid == child_tid)
         {
           if (cp->waited_on)
-            return -1;
+            break;
           else if (cp->terminated)
             cp->waited_on = true;
           else
@@ -262,6 +262,8 @@ process_wait (tid_t child_tid)
           return cp->status;
         }
     }
+    /* If the chld was waited on or not found in this process'
+       list of children, -1 should be returned. */ 
   return -1;
 }
 

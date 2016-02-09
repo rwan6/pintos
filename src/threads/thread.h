@@ -138,8 +138,8 @@ struct thread
 #endif
   };
 
-  /* Holds the child thread, the child's status, and an element the
-     parent can use to track these values. */
+/* Holds the child thread, the child's status, and an element the
+   parent can use to track these values. */
 struct child_process
   {
     struct thread *child;               /* A single child thread. */
