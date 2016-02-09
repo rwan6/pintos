@@ -33,8 +33,8 @@ struct sys_fd
       struct. */
     struct file *file;                    /* Pointer to the file's 'file'
        struct. */
-    struct list_elem sys_fd_elem;         /* List element for the opened
-      files. */
+    struct list_elem sys_fd_elem;         /* List element for sys_file's
+      fd_list. */
     struct list_elem used_fds_elem;       /* List element for used fds. */
     struct list_elem thread_opened_elem;  /* List element for the thread's
       personal list of fds. */
