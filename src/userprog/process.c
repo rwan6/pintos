@@ -38,7 +38,10 @@ struct load
 /* Starts a new thread running a user program loaded from
    FILENAME.  The new thread may be scheduled (and may even exit)
    before process_execute() returns.  Returns the new process's
-   thread id, or TID_ERROR if the thread cannot be created. */
+   thread id, or TID_ERROR if the thread cannot be created.
+   If a child needs to load an executable, the parent will wait
+   in this function until the child finished and return the status
+   of the load. */
 tid_t
 process_execute (const char *file_name)
 {
@@ -73,13 +76,13 @@ process_execute (const char *file_name)
   /* Create a new thread to execute FILE_NAME. Instead of passing
      the file_name char pointer, we pass the address of load_info,
      so that the child thread can update the load status and use the
-     semaphore to signal parent to stop waiting.*/
+     semaphore to signal parent to stop waiting. */
   tid = thread_create (file_name, PRI_DEFAULT, start_process,
     &load_info);
 
   struct child_process *cp = NULL;
 
-  /* If the child wa spawned successfully, add it to the caller's
+  /* If the child was spawned successfully, add it to the caller's
      list of children. */
   if (tid != TID_ERROR)
     {
@@ -132,7 +135,8 @@ process_execute (const char *file_name)
 }
 
 /* A thread function that loads a user process and starts it
-   running. */
+   running.  Also performs argument parsing and sets up the
+   user memory stack. */
 static void
 start_process (void *load_info)
 {
@@ -284,7 +288,7 @@ process_wait (tid_t child_tid)
 /* Free the current process's resources before exiting.  If parent
    is still alive, also wake them up so they are not caught in a
    deadlock.  This function covers the case when the thread dies
-   abruptly.  Proper "cleanup" is ensured as well. */
+   abruptly.  Proper memory "cleanup" is ensured as well. */
 void
 process_exit (void)
 {

@@ -46,7 +46,9 @@ syscall_init (void)
 }
 
 /* Takes the interrupt frame as an argument and traces the stack
-   to determine which system call function needs to be invoked. */
+   to determine which system call function needs to be invoked.
+   Also performs stack pointer, argument, and buffer/filename
+   address checks. */
 static void
 syscall_handler (struct intr_frame *f)
 {
