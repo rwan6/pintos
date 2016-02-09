@@ -288,6 +288,7 @@ process_wait (tid_t child_tid)
 void
 process_exit (void)
 {
+  lock_acquire (&exit_lock);
   struct thread *cur = thread_current ();
   uint32_t *pd;
   printf ("%s: exit(%d)\n", cur->name, cur->return_status);
@@ -333,6 +334,7 @@ process_exit (void)
   if (cur->executable != NULL)
     file_allow_write (cur->executable);
 
+  lock_release (&exit_lock);
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
   pd = cur->pagedir;

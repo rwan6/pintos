@@ -102,6 +102,7 @@ thread_init (void)
   list_init (&all_list);
   
   lock_init (&file_lock);
+  lock_init (&exit_lock);
 
   if (thread_mlfqs)
     {

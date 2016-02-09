@@ -156,6 +156,10 @@ struct child_process
    Owned by userprog/process.c and userprog/syscall.c. */
 struct lock file_lock;
 
+/* Lock used to lock down the exit function to avoid interleaving
+   parent-child threads.  Owned by userprog/process.c. */
+struct lock exit_lock;
+
 /* If false (default), use round-robin scheduler.
    If true, use multi-level feedback queue scheduler.
    Controlled by kernel command-line option "-o mlfqs". */
