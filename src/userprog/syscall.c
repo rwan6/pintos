@@ -7,12 +7,12 @@
 #include "threads/interrupt.h"
 #include "threads/thread.h"
 #include "threads/malloc.h"
-#include "threads/synch.h" /* For synching in exec and with files */
-#include "threads/vaddr.h" /* For validating the user address. */
+#include "threads/synch.h"    /* For synching in exec and with files */
+#include "threads/vaddr.h"    /* For validating the user address. */
 #include "devices/shutdown.h" /* For shutdown_power_off. */
-#include "devices/input.h" /* For input_putc(). */
-#include "filesys/file.h" /* For file operations. */
-#include "filesys/filesys.h" /* For filesys operations. */
+#include "devices/input.h"    /* For input_putc(). */
+#include "filesys/file.h"     /* For file operations. */
+#include "filesys/filesys.h"  /* For filesys operations. */
 
 /* Prototypes for system call functions and helper functions. */
 static void syscall_handler (struct intr_frame *);
@@ -31,8 +31,6 @@ static unsigned tell (int);
 static void close (int);
 static bool check_pointer (const void *, unsigned);
 static struct sys_fd* get_fd_item (int);
-
-#define MAX_ARG_LENGTH 14  /* Maximum file name length. */
 
 /* Initialize the system call interrupt, as well the next available
    file descriptor and the file lists. */
@@ -57,9 +55,9 @@ syscall_handler (struct intr_frame *f)
   int *sp = (int *) (f->esp);
   /* Check if the argument pointers are valid. */
   if (!check_pointer (sp, 1) ||
-    !check_pointer ((sp + 1), 1) ||
-    !check_pointer ((sp + 2), 1) ||
-    !check_pointer ((sp + 3), 1))
+      !check_pointer ((sp + 1), 1) ||
+      !check_pointer ((sp + 2), 1) ||
+      !check_pointer ((sp + 3), 1))
     exit (-1);
 
   int syscall_num = *sp;
@@ -81,6 +79,7 @@ syscall_handler (struct intr_frame *f)
       if (!check_pointer ((const void *) arg2, 1))
         exit (-1);
     }
+
   switch (syscall_num)
     {
       case SYS_HALT :
@@ -145,7 +144,6 @@ exit (int status)
   if (t->parent != NULL)
     t->my_process->status = status;
 
-
   t->return_status = status;
   thread_exit ();
 }
@@ -156,7 +154,7 @@ static pid_t
 exec (const char *cmd_line)
 {
   tid_t new_process_pid;
-  if (!check_pointer ((const void *) cmd_line, MAX_ARG_LENGTH))
+  if (!check_pointer ((const void *) cmd_line, MAX_FNAME_LENGTH))
     exit (-1);
   else
     {
@@ -237,8 +235,7 @@ open (const char *file)
     }
   fd->value = next_avail_fd++;
   fd->file = f;
-  fd->owner_tid = (int) thread_current ()->tid;
-
+  fd->owner_tid = thread_current ()->tid;
 
   /* If we have not opened it before, create a new entry. */
   if (!found)
@@ -427,13 +424,10 @@ close (int fd)
 
   /* Close the file and remove it from all lists if fd_instance
      is valid. */
-
   file_close (fd_instance->file);
 
   list_remove (&fd_instance->used_fds_elem);
-
   list_remove (&fd_instance->thread_opened_elem);
-
   list_remove (&fd_instance->sys_fd_elem);
 
   if (list_empty (&fd_instance->sys_file->fd_list))
@@ -476,11 +470,8 @@ check_pointer (const void *pointer, unsigned size)
 }
 
 /* Function to retrieve the sys_fd struct corresponding to a particular
-   fd.  Since this iterative process is used frequently, making it
-   a function helps to reduce redundancies across the system call
-   functions.  Returns NULL if the fd could not be located in any
-   list member or if it was found but the calling process is not the
-   owner. */
+   fd. Returns NULL if the fd could not be located in any list member or
+   if it was found but the calling process is not the owner. */
 static struct sys_fd *
 get_fd_item (int fd)
 {
@@ -493,8 +484,8 @@ get_fd_item (int fd)
       fd_instance = list_entry (e, struct sys_fd, used_fds_elem);
       if (fd == fd_instance->value)
         {
-          /* Check that I am the owner of this pid. */
-          if ((int) thread_current ()->tid == fd_instance->owner_tid)
+          /* Check that I am the owner of this fd. */
+          if (thread_current ()->tid == fd_instance->owner_tid)
             return fd_instance;
           else
             break;

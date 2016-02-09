@@ -120,18 +120,18 @@ struct thread
        waiting on */
     struct list donated_list;           /* List of threads that donated to
        this thread */
-    struct list opened_fds;             /* List of opened file descriptors */
 
 #ifdef USERPROG
-    /* Owned by userprog/process.c. */
+    /* Owned by userprog/process.c and userprog/syscall.c */
+    struct list opened_fds;             /* List of opened file descriptors */
     uint32_t *pagedir;                  /* Page directory. */
     struct thread *parent;              /* Thread that spawned me. */
     struct list children;               /* List of children I spawned. */
     struct lock wait_lock;              /* Lock held by child thread. */
-    struct condition wait_cond;         /* Condition to wait on
-      by parent process. */
-    struct child_process *my_process;   /* Copy of child_process in my
-      parent's children list. */
+    struct condition wait_cond;         /* Condition that a child process
+                                           signals when a parent waits. */
+    struct child_process *my_process;   /* Pointer to child_process in my
+                                           parent's children list. */
     tid_t child_wait_tid;               /* tid of child I am waiting on. */
     int return_status;                  /* Return status of this thread */
     struct file *executable;            /* Executable file. */
@@ -145,9 +145,9 @@ struct child_process
     struct thread *child;               /* A single child thread. */
     int status;                         /* Child's status. */
     bool terminated;                    /* Denotes whether child has
-      terminated/exited. */
+                                           terminated/exited. */
     bool waited_on;                     /* Denotes if this child has
-      already been waited on. */
+                                           already been waited on. */
     struct list_elem child_elem;        /* List element. */
     tid_t child_tid;                    /* tid of child process */
   };
@@ -161,9 +161,11 @@ struct lock file_lock;
    Controlled by kernel command-line option "-o mlfqs". */
 extern bool thread_mlfqs;
 
-/* Used by thread.c and synch.c. See comments related to this less_list_func in thread.c.  */
-bool priority_less (const struct list_elem *thread_a_, const struct list_elem *thread_b_,
-            void *aux UNUSED);
+/* Used by thread.c and synch.c. See comments related to this
+   less_list_func in thread.c.  */
+bool priority_less (const struct list_elem *thread_a_,
+                    const struct list_elem *thread_b_,
+                    void *aux UNUSED);
 
 /* Used by syscall.c. See comments related to this function
    in thread.c. */

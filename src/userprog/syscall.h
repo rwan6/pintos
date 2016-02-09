@@ -4,6 +4,8 @@
 #include <list.h>
 #include "threads/thread.h"
 
+#define MAX_FNAME_LENGTH 14  /* Maximum file name length. */
+
 typedef int pid_t;
 void syscall_init (void);
 void close_fd (struct thread *);
@@ -11,7 +13,7 @@ void close_fd (struct thread *);
 /* Struct to map system files to their list of open fd. */
 struct sys_file
   {
-    char name[15];                    /* Name of the file. */
+    char name[MAX_FNAME_LENGTH + 1];  /* Name of the file. */
     struct list_elem sys_file_elem;   /* List element for opened
       files. */
     struct file *file;                /* Pointer to the file's 
@@ -26,7 +28,7 @@ struct sys_file
 struct sys_fd
   {
     int value;                            /* The fd value. */
-    int owner_tid;                        /* The tid of the owner. */
+    tid_t owner_tid;                      /* The tid of the owner. */
     struct sys_file *sys_file;            /* Pointer to the system file
       struct. */
     struct file *file;                    /* Pointer ot the file's 'file'

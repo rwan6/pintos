@@ -22,7 +22,9 @@
 
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
-#define MAX_ARG_NUM 128  /* Assume there are at most 128 arguments. */
+#define MAX_ARG_NUM 128  /* Assume there are at most 128 arguments, the max
+                            length of command-line arguments that the pintos
+                            utility can pass to the kernel. */
 
 /* Load struct to track whether a load was successful. */
 struct load
@@ -171,7 +173,7 @@ start_process (void *load_info)
       argc++;
     }
 
-  /* Push each argument in reverse order. */
+  /* Array for keeping track of the pointers of each pushed argument */
   char **ptrs = (char **) malloc (sizeof (char*) * argc);
   if (ptrs == NULL)
     {
@@ -179,7 +181,8 @@ start_process (void *load_info)
       cur->return_status = -1;
       thread_exit ();
     }
-
+  
+  /* Push each argument in reverse order. */
   for (i = argc - 1; i >= 0; i--)
     {
       size_t len = strlen (argv[i]) + 1;
@@ -242,7 +245,7 @@ process_wait (tid_t child_tid)
   struct child_process *cp;
 
   /* Wait on the child given by child_tid and return their status.
-     This function covers the case when the child has already been
+     This function also covers the cases when the child has already been
      waited on and if the child has already terminated. */
   for (e = list_begin (&t->children);
        e != list_end (&t->children);
@@ -268,7 +271,8 @@ process_wait (tid_t child_tid)
           return cp->status;
         }
     }
-  /* If the chld was waited on or not found in this process'
+    
+  /* If the chld was already waited on or not found in this process'
      list of children, -1 should be returned. */ 
   return -1;
 }
