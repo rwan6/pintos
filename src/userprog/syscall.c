@@ -155,19 +155,8 @@ exit (int status)
      notify them that I am being terminated. */
   if (t->parent != NULL)
     {
-      for (e = list_begin (&t->parent->children);
-           e != list_end (&t->parent->children);
-           e = list_next(e))
-        {
-          cp = list_entry (e, struct child_process,
-            child_elem);
-          /* If this child_process corresponds to me. */
-          if (t == cp->child)
-            {
-              cp->terminated = true;
-              cp->status = status;
-            }
-        }
+      t->my_process->terminated = true;
+      t->my_process->status = status;
     }
 
   /* Close any open file handles.  Closing a file also reenables writes. */
