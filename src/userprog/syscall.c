@@ -34,7 +34,8 @@ static struct sys_fd* get_fd_item (int);
 
 #define MAX_ARG_LENGTH 14  /* Maximum file name length. */
 
-/* Initialize the system call interrupt. */
+/* Initialize the system call interrupt, as well the next available
+   file descriptor and the file lists. */
 void
 syscall_init (void)
 {
@@ -138,24 +139,12 @@ static void
 exit (int status)
 {
   struct thread *t = thread_current ();
-  struct list_elem *e;
 
   /* If my parent is still alive, update my status so it can
      be checked after I am terminated. */
   if (t->parent != NULL)
     t->my_process->status = status;
 
-  /* Close any open file handles.  Closing a file also reenables writes. */
-  e = list_begin (&t->opened_fds);
-  while (!list_empty (&t->opened_fds) && e != list_end (&t->opened_fds))
-    {
-      /* Since we're deleting an item, we need to save the next pointer,
-         since otherwise we might page fault. */
-      struct list_elem *next = list_next (e);
-      int fd = list_entry (e, struct sys_fd, thread_opened_elem)->value;
-      close (fd);
-      e = next;
-    }
 
   t->return_status = status;
   thread_exit ();
@@ -176,7 +165,8 @@ exec (const char *cmd_line)
     }
 }
 
-/* Wait for a child process pid and retrieves the child's exit status. */
+/* Wait for a child process pid and retrieves the child's exit
+   status. */
 static int
 wait (pid_t pid)
 {
@@ -414,6 +404,7 @@ close (int fd)
 
   /* Close the file and remove it from all lists if fd_instance
      is valid. */
+
   lock_acquire (&file_lock);
   file_close (fd_instance->file);
   lock_release (&file_lock);
@@ -429,7 +420,6 @@ close (int fd)
       list_remove (&fd_instance->sys_file->sys_file_elem);
       free (fd_instance->sys_file);
     }
-  
   free (fd_instance);
 }
 
@@ -475,7 +465,7 @@ get_fd_item (int fd)
   struct list_elem *e;
   struct sys_fd *fd_instance;
   for (e = list_begin (&used_fds);
-        e != list_end (&used_fds);
+       e != list_end (&used_fds);
        e = list_next(e))
     {
       fd_instance = list_entry (e, struct sys_fd, used_fds_elem);
@@ -490,3 +480,24 @@ get_fd_item (int fd)
     }
   return NULL;
 }
+
+/* Helper function to close all outstanding file descriptors.  This
+   function can be called whether or not a thread dies "gracefully"
+   (i.e. via exit) or abruptly (directly to process_exit). */
+void
+close_fd (struct thread *t)
+{
+  struct list_elem *e;
+  struct list_elem *next;
+  e = list_begin (&t->opened_fds);
+  while (!list_empty (&t->opened_fds) && e != list_end (&t->opened_fds))
+    {
+      /* Since we're deleting an item, we need to save the next pointer,
+         since otherwise we might page fault. */
+      next = list_next (e);
+      int fd = list_entry (e, struct sys_fd, thread_opened_elem)->value;
+      close (fd);
+      e = next;
+    } 
+}
+

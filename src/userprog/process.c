@@ -68,7 +68,8 @@ process_execute (const char *file_name)
   file_name = strtok_r (fn_copy2," ", &save_ptr);
 
   /* Create a new thread to execute FILE_NAME. */
-  tid = thread_create (file_name, PRI_DEFAULT, start_process, &exec_info);
+  tid = thread_create (file_name, PRI_DEFAULT, start_process,
+    &exec_info);
 
   struct child_process *cp = NULL;
   
@@ -78,11 +79,18 @@ process_execute (const char *file_name)
     {
       struct thread *child_thread = get_caller_child (tid);
       if (child_thread == NULL)
-        return -1;
+        {
+          palloc_free_page (fn_copy2);
+          return -1;
+        }
 
       cp = malloc (sizeof (struct child_process));
       if (cp == NULL)
-        return -1;
+        {
+          palloc_free_page (fn_copy2);
+          return -1;
+        }
+        
       cp->child = child_thread;
       cp->child->my_process = cp;
       cp->child_tid = tid;
@@ -109,11 +117,10 @@ process_execute (const char *file_name)
         }
     }
 
+  palloc_free_page (fn_copy2);
+
   if (tid == TID_ERROR)
-    {
-      palloc_free_page (fn_copy);
-      palloc_free_page (fn_copy2);
-    }
+    palloc_free_page (fn_copy);
 
   return tid;
 }
@@ -258,12 +265,11 @@ process_wait (tid_t child_tid)
               cond_wait (&t->wait_cond, &t->wait_lock);
               lock_release (&t->wait_lock);
             }
-            //printf ("Status returned is: %d for %d by %d\n", cp->status, child_tid, t->tid);
           return cp->status;
         }
     }
-    /* If the chld was waited on or not found in this process'
-       list of children, -1 should be returned. */ 
+  /* If the chld was waited on or not found in this process'
+     list of children, -1 should be returned. */ 
   return -1;
 }
 
@@ -277,7 +283,11 @@ process_exit (void)
   struct thread *cur = thread_current ();
   uint32_t *pd;
   printf ("%s: exit(%d)\n", cur->name, cur->return_status);
-      
+  
+  /* Close any open file handles.  Closing a file also reenables
+     writes. */   
+  close_fd (cur);
+  
   /* If my parent is still alive, make sure they are not
      caught in a deadlock.  Otherwise, deallocate my child_process
      from my parent's list. */
@@ -292,7 +302,7 @@ process_exit (void)
         }
     }
   else
-    free (cur->my_process); 
+    free (cur->my_process);
     
   /* Update each of my children's parents to NULL and free that child
      if they have already been terminated. */
@@ -311,7 +321,7 @@ process_exit (void)
         free (cp);
       e = next;
     }
-
+  
   /* Reallow writes to executable. */
   if (cur->executable != NULL)
     file_allow_write (cur->executable);
@@ -349,7 +359,7 @@ process_activate (void)
      interrupts. */
   tss_update ();
 }
-
+
 /* We load ELF binaries.  The following definitions are taken
    from the ELF specification, [ELF1], more-or-less verbatim.  */
 
