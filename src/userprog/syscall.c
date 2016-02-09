@@ -424,11 +424,11 @@ close (int fd)
 
   list_remove (&fd_instance->sys_fd_elem);
 
-  // if (list_empty (&fd_instance->sys_file->fd_list))
-  //   {
-  //     list_remove (&fd_instance->sys_file->sys_file_elem);
-  //     free ((void *) fd_instance->sys_file);
-  //   }
+  if (list_empty (&fd_instance->sys_file->fd_list))
+    {
+      list_remove (&fd_instance->sys_file->sys_file_elem);
+      free (fd_instance->sys_file);
+    }
   
   free (fd_instance);
 }
