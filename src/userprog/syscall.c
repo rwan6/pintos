@@ -151,13 +151,10 @@ exit (int status)
       cp->child->parent = NULL;
     }
 
-  /* If my parent is still alive, update my status and
-     notify them that I am being terminated. */
+  /* If my parent is still alive, update my status so it can
+     be checked after I am terminated. */
   if (t->parent != NULL)
-    {
-      t->my_process->terminated = true;
-      t->my_process->status = status;
-    }
+    t->my_process->status = status;
 
   /* Close any open file handles.  Closing a file also reenables writes. */
   e = list_begin (&t->opened_fds);
