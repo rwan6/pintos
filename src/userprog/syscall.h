@@ -4,7 +4,7 @@
 #include <list.h>
 #include "threads/thread.h"
 
-#define MAX_FNAME_LENGTH 14  /* Maximum file name length. */
+#define MAX_FNAME_LENGTH 14  /* Maximum filename length. */
 
 typedef int pid_t;
 void syscall_init (void);
