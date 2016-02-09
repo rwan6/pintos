@@ -123,6 +123,9 @@ syscall_handler (struct intr_frame *f)
       case SYS_CLOSE :
         close (arg1);
         break;
+      default :
+        exit (-1);
+        break;
     }
 }
 
