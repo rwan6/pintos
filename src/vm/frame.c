@@ -7,8 +7,12 @@ get_frame (enum palloc_flags flags)
 {
   void *frame = palloc_get_page (flags);
   if (!frame)
-    {
-      exit (-1);
-    }
+    ASSERT (!frame);
   return frame;
+}
+
+void
+free_frame (void *kpage)
+{
+	palloc_free_page (kpage);
 }

@@ -19,6 +19,7 @@
 #include "threads/malloc.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
+#include "vm/frame.h"
 
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
@@ -50,10 +51,10 @@ process_execute (const char *file_name)
 
   /* Make a copy of FILE_NAME.
      Otherwise there's a race between the caller and load(). */
-  fn_copy = palloc_get_page (0);
+  fn_copy = get_frame (0);
   if (fn_copy == NULL)
     {
-      palloc_free_page (fn_copy);
+      free_frame (fn_copy);
       return TID_ERROR;
     }
   strlcpy (fn_copy, file_name, PGSIZE/8);
@@ -64,10 +65,10 @@ process_execute (const char *file_name)
   load_info.file_name = fn_copy;
   sema_init (&load_info.s, 0);
 
-  fn_copy2 = palloc_get_page (0);
+  fn_copy2 = get_frame (0);
   if (fn_copy2 == NULL)
     {
-      palloc_free_page (fn_copy);
+      free_frame (fn_copy);
       return TID_ERROR;
     }
   strlcpy (fn_copy2, file_name, PGSIZE);
@@ -89,14 +90,14 @@ process_execute (const char *file_name)
       struct thread *child_thread = get_caller_child (tid);
       if (child_thread == NULL)
         {
-          palloc_free_page (fn_copy2);
+          free_frame (fn_copy2);
           return -1;
         }
 
       cp = malloc (sizeof (struct child_process));
       if (cp == NULL)
         {
-          palloc_free_page (fn_copy2);
+          free_frame (fn_copy2);
           return -1;
         }
 
@@ -126,10 +127,10 @@ process_execute (const char *file_name)
         }
     }
 
-  palloc_free_page (fn_copy2);
+  free_frame (fn_copy2);
 
   if (tid == TID_ERROR)
-    palloc_free_page (fn_copy);
+    free_frame (fn_copy);
 
   return tid;
 }
@@ -163,7 +164,7 @@ start_process (void *load_info)
      updates the semaphore to inform the parent. */
   if (!success)
     {
-      palloc_free_page (file_name);
+      free_frame (file_name);
       cur->return_status = -1;
       sema_up (&info->s);
       thread_exit ();
@@ -186,7 +187,7 @@ start_process (void *load_info)
   char **ptrs = (char **) malloc (sizeof (char*) * argc);
   if (ptrs == NULL)
     {
-      palloc_free_page (file_name);
+      free_frame (file_name);
       cur->return_status = -1;
       thread_exit ();
     }
@@ -227,7 +228,7 @@ start_process (void *load_info)
   if_.esp = ((void **) if_.esp - 1);
   *((void **) if_.esp) = 0;
 
-  palloc_free_page (file_name);
+  free_frame (file_name);
   free (ptrs);
 
   /* Start the user process by simulating a return from an
@@ -640,14 +641,14 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
       size_t page_zero_bytes = PGSIZE - page_read_bytes;
 
       /* Get a page of memory. */
-      uint8_t *kpage = palloc_get_page (PAL_USER);
+      uint8_t *kpage = get_frame (PAL_USER);
       if (kpage == NULL)
         return false;
 
       /* Load this page. */
       if (file_read (file, kpage, page_read_bytes) != (int) page_read_bytes)
         {
-          palloc_free_page (kpage);
+          free_frame (kpage);
           return false;
         }
       memset (kpage + page_read_bytes, 0, page_zero_bytes);
@@ -675,14 +676,14 @@ setup_stack (void **esp)
   uint8_t *kpage;
   bool success = false;
 
-  kpage = palloc_get_page (PAL_USER | PAL_ZERO);
+  kpage = get_frame (PAL_USER | PAL_ZERO);
   if (kpage != NULL)
     {
       success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
       if (success)
         *esp = PHYS_BASE;
       else
-        palloc_free_page (kpage);
+        free_frame (kpage);
     }
   return success;
 }
