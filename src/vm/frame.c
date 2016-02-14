@@ -14,7 +14,7 @@ get_frame (enum palloc_flags flags)
   if (!fe)
     {
       palloc_free_page (frame);
-      exit (-1);
+      return NULL;
     }
   list_push_back (&all_frames, &fe->frame_elem);
   list_init (&fe->virt_mapped_page);
