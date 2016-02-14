@@ -46,9 +46,7 @@ syscall_init (void)
   next_avail_fd = 2; /* 0 and 1 are reserved. */
   
   /* Initialize frame table items. */
-  list_init (&all_frames);
-  
-  
+  init_frame ();
 }
 
 /* Takes the interrupt frame as an argument and traces the stack

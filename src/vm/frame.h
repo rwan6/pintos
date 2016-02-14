@@ -1,14 +1,17 @@
 #ifndef VM_FRAME_H
 #define VM_FRAME_H
 
+#include <hash.h>
+#include <list.h>
 #include "threads/palloc.h"
 #include "threads/thread.h"
+
+/* Prototypes for frame.c functions. */
+void init_frame (void);
 
 struct frame_entry
   {
     struct list_elem frame_elem;      /* List element for frame page. */
-    struct list virt_mapped_page;     /* List of virtual pages that map
-                                         to this frame entry. */
     int frame_status;                 /* Frame's status. */
     void *addr;                       /* Frame's address. */
   };
