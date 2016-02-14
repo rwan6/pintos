@@ -6,11 +6,12 @@
 
 struct frame_entry
   {
-    struct list_elem frame_elem;     /* List element for frame page. */
-    struct list virt_mapped_page;    /* List of virtual pages that map
-                                        to this frame entry. */
-    int frame_status;                /* Frame's status. */
-    void *paddr;                     /* Frame's physical address. */
+    struct list_elem frame_elem;      /* List element for frame page. */
+    struct list virt_mapped_page;     /* List of virtual pages that map
+                                         to this frame entry. */
+    struct hash_elem frame_hash_elem; /* Hash elment for frame page */
+    int frame_status;                 /* Frame's status. */
+    void *addr;                       /* Frame's address. */
   };
 
 void *get_frame (enum palloc_flags);
