@@ -13,6 +13,7 @@
 #include "devices/input.h"    /* For input_putc(). */
 #include "filesys/file.h"     /* For file operations. */
 #include "filesys/filesys.h"  /* For filesys operations. */
+#include "vm/frame.h"         /* For frame page. */
 
 /* Prototypes for system call functions and helper functions. */
 static void syscall_handler (struct intr_frame *);
@@ -43,6 +44,11 @@ syscall_init (void)
   list_init (&opened_files);
   list_init (&used_fds);
   next_avail_fd = 2; /* 0 and 1 are reserved. */
+  
+  /* Initialize frame table items. */
+  list_init (&all_frames);
+  
+  
 }
 
 /* Takes the interrupt frame as an argument and traces the stack

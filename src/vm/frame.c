@@ -1,5 +1,6 @@
 #include "vm/frame.h"
 #include "threads/palloc.h"
+#include "threads/thread.h"
 #include "userprog/syscall.h"
 
 void *
