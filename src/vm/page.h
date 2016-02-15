@@ -5,6 +5,7 @@
 
 /* Prototypes for page.c functions. */
 void init_supp_page_table (void);
+void init_page_entry (struct frame_entry *);
 
 struct page_table_entry
   {
