@@ -3,6 +3,7 @@
 
 #include <debug.h>
 #include <list.h>
+#include <hash.h>
 #include <stdint.h>
 #include "threads/synch.h"
 #include "threads/fixed-point.h"
@@ -135,6 +136,13 @@ struct thread
     tid_t child_wait_tid;               /* tid of child I am waiting on. */
     int return_status;                  /* Return status of this thread. */
     struct file *executable;            /* Executable file. */
+#endif
+    
+#ifdef VM
+    /* Owned by userprog/process.c and vm/page.c */
+    struct hash supp_page_table;        /* Supplemental page table map.
+                                           Used to hold pages mapping to
+                                           physical frames. */
 #endif
   };
 

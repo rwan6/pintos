@@ -28,9 +28,9 @@ page_hash (const struct hash_elem *page, void *aux UNUSED)
 /* Initialize the supplemental page table and all related data
    structures. */
 void
-init_supp_page_table (void)
+init_supp_page_table (struct hash *page_table)
 {
-  hash_init (&supp_page_table, page_hash, page_table_less, NULL);
+  hash_init (page_table, page_hash, page_table_less, NULL);
 }
 
 /* Set up a page table entry each time a new frame is allocated. */

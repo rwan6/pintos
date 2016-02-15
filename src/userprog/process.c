@@ -151,6 +151,9 @@ start_process (void *load_info)
   struct thread *cur = thread_current ();
 
   file_name = strtok_r (file_name, " ", &save_ptr);
+  
+  /* Initialize the supplementary page table. */
+  init_supp_page_table (&thread_current ()->supp_page_table);
 
   /* Initialize interrupt frame and load executable. */
   memset (&if_, 0, sizeof if_);
@@ -649,7 +652,6 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
       
       /* If a new frame entry was successfully allocated, set up the
          corresponding page table entry. */
-      // init_page_entry (new_fe);
       
       /* Load this page. */
       if (file_read (file, kpage, page_read_bytes) != (int) page_read_bytes)

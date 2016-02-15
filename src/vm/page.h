@@ -4,7 +4,7 @@
 #include "vm/frame.h"
 
 /* Prototypes for page.c functions. */
-void init_supp_page_table (void);
+void init_supp_page_table (struct hash *page_table);
 void init_page_entry (struct frame_entry *);
 
 struct page_table_entry
@@ -15,10 +15,5 @@ struct page_table_entry
     struct frame_entry *phys_frame;   /* Pointer to the frame entry
                                          corresponding to this page. */
   };
-  
-/* Supplemental Page Table (Hash Map).  Used to hold pages mapping
-   to physical frames.
-   Owned by page.c and userprog/exception.c. */
-struct hash supp_page_table;
 
 #endif /* vm/page.h */
