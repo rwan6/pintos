@@ -6,17 +6,18 @@
 #include "threads/palloc.h"
 #include "threads/thread.h"
 
-/* Prototypes for frame.c functions. */
-void init_frame (void);
-
 struct frame_entry
   {
     struct list_elem frame_elem;      /* List element for frame page. */
-    int frame_status;                 /* Frame's status. */
     void *addr;                       /* Frame's address. */
+    uint32_t offset;                  /* Offset of read_bytes. */
+    uint32_t num_bytes;               /* Number of read_bytes for
+                                         this frame. */
   };
 
-void *get_frame (enum palloc_flags);
+/* Prototypes for frame.c functions. */
+void init_frame (void);
+struct frame_entry *get_frame (enum palloc_flags);
 void free_frame (void *);
 
 /* List of all frames currently in use.

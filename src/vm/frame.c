@@ -11,7 +11,7 @@ init_frame (void)
   list_init (&all_frames);
 }
 
-void *
+struct frame_entry *
 get_frame (enum palloc_flags flags)
 {
   void *frame = palloc_get_page (flags);
@@ -25,9 +25,8 @@ get_frame (enum palloc_flags flags)
       PANIC ("Unable to allocate page table entry!");
     }
   list_push_back (&all_frames, &fe->frame_elem);
-  fe->frame_status = 0; /* TODO: figure out what this is used for */
   fe->addr = frame;
-  return frame;
+  return fe;
 }
 
 void

@@ -52,10 +52,10 @@ process_execute (const char *file_name)
 
   /* Make a copy of FILE_NAME.
      Otherwise there's a race between the caller and load(). */
-  fn_copy = get_frame (0);
+  fn_copy = palloc_get_page (0);
   if (fn_copy == NULL)
     {
-      free_frame (fn_copy);
+      palloc_free_page (fn_copy);
       return TID_ERROR;
     }
   strlcpy (fn_copy, file_name, PGSIZE/8);
@@ -66,10 +66,10 @@ process_execute (const char *file_name)
   load_info.file_name = fn_copy;
   sema_init (&load_info.s, 0);
 
-  fn_copy2 = get_frame (0);
+  fn_copy2 = palloc_get_page (0);
   if (fn_copy2 == NULL)
     {
-      free_frame (fn_copy);
+      palloc_free_page (fn_copy);
       return TID_ERROR;
     }
   strlcpy (fn_copy2, file_name, PGSIZE);
@@ -91,14 +91,14 @@ process_execute (const char *file_name)
       struct thread *child_thread = get_caller_child (tid);
       if (child_thread == NULL)
         {
-          free_frame (fn_copy2);
+          palloc_free_page (fn_copy2);
           return -1;
         }
 
       cp = malloc (sizeof (struct child_process));
       if (cp == NULL)
         {
-          free_frame (fn_copy2);
+          palloc_free_page (fn_copy2);
           return -1;
         }
 
@@ -128,10 +128,10 @@ process_execute (const char *file_name)
         }
     }
 
-  free_frame (fn_copy2);
+  palloc_free_page (fn_copy2);
 
   if (tid == TID_ERROR)
-    free_frame (fn_copy);
+    palloc_free_page (fn_copy);
 
   return tid;
 }
@@ -645,13 +645,29 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
       size_t page_zero_bytes = PGSIZE - page_read_bytes;
 
       /* Get a page of memory. */
-      uint8_t *kpage = get_frame (PAL_USER);
+      struct frame_entry * new_frame = get_frame(PAL_USER);
+      
+      new_frame->offset = (uint32_t) ofs;
+      uint8_t *kpage = new_frame->addr;
       
       if (kpage == NULL)
         return false;
       
       /* If a new frame entry was successfully allocated, set up the
          corresponding page table entry. */
+      struct page_table_entry *pte = malloc(sizeof(struct page_table_entry));
+      pte->vaddr = upage;
+      pte->phys_frame = new_frame;
+      
+      /* If the page is all zeros. */
+      if (zero_bytes == PGSIZE)
+        pte->page_status = 0;
+      else
+        pte->page_status = 2;
+      
+      pte->page_read_only = !writable;
+      
+      hash_insert (&thread_current ()->supp_page_table, &pte->pt_elem);   
       
       /* Load this page. */
       if (file_read (file, kpage, page_read_bytes) != (int) page_read_bytes)
@@ -684,12 +700,27 @@ setup_stack (void **esp)
   uint8_t *kpage;
   bool success = false;
 
-  kpage = get_frame (PAL_USER | PAL_ZERO);
+  struct frame_entry * new_frame = get_frame (PAL_USER | PAL_ZERO);
+  kpage = new_frame->addr;
+  
   if (kpage != NULL)
     {
       success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
       if (success)
-        *esp = PHYS_BASE;
+        {
+          /* If a new frame entry was successfully allocated, set up the
+             corresponding page table entry. */
+          struct page_table_entry *pte = malloc(sizeof(
+            struct page_table_entry));
+          pte->vaddr = ((uint8_t *) PHYS_BASE) - PGSIZE;
+          pte->phys_frame = new_frame;
+          pte->page_read_only = false;
+          pte->page_status = 0;
+      
+          /* Link to a frame table entry. */
+          hash_insert (&thread_current ()->supp_page_table, &pte->pt_elem);
+          *esp = PHYS_BASE;
+        }
       else
         free_frame (kpage);
     }

@@ -138,12 +138,10 @@ struct thread
     struct file *executable;            /* Executable file. */
 #endif
     
-#ifdef VM
     /* Owned by userprog/process.c and vm/page.c */
     struct hash supp_page_table;        /* Supplemental page table map.
                                            Used to hold pages mapping to
                                            physical frames. */
-#endif
   };
 
 /* Holds the child thread, the child's status, and an element the

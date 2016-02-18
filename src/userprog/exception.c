@@ -108,10 +108,7 @@ kill (struct intr_frame *f)
     }
 }
 
-/* Page fault handler.  This is a skeleton that must be filled in
-   to implement virtual memory.  Some solutions to project 2 may
-   also require modifying this code.
-
+/* Page fault handler.
    At entry, the address that faulted is in CR2 (Control Register
    2) and information about the fault, formatted as described in
    the PF_* macros in exception.h, is in F's error_code member.  The
@@ -147,7 +144,12 @@ page_fault (struct intr_frame *f)
   not_present = (f->error_code & PF_P) == 0;
   write = (f->error_code & PF_W) != 0;
   user = (f->error_code & PF_U) != 0;
-
+  
+  /* Get current thread's page table for page fault handler. */
+  struct hash *supp_page_table = &thread_current ()->supp_page_table;
+  struct page_table_entry *pte = page_lookup (fault_addr);
+  
+  /* Delete all below. */
   /* To implement virtual memory, delete the rest of the function
      body, and replace it with code that brings in the page to
      which fault_addr refers. */
@@ -157,5 +159,6 @@ page_fault (struct intr_frame *f)
           write ? "writing" : "reading",
           user ? "user" : "kernel");
   kill (f);
+  /**************************/
 }
 
