@@ -21,6 +21,7 @@
 #include "threads/vaddr.h"
 #include "vm/frame.h"
 #include "vm/page.h"
+#include "vm/swap.h"
 
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
@@ -168,7 +169,7 @@ start_process (void *load_info)
      updates the semaphore to inform the parent. */
   if (!success)
     {
-      free_frame (file_name);
+      palloc_free_page (file_name);
       cur->return_status = -1;
       sema_up (&info->s);
       thread_exit ();
@@ -191,7 +192,7 @@ start_process (void *load_info)
   char **ptrs = (char **) malloc (sizeof (char*) * argc);
   if (ptrs == NULL)
     {
-      free_frame (file_name);
+      palloc_free_page (file_name);
       cur->return_status = -1;
       thread_exit ();
     }
@@ -232,7 +233,7 @@ start_process (void *load_info)
   if_.esp = ((void **) if_.esp - 1);
   *((void **) if_.esp) = 0;
 
-  free_frame (file_name);
+  palloc_free_page (file_name);
   free (ptrs);
 
   /* Start the user process by simulating a return from an
@@ -347,6 +348,33 @@ process_exit (void)
     file_allow_write (cur->executable);
 
   lock_release (&exit_lock);
+  
+  /* Page reclamation: remove pages and deallocate memory associated
+     with frame entries, supplemental page table, and swap slots.
+     Note that memory files have already been unmapped and deallocated. */
+  struct hash_iterator hi;
+  hash_first (&hi, &cur->supp_page_table);
+  while (hash_next (&hi))
+    {
+      struct page_table_entry *pte = hash_entry (hash_cur (&hi), 
+        struct page_table_entry, pt_elem);
+      
+      /* Determine page's status and deallocate respective resources. */
+      enum page_status ps = pte->page_status;
+      if (ps == PAGE_ZEROS || ps == PAGE_NONZEROS)
+        {
+          if (pte->phys_frame != NULL)
+              free_frame (pte);
+        }
+      else if (ps == PAGE_SWAP)
+        {
+          swap_free (pte->ss);
+          free (pte->ss);
+        }
+        
+      free (pte);
+    }
+  
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
   pd = cur->pagedir;
@@ -676,7 +704,8 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
       /* Load this page. */
       if (file_read (file, kpage, page_read_bytes) != (int) page_read_bytes)
         {
-          free_frame (kpage);
+          free_frame (pte);
+          free (pte);
           return false;
         }
       memset (kpage + page_read_bytes, 0, page_zero_bytes);
@@ -684,7 +713,8 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
       /* Add the page to the process's address space. */
       if (!install_page (upage, kpage, writable))
         {
-          free_frame (kpage);
+          free_frame (pte);
+          free (pte);
           return false;
         }
 
@@ -702,6 +732,7 @@ static bool
 setup_stack (void **esp)
 {
   uint8_t *kpage;
+  struct page_table_entry *pte = NULL;
   bool success = false;
 
   struct frame_entry * new_frame = get_frame (PAL_USER | PAL_ZERO);
@@ -709,25 +740,26 @@ setup_stack (void **esp)
 
   if (kpage != NULL)
     {
+      /* If a new frame entry was successfully allocated, set up the
+         corresponding page table entry. */
+      pte = malloc(sizeof(struct page_table_entry));
+      pte->upage = ((uint8_t *) PHYS_BASE) - PGSIZE;
+      pte->kpage = kpage;
+      pte->phys_frame = new_frame;
+      pte->page_read_only = false;
+      pte->page_status = PAGE_ZEROS;
       success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
       if (success)
         {
-          /* If a new frame entry was successfully allocated, set up the
-             corresponding page table entry. */
-          struct page_table_entry *pte = malloc(sizeof(
-            struct page_table_entry));
-          pte->upage = ((uint8_t *) PHYS_BASE) - PGSIZE;
-          pte->kpage = kpage;
-          pte->phys_frame = new_frame;
-          pte->page_read_only = false;
-          pte->page_status = PAGE_ZEROS;
-
           /* Link to a frame table entry. */
           hash_insert (&thread_current ()->supp_page_table, &pte->pt_elem);
           *esp = PHYS_BASE;
         }
       else
-        free_frame (kpage);
+        {
+          free_frame (pte);
+          free (pte);
+        }
     }
   return success;
 }

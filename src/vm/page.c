@@ -48,10 +48,9 @@ init_page_entry (void)
   return pte;
 }
 
-
 /* Returns the page containing the given virtual address,
    or a null pointer if no such page exists.  Derived from
-   A.8.5 in the Pintos documentation. */
+   section A.8.5 in the Pintos documentation. */
 struct page_table_entry *
 page_lookup (const void *address)
 {
@@ -89,7 +88,7 @@ page_create_from_vaddr (const void *address)
   
   struct frame_entry *fe = get_frame (PAL_USER);
   pte->kpage = fe->addr;
-  pte->upage = address;
+  pte->upage = (void *) address;
   pte->phys_frame = fe;
   memset (fe->addr, 0, PGSIZE);
   hash_insert (&thread_current ()->supp_page_table, &pte->pt_elem);
@@ -145,3 +144,4 @@ page_fetch_and_set (struct page_table_entry *pte)
       process_exit ();
     }
 }
+

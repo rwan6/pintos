@@ -1,10 +1,11 @@
 #ifndef VM_FRAME_H
 #define VM_FRAME_H
 
-#include <hash.h>
-#include <list.h>
+#include "vm/page.h"
 #include "threads/palloc.h"
 #include "threads/thread.h"
+#include <hash.h>
+#include <list.h>
 
 struct frame_entry
   {
@@ -18,7 +19,7 @@ struct frame_entry
 /* Prototypes for frame.c functions. */
 void init_frame (void);
 struct frame_entry *get_frame (enum palloc_flags);
-void free_frame (void *);
+void free_frame (struct page_table_entry *);
 
 /* List of all frames currently in use.
    Owned by frame.c, userprog/syscall.c, and userprog/process.c. */

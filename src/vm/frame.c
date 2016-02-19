@@ -30,7 +30,8 @@ get_frame (enum palloc_flags flags)
 }
 
 void
-free_frame (void *kpage)
+free_frame (struct page_table_entry *pte)
 {
-	palloc_free_page (kpage);
+	palloc_free_page (pte->kpage);
+  free (pte->phys_frame);
 }

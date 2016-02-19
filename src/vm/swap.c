@@ -1,6 +1,6 @@
-#include <bitmap.h>
 #include "vm/frame.h"
 #include "vm/swap.h"
+#include <bitmap.h>
 
 #define BLOCKS_IN_PAGE 8
 

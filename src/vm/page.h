@@ -1,13 +1,14 @@
 #ifndef VM_PAGE_H
 #define VM_PAGE_H
 
+#include "vm/swap.h"
 #include "vm/frame.h"
 
 /* -------- Enumeration of Page Status --------	*/
-/* 0 -- Zero-filled page (in Frame Table).  	*/
-/* 1 -- In swap slot.                       	*/
-/* 2 -- Memory Mapped (in disk).            	*/
-/* 3 -- Non-zero-filled page (in Frame Table). 	*/
+/* 0 -- Zero-filled page (in Frame Table).  	  */
+/* 1 -- Non-zero-filled page (in Frame Table). 	*/
+/* 2 -- In swap slot.                       	  */
+/* 3 -- Memory Mapped (in disk).            	  */
 /* -------------------------------------------- */
 enum page_status
 	{
@@ -31,6 +32,7 @@ struct page_table_entry
                                          enumeration. */
     bool page_read_only;              /* Denotes whether page is
                                          read-only. */
+    struct swap_slot *ss;             /* Swap slot for this page. */
   };
 
 /* Prototypes for page.c functions. */

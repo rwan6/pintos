@@ -1,6 +1,7 @@
 #ifndef VM_SWAP_H
 #define VM_SWAP_H
 
+#include "vm/frame.h"
 #include "devices/block.h"
 
 struct swap_slot
