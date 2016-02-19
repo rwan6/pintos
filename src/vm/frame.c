@@ -1,7 +1,6 @@
 #include "vm/frame.h"
 #include "threads/palloc.h"
 #include "threads/malloc.h"
-#include "threads/thread.h"
 #include "userprog/syscall.h"
 
 /* Initialize the frame table and all related structures. */
@@ -17,7 +16,7 @@ get_frame (enum palloc_flags flags)
   void *frame = palloc_get_page (flags);
   if (!frame) /* All frames full, need to evict to swap */
     PANIC ("All frames full!");
-  
+
   struct frame_entry *fe = malloc (sizeof (struct frame_entry));
   if (!fe)
     {

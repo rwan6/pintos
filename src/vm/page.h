@@ -1,7 +1,7 @@
 #ifndef VM_PAGE_H
 #define VM_PAGE_H
 
-#include "vm/swap.h"
+// #include "vm/swap.h"
 #include "vm/frame.h"
 
 /* -------- Enumeration of Page Status --------	*/
