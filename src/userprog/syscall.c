@@ -44,7 +44,7 @@ syscall_init (void)
   list_init (&opened_files);
   list_init (&used_fds);
   next_avail_fd = 2; /* 0 and 1 are reserved. */
-  
+
   /* Initialize frame table items. */
   init_frame ();
 }

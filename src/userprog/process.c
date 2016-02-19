@@ -151,7 +151,7 @@ start_process (void *load_info)
   struct thread *cur = thread_current ();
 
   file_name = strtok_r (file_name, " ", &save_ptr);
-  
+
   /* Initialize the supplementary page table. */
   init_supp_page_table (&thread_current ()->supp_page_table);
 
@@ -646,29 +646,30 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 
       /* Get a page of memory. */
       struct frame_entry * new_frame = get_frame(PAL_USER);
-      
+
       new_frame->offset = (uint32_t) ofs;
       uint8_t *kpage = new_frame->addr;
-      
+
       if (kpage == NULL)
         return false;
-      
+
       /* If a new frame entry was successfully allocated, set up the
          corresponding page table entry. */
       struct page_table_entry *pte = malloc(sizeof(struct page_table_entry));
-      pte->vaddr = upage;
+      pte->upage = upage;
+      pte->kpage = kpage;
       pte->phys_frame = new_frame;
-      
+
       /* If the page is all zeros. */
       if (zero_bytes == PGSIZE)
         pte->page_status = 0;
       else
-        pte->page_status = 2;
-      
+        pte->page_status = 3;
+
       pte->page_read_only = !writable;
-      
-      hash_insert (&thread_current ()->supp_page_table, &pte->pt_elem);   
-      
+
+      hash_insert (&thread_current ()->supp_page_table, &pte->pt_elem);
+
       /* Load this page. */
       if (file_read (file, kpage, page_read_bytes) != (int) page_read_bytes)
         {
@@ -702,7 +703,7 @@ setup_stack (void **esp)
 
   struct frame_entry * new_frame = get_frame (PAL_USER | PAL_ZERO);
   kpage = new_frame->addr;
-  
+
   if (kpage != NULL)
     {
       success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
@@ -712,11 +713,12 @@ setup_stack (void **esp)
              corresponding page table entry. */
           struct page_table_entry *pte = malloc(sizeof(
             struct page_table_entry));
-          pte->vaddr = ((uint8_t *) PHYS_BASE) - PGSIZE;
+          pte->upage = ((uint8_t *) PHYS_BASE) - PGSIZE;
+          pte->kpage = kpage;
           pte->phys_frame = new_frame;
           pte->page_read_only = false;
           pte->page_status = 0;
-      
+
           /* Link to a frame table entry. */
           hash_insert (&thread_current ()->supp_page_table, &pte->pt_elem);
           *esp = PHYS_BASE;
