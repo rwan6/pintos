@@ -7,6 +7,7 @@
 #define MAX_FNAME_LENGTH 14  /* Maximum filename length. */
 
 typedef int pid_t;
+typedef int mapid_t;
 void syscall_init (void);
 void close_fd (struct thread *);
 

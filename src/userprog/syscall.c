@@ -14,6 +14,7 @@
 #include "filesys/file.h"     /* For file operations. */
 #include "filesys/filesys.h"  /* For filesys operations. */
 #include "vm/frame.h"         /* For frame page. */
+#include "vm/page.h"          /* For page tables. */
 
 /* Prototypes for system call functions and helper functions. */
 static void syscall_handler (struct intr_frame *);
@@ -30,10 +31,13 @@ static int write (int, const void *, unsigned);
 static void seek (int, unsigned);
 static unsigned tell (int);
 static void close (int);
+static mapid_t mmap (int, void *);
+static void munmap (mapid_t);
 static bool check_pointer (const void *, unsigned);
 static struct sys_fd* get_fd_item (int);
 
 static int next_avail_fd;       /* Tracks the next available fd. */
+static mapid_t next_avail_mapid; /* Tracks the next available mapid */
 
 /* Initialize the system call interrupt, as well as the next available
    file descriptor and the file lists. */
@@ -44,7 +48,7 @@ syscall_init (void)
   list_init (&opened_files);
   list_init (&used_fds);
   next_avail_fd = 2; /* 0 and 1 are reserved. */
-
+  next_avail_mapid = 0;
   /* Initialize frame table items. */
   init_frame ();
 }
@@ -128,6 +132,12 @@ syscall_handler (struct intr_frame *f)
         break;
       case SYS_CLOSE :
         close (arg1);
+        break;
+      case SYS_MMAP :
+        mmap (arg1, (void *) arg2);
+        break;
+      case SYS_MUNMAP :
+        munmap (arg1);
         break;
       default :
         exit (-1);
@@ -523,4 +533,43 @@ close_fd (struct thread *t)
       close (fd);
       e = next;
     }
+}
+
+mapid_t
+mmap (int fd, void* addr)
+{
+  int size = filesize (fd);
+  int num_full_pages = size / PGSIZE;
+  int last_page_bytes = size % PGSIZE;
+  void * cur_page_addr = addr;
+  
+  int i;
+  for (i = 0; i < num_full_pages; i++)
+    {
+      /* Allocate pages */
+      
+      /* Check if address is in page table already */
+      if (page_lookup(cur_page_addr) != NULL)
+        exit (-1);
+      
+      
+     cur_page_addr += PGSIZE;
+    }
+    
+  /* Allocate the last partial page */
+  if (last_page_bytes > 0)
+    {
+      /* Check if address is in page table already */
+      if (page_lookup(cur_page_addr) != NULL)
+        exit (-1);
+    }
+  
+  /* Do some bookkeeping */
+  return next_avail_mapid++;
+}
+
+void
+munmap (mapid_t m)
+{
+  
 }
