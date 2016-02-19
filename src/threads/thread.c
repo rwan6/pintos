@@ -608,6 +608,7 @@ init_thread (struct thread *t, const char *name, int priority)
 
   list_init (&t->donated_list);
   list_init (&t->opened_fds);
+  list_init (&t->mmapped_mapids);
   list_init (&t->children);
   lock_init (&t->wait_lock);
   cond_init (&t->wait_cond);

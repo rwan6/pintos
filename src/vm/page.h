@@ -37,7 +37,8 @@ struct page_table_entry
 void init_supp_page_table (struct hash *page_table);
 struct page_table_entry *init_page_entry (void);
 struct page_table_entry *page_lookup (const void *);
-void extend_stack(const void *);
+void extend_stack (const void *);
 void page_fetch_and_set (struct page_table_entry *);
+void page_create_from_vaddr (const void *);
 
 #endif /* vm/page.h */

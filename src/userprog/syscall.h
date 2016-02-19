@@ -10,6 +10,7 @@ typedef int pid_t;
 typedef int mapid_t;
 void syscall_init (void);
 void close_fd (struct thread *);
+void munmap_all (struct thread *);
 
 /* Struct to map system files to their list of open fd. */
 struct sys_file
@@ -37,8 +38,21 @@ struct sys_fd
     struct list_elem thread_opened_elem;  /* List element for the thread's
                                              personal list of fds. */
   };
+  
+struct sys_mmap
+  {
+    mapid_t mapid;
+    int fd;
+    tid_t owner_tid;
+    void *start_addr;
+    int size;
+    int num_pages;
+    struct list_elem sys_mmap_elem;
+    struct list_elem thread_mmapped_elem;
+  };
 
 struct list opened_files;       /* Global list of opened files. */
 struct list used_fds;           /* Global list of used fds values. */
+struct list mmapped_files;         /* Global list of memory mapped file */
 
 #endif /* userprog/syscall.h */

@@ -47,6 +47,7 @@ syscall_init (void)
   intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
   list_init (&opened_files);
   list_init (&used_fds);
+  list_init (&mmapped_files);
   next_avail_fd = 2; /* 0 and 1 are reserved. */
   next_avail_mapid = 0;
   /* Initialize frame table items. */
@@ -535,41 +536,124 @@ close_fd (struct thread *t)
     }
 }
 
-mapid_t
-mmap (int fd, void* addr)
+/* Helper function to close all memory mapped files.  This
+   function can be called whether or not a thread dies "gracefully"
+   (i.e. via exit) or abruptly (directly to process_exit). */
+void
+munmap_all (struct thread *t)
 {
-  int size = filesize (fd);
-  int num_full_pages = size / PGSIZE;
-  int last_page_bytes = size % PGSIZE;
-  void * cur_page_addr = addr;
+  struct list_elem *e;
+  struct list_elem *next;
+  e = list_begin (&t->mmapped_mapids);
+  while (!list_empty (&t->mmapped_mapids) && e != list_end (&t->mmapped_mapids))
+    {
+      /* Since we're deleting an item, we need to save the next pointer,
+         since otherwise we might page fault. */
+      next = list_next (e);
+      struct sys_mmap *m = list_entry (e, struct sys_mmap, thread_mmapped_elem);
+      mapid_t mapid = m->mapid;
+      munmap (mapid);
+      e = next;
+    }
+}
+
+mapid_t
+mmap (int fd, void *addr)
+{
+  /* STDIN and STDOUT are not mappable */
+  if (fd == 0 || fd == 1)
+    return -1;
+  
+  lock_acquire (&file_lock);
+  struct sys_fd *sf = get_fd_item (fd);
+  lock_release (&file_lock);
+  
+  if (!sf)
+    return -1;
+  
+  int new_fd = open (sf->sys_file->name);
+  int size = filesize (new_fd);
+  
+  /* Fails if fd has a length of zero bytes */
+  if (size == 0)
+    return -1;
+  /* addr needs to be page-aligned and cannot be 0 */
+  if ((uintptr_t) addr % PGSIZE != 0 || addr == 0)
+    return -1;
+  
+  /* We need ceiling of (size / PGSIZE) pages */
+  int num_pages = size / PGSIZE;
+  if (size % PGSIZE != 0)
+    num_pages++;
+  
+  /* Allocate sys_mmap for bookkeeping */
+  lock_acquire (&file_lock);
+  struct sys_mmap *m = malloc (sizeof (struct sys_mmap));
+  if (!m)
+    {
+      lock_release (&file_lock);
+      return -1;
+    }
+  m->mapid = next_avail_mapid++;
+  m->fd = new_fd;
+  m->owner_tid = thread_current ()->tid;
+  m->start_addr = addr;
+  m->size = size;
+  m->num_pages = num_pages;
+  list_push_back (&mmapped_files, &m->sys_mmap_elem);
+  
+  /* Add the fd to the thread's mmapped_mapids list. */
+  struct thread *t = thread_current ();
+  list_push_back (&t->mmapped_mapids, &m->thread_mmapped_elem);
+  lock_release (&file_lock);
   
   int i;
-  for (i = 0; i < num_full_pages; i++)
+  for (i = 0; i < num_pages; i++)
     {
-      /* Allocate pages */
+      /* Address should not be in page table already */
+      if (page_lookup(addr) != NULL)
+        return -1;
       
-      /* Check if address is in page table already */
-      if (page_lookup(cur_page_addr) != NULL)
-        exit (-1);
+      /* Allocate page */
+      page_create_from_vaddr(addr);
       
+      /* Copy file into the page */
       
-     cur_page_addr += PGSIZE;
-    }
-    
-  /* Allocate the last partial page */
-  if (last_page_bytes > 0)
-    {
-      /* Check if address is in page table already */
-      if (page_lookup(cur_page_addr) != NULL)
-        exit (-1);
+      addr += PGSIZE;
     }
   
-  /* Do some bookkeeping */
-  return next_avail_mapid++;
+  return m->mapid;
 }
 
 void
 munmap (mapid_t m)
 {
-  
+  lock_acquire (&file_lock);
+  struct list_elem *e;
+  struct sys_mmap *mmap_instance;
+  for (e = list_begin (&mmapped_files);
+       e != list_end (&mmapped_files);
+       e = list_next(e))
+    {
+      mmap_instance = list_entry (e, struct sys_mmap, sys_mmap_elem);
+      if (mmap_instance->mapid == m)
+        {
+          if (mmap_instance->owner_tid == thread_current ()->tid)
+            {
+              int i;
+              for (i = 0; i < mmap_instance->num_pages; i++)
+                {
+                  /* Evict the pages, which implicitly writes them back to
+                     the file */
+                }
+              close (mmap_instance->fd);
+              list_remove (&mmap_instance->sys_mmap_elem);
+              free (mmap_instance);
+            }
+          else
+            break;
+        }
+    }
+  lock_release (&file_lock);
+  exit (-1);
 }

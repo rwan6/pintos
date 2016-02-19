@@ -76,21 +76,30 @@ extend_stack (const void *address)
     }
   else //if doesn't exist, then create a new frame and pte, and return
     {
-      pte = malloc (sizeof (struct page_table_entry));
-      struct frame_entry *fe = get_frame (PAL_USER);
-      pte->kpage = fe->addr;
-      pte->upage = (void *) address;
-      pte->phys_frame = fe;
-      memset (fe->addr, 0, PGSIZE);
-      hash_insert (&thread_current ()->supp_page_table, &pte->pt_elem);
+      page_create_from_vaddr (address);
+    }
+}
 
-      bool success = pagedir_set_page (thread_current ()->pagedir, pte->upage,
-        pte->kpage, !pte->page_read_only);
-      if (!success)
-        {
-          thread_current ()->return_status = -1;
-          process_exit ();
-        }
+void
+page_create_from_vaddr (const void *address)
+{
+  struct page_table_entry *pte = malloc (sizeof (struct page_table_entry));
+  if (!pte)
+    PANIC ("Unable to allocate page table entry!");
+  
+  struct frame_entry *fe = get_frame (PAL_USER);
+  pte->kpage = fe->addr;
+  pte->upage = address;
+  pte->phys_frame = fe;
+  memset (fe->addr, 0, PGSIZE);
+  hash_insert (&thread_current ()->supp_page_table, &pte->pt_elem);
+  
+  bool success = pagedir_set_page (thread_current ()->pagedir, pte->upage,
+    pte->kpage, !pte->page_read_only);
+  if (!success)
+    {
+      thread_current ()->return_status = -1;
+      process_exit ();
     }
 }
 
