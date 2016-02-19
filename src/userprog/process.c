@@ -662,9 +662,9 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 
       /* If the page is all zeros. */
       if (zero_bytes == PGSIZE)
-        pte->page_status = 0;
+        pte->page_status = PAGE_ZEROS;
       else
-        pte->page_status = 3;
+        pte->page_status = PAGE_NONZEROS;
 
       pte->page_read_only = !writable;
 
@@ -717,7 +717,7 @@ setup_stack (void **esp)
           pte->kpage = kpage;
           pte->phys_frame = new_frame;
           pte->page_read_only = false;
-          pte->page_status = 0;
+          pte->page_status = PAGE_ZEROS;
 
           /* Link to a frame table entry. */
           hash_insert (&thread_current ()->supp_page_table, &pte->pt_elem);

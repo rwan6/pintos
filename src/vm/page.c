@@ -1,6 +1,9 @@
+#include <string.h>
 #include "vm/page.h"
 #include "threads/malloc.h"
 #include "threads/vaddr.h"
+#include "userprog/process.h"
+#include "userprog/pagedir.h"
 
 /* hash_less_func for sorting the supplemental page table according
    to the page's virtual addresses. */
@@ -63,7 +66,7 @@ page_lookup (const void *address)
 }
 
 void
-extend_stack(const void *address)
+extend_stack (const void *address)
 {
   struct page_table_entry *pte = page_lookup (address);
   if (pte != NULL)//page_lookup, if exists, fetch data.. (normal case)
@@ -76,23 +79,29 @@ extend_stack(const void *address)
       pte = malloc (sizeof (struct page_table_entry));
       struct frame_entry *fe = get_frame (PAL_USER);
       pte->kpage = fe->addr;
+      pte->upage = (void *) address;
       pte->phys_frame = fe;
       memset (fe->addr, 0, PGSIZE);
+      hash_insert (&thread_current ()->supp_page_table, &pte->pt_elem);
+
       bool success = pagedir_set_page (thread_current ()->pagedir, pte->upage,
         pte->kpage, !pte->page_read_only);
       if (!success)
-        PANIC ("Set page failed.");
+        {
+          thread_current ()->return_status = -1;
+          process_exit ();
+        }
     }
 }
 
 void
 page_fetch_and_set (struct page_table_entry *pte)
 {
-  int status = pte->page_status;
+  enum page_status status = pte->page_status;
   struct thread *cur = thread_current ();
 
-  bool success;
-  if (status == 0)
+  bool success = false;
+  if (status == PAGE_ZEROS)
     {
       if (pte->phys_frame != NULL)
         {
@@ -105,20 +114,25 @@ page_fetch_and_set (struct page_table_entry *pte)
           pte->kpage = fe->addr;
           pte->phys_frame = fe;
           memset (fe->addr, 0, PGSIZE);
+          hash_insert (&thread_current ()->supp_page_table, &pte->pt_elem);
+
           success = pagedir_set_page (cur->pagedir, pte->upage,
             pte->kpage, !pte->page_read_only);
         }
     }
-  else if (status == 1)
+  else if (status == PAGE_SWAP)
     {
       // TODO handle swap slot case
       success = true;
     }
-  else if (status == 2)
+  else if (status == PAGE_MMAP)
     {
       // TODO mmap file case
       success = true;
     }
   if (!success)
-    PANIC ("Set page failed in page table");
+    {
+      thread_current ()->return_status = -1;
+      process_exit ();
+    }
 }

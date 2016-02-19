@@ -3,9 +3,13 @@
 #include <stdio.h>
 #include "userprog/gdt.h"
 #include "userprog/syscall.h"
+#include "userprog/process.h"
 #include "threads/interrupt.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"    /* For validating the user address. */
+#include "vm/page.h"
+
+#define STACK_SIZE_LIMIT 0x800000 /* 8MB. */
 
 /* Number of page faults processed. */
 static long long page_fault_cnt;
@@ -147,11 +151,16 @@ page_fault (struct intr_frame *f)
   write = (f->error_code & PF_W) != 0;
   user = (f->error_code & PF_U) != 0;
 
+  struct page_table_entry *pte = page_lookup (fault_addr);
+
   /* Verify the access is legal. If not, exit. */
-  if (not_present || fault_addr == NULL ||
-      is_kernel_vaddr (fault_addr))
+  if (pte == NULL || not_present || fault_addr == NULL ||
+      is_kernel_vaddr (fault_addr) ||
+      (pte->page_read_only && write))
     {
-      PANIC ("User memory access is illegal.");
+      thread_current ()->return_status = -1;
+      process_exit ();
+      // PANIC ("User memory access is illegal.");
     }
   /* Handle stack growth. */
   if(user)
@@ -159,7 +168,11 @@ page_fault (struct intr_frame *f)
       void *stack_pointer = f->esp;
       /* Impose an absolute limit on stack size. */
       if (stack_pointer < PHYS_BASE - STACK_SIZE_LIMIT)
-        PANIC ("Stack went over size limit.");
+        {
+          thread_current ()->return_status = -1;
+          process_exit ();
+        }
+        // PANIC ("Stack went over size limit.");
       else if (fault_addr >= stack_pointer - 32)
         {
           //grow stack
@@ -169,8 +182,8 @@ page_fault (struct intr_frame *f)
     }
 
   /* Get current thread's page table for page fault handler. */
-  struct hash *supp_page_table = &thread_current ()->supp_page_table;
-  struct page_table_entry *pte = page_lookup (fault_addr);
+  // struct hash *supp_page_table = &thread_current ()->supp_page_table;
+  // page_fetch_and_set (pte);
 
   /* Delete all below. */
   /* To implement virtual memory, delete the rest of the function
