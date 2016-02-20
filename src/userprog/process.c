@@ -690,6 +690,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
       pte->upage = upage;
       pte->kpage = kpage;
       pte->phys_frame = new_frame;
+      new_frame->pte = pte;
 
       /* If the page is all zeros. */
       if (zero_bytes == PGSIZE)
@@ -748,6 +749,7 @@ setup_stack (void **esp)
       pte->phys_frame = new_frame;
       pte->page_read_only = false;
       pte->page_status = PAGE_ZEROS;
+      new_frame->pte = pte;
       success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
       if (success)
         {
