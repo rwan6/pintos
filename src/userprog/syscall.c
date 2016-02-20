@@ -470,24 +470,24 @@ close (int fd)
 static bool
 check_pointer (const void *pointer, unsigned size)
 {
-  struct thread *t = thread_current ();
+  // struct thread *t = thread_current ();
 
   /* First validate end-cases.  If these do not fail, check
      everything.  Limits the number of checks that need to
      be made. */
-  if (pointer == NULL || is_kernel_vaddr (pointer) ||
-    pagedir_get_page (t->pagedir, pointer) == NULL)
+  if (pointer == NULL || is_kernel_vaddr (pointer) /*||
+    pagedir_get_page (t->pagedir, pointer) == NULL*/)
     return false;
   else if (pointer + (size-1) == NULL ||
-    is_kernel_vaddr (pointer + (size-1)) ||
-    pagedir_get_page (t->pagedir, pointer + (size-1)) == NULL)
+    is_kernel_vaddr (pointer + (size-1)) /*||
+    pagedir_get_page (t->pagedir, pointer + (size-1)) == NULL*/)
     return false;
 
   unsigned i;
   for (i = 1; i < (size - 1); i++)
     {
-      if (pointer + i == NULL || is_kernel_vaddr (pointer + i) ||
-        pagedir_get_page (t->pagedir, pointer + i) == NULL)
+      if (pointer + i == NULL || is_kernel_vaddr (pointer + i) /*||
+        pagedir_get_page (t->pagedir, pointer + i) == NULL*/)
         return false;
     }
   return true;
@@ -579,7 +579,7 @@ mmap (int fd, void *addr)
   /* Fails if fd has a length of zero bytes */
   if (size == 0)
     return MAP_FAILED;
-  
+
   /* addr needs to be page-aligned and cannot be 0 */
   if (pg_ofs (addr) != 0 || addr == 0)
     return MAP_FAILED;

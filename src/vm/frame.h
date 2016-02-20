@@ -6,6 +6,7 @@
 #include "vm/page.h"
 #include "threads/palloc.h"
 #include "threads/thread.h"
+#include "threads/vaddr.h"
 
 struct frame_entry
   {

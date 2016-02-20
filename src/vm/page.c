@@ -62,7 +62,7 @@ page_lookup (const void *address)
   struct thread *cur = thread_current ();
 
   lock_acquire (&cur->spt_lock);
-  p.upage = (void *) address;
+  p.upage = pg_round_down ((void *) address);
   e = hash_find (&cur->supp_page_table, &p.pt_elem);
   lock_release (&cur->spt_lock);
   return e != NULL ? hash_entry (e, struct page_table_entry, pt_elem)
@@ -93,8 +93,8 @@ page_create_from_vaddr (const void *address)
 
   struct thread *cur = thread_current ();
   struct frame_entry *fe = get_frame (PAL_USER);
-  pte->kpage = fe->addr;
-  pte->upage = (void *) address;
+  pte->kpage = pg_round_down (fe->addr);
+  pte->upage = pg_round_down ((void *) address);
   pte->phys_frame = fe;
   memset (fe->addr, 0, PGSIZE);
   lock_acquire (&cur->spt_lock);

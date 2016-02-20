@@ -151,11 +151,9 @@ page_fault (struct intr_frame *f)
   write = (f->error_code & PF_W) != 0;
   user = (f->error_code & PF_U) != 0;
 
-  struct page_table_entry *pte = page_lookup (fault_addr);
   /* Verify the access is legal. If not, exit. */
-  if (pte == NULL || not_present || fault_addr == NULL ||
-      is_kernel_vaddr (fault_addr) ||
-      (pte->page_read_only && write))
+  if (/*pte == NULL ||*/ !not_present || fault_addr == NULL ||
+      is_kernel_vaddr (fault_addr))
     {
       thread_current ()->return_status = -1;
       thread_exit ();
@@ -180,6 +178,12 @@ page_fault (struct intr_frame *f)
         }
     }
 
+  struct page_table_entry *pte = page_lookup (pg_round_down (fault_addr));
+  if (pte == NULL || (pte->page_read_only && write))
+    {
+      thread_current ()->return_status = -1;
+      thread_exit ();
+    }
   // TODO: call page_fetch_and_set
 
   /* Delete all below. */

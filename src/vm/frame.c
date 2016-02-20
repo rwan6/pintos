@@ -36,7 +36,7 @@ get_frame (enum palloc_flags flags)
   list_push_back (&all_frames, &fe->frame_elem);
   if (clock_handle == NULL)
     clock_handle = list_begin (&all_frames);
-  fe->addr = frame;
+  fe->addr = pg_round_down (frame);
   fe->t = thread_current ();
   lock_release (&frame_table_lock);
   return fe;

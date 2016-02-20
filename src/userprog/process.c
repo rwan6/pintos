@@ -302,10 +302,10 @@ process_exit (void)
   struct thread *cur = thread_current ();
   uint32_t *pd;
   printf ("%s: exit(%d)\n", cur->name, cur->return_status);
-  
+
   /* Unmaps any mapped files. */
   munmap_all (cur);
-  
+
   /* Close any open file handles.  Closing a file also reenables
      writes. */
   close_fd (cur);
@@ -351,7 +351,7 @@ process_exit (void)
      with frame entries, supplemental page table, and swap slots.
      Note that memory files have already been unmapped and deallocated. */
   hash_destroy (&cur->supp_page_table, page_deallocate);
-  
+
   lock_release (&exit_lock);
   // printf ("After hash_destroy\n");
   /* Destroy the current process's page directory and switch back
@@ -666,8 +666,8 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
       /* If a new frame entry was successfully allocated, set up the
          corresponding page table entry. */
       struct page_table_entry *pte = init_page_entry ();
-      pte->upage = upage;
-      pte->kpage = kpage;
+      pte->upage = pg_round_down (upage);
+      pte->kpage = pg_round_down (kpage);
       pte->phys_frame = new_frame;
 
       /* If the page is all zeros. */
@@ -724,8 +724,8 @@ setup_stack (void **esp)
       /* If a new frame entry was successfully allocated, set up the
          corresponding page table entry. */
       pte = init_page_entry ();
-      pte->upage = ((uint8_t *) PHYS_BASE) - PGSIZE;
-      pte->kpage = kpage;
+      pte->upage = pg_round_down (((uint8_t *) PHYS_BASE) - PGSIZE);
+      pte->kpage = pg_round_down (kpage);
       pte->phys_frame = new_frame;
       pte->page_read_only = false;
       pte->page_status = PAGE_ZEROS;
