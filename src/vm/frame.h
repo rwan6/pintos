@@ -31,4 +31,7 @@ struct list all_frames;
 /* The clock handle for clock algorithm. Points to frame entry. */
 struct list_elem *clock_handle;
 
+/* Global lock for frame table. */
+struct lock frame_table_lock;
+
 #endif /* vm/frame.h */
