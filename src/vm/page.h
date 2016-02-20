@@ -1,8 +1,7 @@
 #ifndef VM_PAGE_H
 #define VM_PAGE_H
 
-// #include "vm/swap.h"
-#include "vm/frame.h"
+#include <hash.h>
 
 /* -------- Enumeration of Page Status --------	*/
 /* 0 -- Zero-filled page (in Frame Table).  	  */

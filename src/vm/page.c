@@ -1,5 +1,6 @@
 #include <string.h>
 #include "vm/page.h"
+#include "vm/frame.h"
 #include "threads/malloc.h"
 #include "threads/vaddr.h"
 #include "userprog/process.h"
@@ -85,14 +86,14 @@ page_create_from_vaddr (const void *address)
   struct page_table_entry *pte = malloc (sizeof (struct page_table_entry));
   if (!pte)
     PANIC ("Unable to allocate page table entry!");
-  
+
   struct frame_entry *fe = get_frame (PAL_USER);
   pte->kpage = fe->addr;
   pte->upage = (void *) address;
   pte->phys_frame = fe;
   memset (fe->addr, 0, PGSIZE);
   hash_insert (&thread_current ()->supp_page_table, &pte->pt_elem);
-  
+
   bool success = pagedir_set_page (thread_current ()->pagedir, pte->upage,
     pte->kpage, !pte->page_read_only);
   if (!success)
