@@ -152,15 +152,14 @@ page_fault (struct intr_frame *f)
   user = (f->error_code & PF_U) != 0;
 
   struct page_table_entry *pte = page_lookup (fault_addr);
-
   /* Verify the access is legal. If not, exit. */
   if (pte == NULL || not_present || fault_addr == NULL ||
       is_kernel_vaddr (fault_addr) ||
       (pte->page_read_only && write))
     {
       thread_current ()->return_status = -1;
-      process_exit ();
-      // PANIC ("User memory access is illegal.");
+      thread_exit ();
+      //PANIC ("User memory access is illegal.");
     }
   /* Handle stack growth. */
   if(user)
@@ -170,7 +169,7 @@ page_fault (struct intr_frame *f)
       if (stack_pointer < PHYS_BASE - STACK_SIZE_LIMIT)
         {
           thread_current ()->return_status = -1;
-          process_exit ();
+          thread_exit ();
         }
         // PANIC ("Stack went over size limit.");
       else if (fault_addr >= stack_pointer - 32)
@@ -187,11 +186,11 @@ page_fault (struct intr_frame *f)
   /* To implement virtual memory, delete the rest of the function
      body, and replace it with code that brings in the page to
      which fault_addr refers. */
-  printf ("Page fault at %p: %s error %s page in %s context.\n",
-          fault_addr,
-          not_present ? "not present" : "rights violation",
-          write ? "writing" : "reading",
-          user ? "user" : "kernel");
-  kill (f);
+  // printf ("Page fault at %p: %s error %s page in %s context.\n",
+  //         fault_addr,
+  //         not_present ? "not present" : "rights violation",
+  //         write ? "writing" : "reading",
+  //         user ? "user" : "kernel");
+  // kill (f);
 }
 

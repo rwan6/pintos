@@ -347,13 +347,13 @@ process_exit (void)
   if (cur->executable != NULL)
     file_allow_write (cur->executable);
 
-  lock_release (&exit_lock);
-
   /* Page reclamation: remove pages and deallocate memory associated
      with frame entries, supplemental page table, and swap slots.
      Note that memory files have already been unmapped and deallocated. */
   hash_destroy (&cur->supp_page_table, page_deallocate);
-
+  
+  lock_release (&exit_lock);
+  // printf ("After hash_destroy\n");
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
   pd = cur->pagedir;

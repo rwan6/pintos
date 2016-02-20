@@ -1,3 +1,4 @@
+#include <stdio.h>
 #include <string.h>
 #include "vm/page.h"
 #include "vm/frame.h"
@@ -169,7 +170,6 @@ page_deallocate (struct hash_elem *e, void *aux UNUSED)
 {
   struct page_table_entry *pte = hash_entry (e,
     struct page_table_entry, pt_elem);
-
   /* Determine page's status and deallocate respective resources. */
   enum page_status ps = pte->page_status;
   if (ps == PAGE_ZEROS || ps == PAGE_NONZEROS)
@@ -185,7 +185,6 @@ page_deallocate (struct hash_elem *e, void *aux UNUSED)
       swap_free (pte->ss);
       free (pte->ss);
     }
-
   if (pte != NULL)
     free (pte);
 }
