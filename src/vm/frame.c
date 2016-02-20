@@ -48,6 +48,7 @@ free_frame (struct page_table_entry *pte)
   lock_acquire (&frame_table_lock);
 	palloc_free_page (pte->kpage);
   free (pte->phys_frame);
+  lock_release (&frame_table_lock);
 }
 
 struct frame_entry *
@@ -77,8 +78,10 @@ evict_frame (void)
               // TODO: mmap case; now it only takes care of ss cases
               struct swap_slot *ss = malloc (sizeof (struct swap_slot));
               swap_write (ss, fe);
+              lock_acquire (&fe->t->spt_lock);
               fe->pte->ss = ss;
               fe->pte->page_status = PAGE_SWAP;
+              lock_release (&fe->t->spt_lock);
 
               //unlink this pte
               fe->pte = NULL;

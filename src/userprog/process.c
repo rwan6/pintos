@@ -669,7 +669,6 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
       pte->upage = upage;
       pte->kpage = kpage;
       pte->phys_frame = new_frame;
-      new_frame->pte = pte;
 
       /* If the page is all zeros. */
       if (zero_bytes == PGSIZE)
@@ -679,7 +678,9 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 
       pte->page_read_only = !writable;
 
+      lock_acquire (&thread_current ()->spt_lock);
       hash_insert (&thread_current ()->supp_page_table, &pte->pt_elem);
+      lock_release (&thread_current ()->spt_lock);
 
       /* Load this page. */
       if (file_read (file, kpage, page_read_bytes) != (int) page_read_bytes)
@@ -728,12 +729,13 @@ setup_stack (void **esp)
       pte->phys_frame = new_frame;
       pte->page_read_only = false;
       pte->page_status = PAGE_ZEROS;
-      new_frame->pte = pte;
       success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
       if (success)
         {
           /* Link to a frame table entry. */
+          lock_acquire (&thread_current ()->spt_lock);
           hash_insert (&thread_current ()->supp_page_table, &pte->pt_elem);
+          lock_release (&thread_current ()->spt_lock);
           *esp = PHYS_BASE;
         }
       else
