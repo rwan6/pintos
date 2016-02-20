@@ -7,7 +7,7 @@
 void
 init_swap_partition (void)
 {
-  struct block *swap_partition = block_get_role (BLOCK_SWAP);
+  swap_partition = block_get_role (BLOCK_SWAP);
   swap_bitmap = bitmap_create (block_size (swap_partition));
   bitmap_set_all (swap_bitmap, false);
 }

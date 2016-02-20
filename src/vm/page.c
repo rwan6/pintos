@@ -1,6 +1,7 @@
 #include <string.h>
 #include "vm/page.h"
 #include "vm/frame.h"
+#include "vm/swap.h"
 #include "threads/malloc.h"
 #include "threads/vaddr.h"
 #include "userprog/process.h"
@@ -132,6 +133,12 @@ page_fetch_and_set (struct page_table_entry *pte)
   else if (status == PAGE_SWAP)
     {
       // TODO handle swap slot case
+      struct frame_entry *fe = get_frame (PAL_USER);
+      pte->kpage = fe->addr;
+      pte->phys_frame = fe;
+      pte->ss = NULL;
+      pte->page_status = PAGE_NONZEROS;
+      swap_read (pte->ss, fe);
       success = true;
     }
   else if (status == PAGE_MMAP)
@@ -146,3 +153,28 @@ page_fetch_and_set (struct page_table_entry *pte)
     }
 }
 
+void
+page_deallocate (struct hash_elem *e, void *aux UNUSED)
+{
+  struct page_table_entry *pte = hash_entry (e,
+    struct page_table_entry, pt_elem);
+
+  /* Determine page's status and deallocate respective resources. */
+  enum page_status ps = pte->page_status;
+  if (ps == PAGE_ZEROS || ps == PAGE_NONZEROS)
+    {
+      if (pte->phys_frame != NULL)
+        {
+          free_frame (pte);
+          pagedir_clear_page (thread_current ()->pagedir, pte->upage);
+        }
+    }
+  else if (ps == PAGE_SWAP)
+    {
+      swap_free (pte->ss);
+      free (pte->ss);
+    }
+
+  if (pte != NULL)
+    free (pte);
+}

@@ -306,7 +306,7 @@ process_exit (void)
   /* Close any open file handles.  Closing a file also reenables
      writes. */
   close_fd (cur);
-  
+
   /* Unmaps any mapped files. */
   munmap_all (cur);
 
@@ -348,33 +348,12 @@ process_exit (void)
     file_allow_write (cur->executable);
 
   lock_release (&exit_lock);
-  
+
   /* Page reclamation: remove pages and deallocate memory associated
      with frame entries, supplemental page table, and swap slots.
      Note that memory files have already been unmapped and deallocated. */
-  struct hash_iterator hi;
-  hash_first (&hi, &cur->supp_page_table);
-  while (hash_next (&hi))
-    {
-      struct page_table_entry *pte = hash_entry (hash_cur (&hi), 
-        struct page_table_entry, pt_elem);
-      
-      /* Determine page's status and deallocate respective resources. */
-      enum page_status ps = pte->page_status;
-      if (ps == PAGE_ZEROS || ps == PAGE_NONZEROS)
-        {
-          if (pte->phys_frame != NULL)
-              free_frame (pte);
-        }
-      else if (ps == PAGE_SWAP)
-        {
-          swap_free (pte->ss);
-          free (pte->ss);
-        }
-        
-      free (pte);
-    }
-  
+  hash_destroy (&cur->supp_page_table, page_deallocate);
+
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
   pd = cur->pagedir;
@@ -676,7 +655,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
       size_t page_zero_bytes = PGSIZE - page_read_bytes;
 
       /* Get a page of memory. */
-      struct frame_entry * new_frame = get_frame(PAL_USER);
+      struct frame_entry *new_frame = get_frame(PAL_USER);
 
       new_frame->offset = (uint32_t) ofs;
       uint8_t *kpage = new_frame->addr;
@@ -686,7 +665,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 
       /* If a new frame entry was successfully allocated, set up the
          corresponding page table entry. */
-      struct page_table_entry *pte = malloc(sizeof(struct page_table_entry));
+      struct page_table_entry *pte = init_page_entry ();
       pte->upage = upage;
       pte->kpage = kpage;
       pte->phys_frame = new_frame;
@@ -743,7 +722,7 @@ setup_stack (void **esp)
     {
       /* If a new frame entry was successfully allocated, set up the
          corresponding page table entry. */
-      pte = malloc(sizeof(struct page_table_entry));
+      pte = init_page_entry ();
       pte->upage = ((uint8_t *) PHYS_BASE) - PGSIZE;
       pte->kpage = kpage;
       pte->phys_frame = new_frame;

@@ -15,6 +15,7 @@
 #include "filesys/filesys.h"  /* For filesys operations. */
 #include "vm/frame.h"         /* For frame page. */
 #include "vm/page.h"          /* For page tables. */
+#include "vm/swap.h"          /* For swap slots. */
 
 /* Prototypes for system call functions and helper functions. */
 static void syscall_handler (struct intr_frame *);
@@ -52,6 +53,7 @@ syscall_init (void)
   next_avail_mapid = 0;
   /* Initialize frame table items. */
   init_frame ();
+  // init_swap_partition ();
 }
 
 /* Takes the interrupt frame as an argument and traces the stack
@@ -563,29 +565,29 @@ mmap (int fd, void *addr)
   /* STDIN and STDOUT are not mappable */
   if (fd == 0 || fd == 1)
     return -1;
-  
+
   lock_acquire (&file_lock);
   struct sys_fd *sf = get_fd_item (fd);
   lock_release (&file_lock);
-  
+
   if (!sf)
     return -1;
-  
+
   int new_fd = open (sf->sys_file->name);
   int size = filesize (new_fd);
-  
+
   /* Fails if fd has a length of zero bytes */
   if (size == 0)
     return -1;
   /* addr needs to be page-aligned and cannot be 0 */
   if ((uintptr_t) addr % PGSIZE != 0 || addr == 0)
     return -1;
-  
+
   /* We need ceiling of (size / PGSIZE) pages */
   int num_pages = size / PGSIZE;
   if (size % PGSIZE != 0)
     num_pages++;
-  
+
   /* Allocate sys_mmap for bookkeeping */
   lock_acquire (&file_lock);
   struct sys_mmap *m = malloc (sizeof (struct sys_mmap));
@@ -601,27 +603,27 @@ mmap (int fd, void *addr)
   m->size = size;
   m->num_pages = num_pages;
   list_push_back (&mmapped_files, &m->sys_mmap_elem);
-  
+
   /* Add the fd to the thread's mmapped_mapids list. */
   struct thread *t = thread_current ();
   list_push_back (&t->mmapped_mapids, &m->thread_mmapped_elem);
   lock_release (&file_lock);
-  
+
   int i;
   for (i = 0; i < num_pages; i++)
     {
       /* Address should not be in page table already */
       if (page_lookup(addr) != NULL)
         return -1;
-      
+
       /* Allocate page */
       page_create_from_vaddr(addr);
-      
+
       /* Copy file into the page */
-      
+
       addr += PGSIZE;
     }
-  
+
   return m->mapid;
 }
 

@@ -181,9 +181,7 @@ page_fault (struct intr_frame *f)
         }
     }
 
-  /* Get current thread's page table for page fault handler. */
-  // struct hash *supp_page_table = &thread_current ()->supp_page_table;
-  // page_fetch_and_set (pte);
+  // TODO: call page_fetch_and_set
 
   /* Delete all below. */
   /* To implement virtual memory, delete the rest of the function

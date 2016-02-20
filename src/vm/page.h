@@ -3,19 +3,19 @@
 
 #include <hash.h>
 
-/* -------- Enumeration of Page Status --------	*/
-/* 0 -- Zero-filled page (in Frame Table).  	  */
-/* 1 -- Non-zero-filled page (in Frame Table). 	*/
-/* 2 -- In swap slot.                       	  */
-/* 3 -- Memory Mapped (in disk).            	  */
+/* -------- Enumeration of Page Status -------- */
+/* 0 -- Zero-filled page (in Frame Table).      */
+/* 1 -- Non-zero-filled page (in Frame Table).  */
+/* 2 -- In swap slot.                           */
+/* 3 -- Memory Mapped (in disk).                */
 /* -------------------------------------------- */
 enum page_status
-	{
+  {
     PAGE_ZEROS,
     PAGE_NONZEROS,
     PAGE_SWAP,
     PAGE_MMAP
-	};
+  };
 
 struct page_table_entry
   {
@@ -41,5 +41,6 @@ struct page_table_entry *page_lookup (const void *);
 void extend_stack (const void *);
 void page_fetch_and_set (struct page_table_entry *);
 void page_create_from_vaddr (const void *);
+void page_deallocate (struct hash_elem *, void *UNUSED);
 
 #endif /* vm/page.h */
