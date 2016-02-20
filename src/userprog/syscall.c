@@ -564,24 +564,28 @@ mmap (int fd, void *addr)
 {
   /* STDIN and STDOUT are not mappable */
   if (fd == 0 || fd == 1)
-    return -1;
+    return MAP_FAILED;
 
   lock_acquire (&file_lock);
   struct sys_fd *sf = get_fd_item (fd);
   lock_release (&file_lock);
 
   if (!sf)
-    return -1;
+    return MAP_FAILED;
 
   int new_fd = open (sf->sys_file->name);
   int size = filesize (new_fd);
 
   /* Fails if fd has a length of zero bytes */
   if (size == 0)
-    return -1;
+    return MAP_FAILED;
+  
   /* addr needs to be page-aligned and cannot be 0 */
-  if ((uintptr_t) addr % PGSIZE != 0 || addr == 0)
-    return -1;
+  if (pg_ofs (addr) != 0 || addr == 0)
+    {
+      //printf("returning %d\n", MAP_FAILED);
+      return MAP_FAILED;
+    }
 
   /* We need ceiling of (size / PGSIZE) pages */
   int num_pages = size / PGSIZE;
@@ -594,7 +598,7 @@ mmap (int fd, void *addr)
   if (!m)
     {
       lock_release (&file_lock);
-      return -1;
+      return MAP_FAILED;
     }
   m->mapid = next_avail_mapid++;
   m->fd = new_fd;

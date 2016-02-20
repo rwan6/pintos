@@ -8,6 +8,9 @@
 
 typedef int pid_t;
 typedef int mapid_t;
+
+#define MAP_FAILED ((mapid_t) -1)
+
 void syscall_init (void);
 void close_fd (struct thread *);
 void munmap_all (struct thread *);

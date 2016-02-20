@@ -302,13 +302,13 @@ process_exit (void)
   struct thread *cur = thread_current ();
   uint32_t *pd;
   printf ("%s: exit(%d)\n", cur->name, cur->return_status);
-
+  
+  /* Unmaps any mapped files. */
+  munmap_all (cur);
+  
   /* Close any open file handles.  Closing a file also reenables
      writes. */
   close_fd (cur);
-
-  /* Unmaps any mapped files. */
-  munmap_all (cur);
 
   /* If my parent is still alive, make sure they are not
      caught in a deadlock.  Otherwise, deallocate my child_process
