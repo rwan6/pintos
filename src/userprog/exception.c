@@ -159,23 +159,21 @@ page_fault (struct intr_frame *f)
       thread_exit ();
       //PANIC ("User memory access is illegal.");
     }
+
   /* Handle stack growth. */
-  if(user)
+  void *stack_pointer = user ? f->esp : thread_current ()->esp;
+  /* Impose an absolute limit on stack size. */
+  if (stack_pointer < PHYS_BASE - STACK_SIZE_LIMIT)
     {
-      void *stack_pointer = f->esp;
-      /* Impose an absolute limit on stack size. */
-      if (stack_pointer < PHYS_BASE - STACK_SIZE_LIMIT)
-        {
-          thread_current ()->return_status = -1;
-          thread_exit ();
-        }
-        // PANIC ("Stack went over size limit.");
-      else if (fault_addr >= stack_pointer - 32)
-        {
-          //grow stack
-          extend_stack(fault_addr);
-          return;
-        }
+      thread_current ()->return_status = -1;
+      thread_exit ();
+    }
+    // PANIC ("Stack went over size limit.");
+  else if (fault_addr >= stack_pointer - 32)
+    {
+      //grow stack
+      extend_stack(fault_addr);
+      return;
     }
 
   struct page_table_entry *pte = page_lookup (pg_round_down (fault_addr));

@@ -63,6 +63,7 @@ syscall_init (void)
 static void
 syscall_handler (struct intr_frame *f)
 {
+  thread_current ()->esp = f->esp;
   /* If esp is a bad address, kill the process immediately. */
   if (!check_pointer ((const void *) (f->esp), 1))
     exit (-1);
