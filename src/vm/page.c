@@ -60,8 +60,10 @@ page_lookup (const void *address)
   struct hash_elem *e;
   struct thread *cur = thread_current ();
 
+  lock_acquire (&cur->spt_lock);
   p.upage = (void *) address;
   e = hash_find (&cur->supp_page_table, &p.pt_elem);
+  lock_release (&cur->spt_lock);
   return e != NULL ? hash_entry (e, struct page_table_entry, pt_elem)
     : NULL;
 }
@@ -88,18 +90,21 @@ page_create_from_vaddr (const void *address)
   if (!pte)
     PANIC ("Unable to allocate page table entry!");
 
+  struct thread *cur = thread_current ();
   struct frame_entry *fe = get_frame (PAL_USER);
   pte->kpage = fe->addr;
   pte->upage = (void *) address;
   pte->phys_frame = fe;
   memset (fe->addr, 0, PGSIZE);
-  hash_insert (&thread_current ()->supp_page_table, &pte->pt_elem);
+  lock_acquire (&cur->spt_lock);
+  hash_insert (&cur->supp_page_table, &pte->pt_elem);
+  lock_release (&cur->spt_lock);
 
-  bool success = pagedir_set_page (thread_current ()->pagedir, pte->upage,
+  bool success = pagedir_set_page (cur->pagedir, pte->upage,
     pte->kpage, !pte->page_read_only);
   if (!success)
     {
-      thread_current ()->return_status = -1;
+      cur->return_status = -1;
       process_exit ();
     }
 }
@@ -124,7 +129,9 @@ page_fetch_and_set (struct page_table_entry *pte)
           pte->kpage = fe->addr;
           pte->phys_frame = fe;
           memset (fe->addr, 0, PGSIZE);
-          hash_insert (&thread_current ()->supp_page_table, &pte->pt_elem);
+          lock_acquire (&cur->spt_lock);
+          hash_insert (&cur->supp_page_table, &pte->pt_elem);
+          lock_release (&cur->spt_lock);
 
           success = pagedir_set_page (cur->pagedir, pte->upage,
             pte->kpage, !pte->page_read_only);
@@ -134,10 +141,14 @@ page_fetch_and_set (struct page_table_entry *pte)
     {
       // TODO handle swap slot case
       struct frame_entry *fe = get_frame (PAL_USER);
+
+      lock_acquire (&cur->spt_lock);
       pte->kpage = fe->addr;
       pte->phys_frame = fe;
       pte->ss = NULL;
       pte->page_status = PAGE_NONZEROS;
+      lock_release (&cur->spt_lock);
+
       swap_read (pte->ss, fe);
       success = true;
     }

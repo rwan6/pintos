@@ -1,7 +1,7 @@
 #ifndef VM_SWAP_H
 #define VM_SWAP_H
 
-#include "vm/frame.h"
+// #include "vm/frame.h"
 #include "devices/block.h"
 
 struct swap_slot
@@ -12,6 +12,7 @@ struct swap_slot
 
 struct block *swap_partition;
 struct bitmap *swap_bitmap;
+struct lock swap_lock;
 
 void init_swap_partition (void);
 void swap_read (struct swap_slot *, struct frame_entry *);

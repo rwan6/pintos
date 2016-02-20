@@ -4,6 +4,7 @@
 #include "threads/malloc.h"
 #include "userprog/syscall.h"
 #include "userprog/pagedir.h"
+#include "threads/synch.h"
 
 /* Initialize the frame table and all related structures. */
 void
@@ -11,11 +12,13 @@ init_frame (void)
 {
   list_init (&all_frames);
   clock_handle = NULL;
+  lock_init (&frame_table_lock);
 }
 
 struct frame_entry *
 get_frame (enum palloc_flags flags)
 {
+  lock_acquire (&frame_table_lock);
   void *frame = palloc_get_page (flags);
   if (!frame) /* All frames full, need to evict to swap */
     {
@@ -27,6 +30,7 @@ get_frame (enum palloc_flags flags)
   if (!fe)
     {
       palloc_free_page (frame);
+      lock_release (&frame_table_lock);
       PANIC ("Unable to allocate page table entry!");
     }
   list_push_back (&all_frames, &fe->frame_elem);
@@ -34,14 +38,17 @@ get_frame (enum palloc_flags flags)
     clock_handle = list_begin (&all_frames);
   fe->addr = frame;
   fe->t = thread_current ();
+  lock_release (&frame_table_lock);
   return fe;
 }
 
 void
 free_frame (struct page_table_entry *pte)
 {
+  lock_acquire (&frame_table_lock);
 	palloc_free_page (pte->kpage);
   free (pte->phys_frame);
+  lock_release (&frame_table_lock);
 }
 
 struct frame_entry *
@@ -71,8 +78,10 @@ evict_frame (void)
               // TODO: mmap case; now it only takes care of ss cases
               struct swap_slot *ss = malloc (sizeof (struct swap_slot));
               swap_write (ss, fe);
+              lock_acquire (&fe->t->spt_lock);
               fe->pte->ss = ss;
               fe->pte->page_status = PAGE_SWAP;
+              lock_release (&fe->t->spt_lock);
 
               //unlink this pte
               fe->pte = NULL;
@@ -90,6 +99,7 @@ evict_frame (void)
         else
           clock_handle = list_next (clock_handle);
     }
+    lock_release (&frame_table_lock);
     return fe;
 }
 
