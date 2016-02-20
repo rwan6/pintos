@@ -137,7 +137,7 @@ syscall_handler (struct intr_frame *f)
         close (arg1);
         break;
       case SYS_MMAP :
-        mmap (arg1, (void *) arg2);
+        f->eax = mmap (arg1, (void *) arg2);
         break;
       case SYS_MUNMAP :
         munmap (arg1);
@@ -582,10 +582,7 @@ mmap (int fd, void *addr)
   
   /* addr needs to be page-aligned and cannot be 0 */
   if (pg_ofs (addr) != 0 || addr == 0)
-    {
-      //printf("returning %d\n", MAP_FAILED);
-      return MAP_FAILED;
-    }
+    return MAP_FAILED;
 
   /* We need ceiling of (size / PGSIZE) pages */
   int num_pages = size / PGSIZE;
