@@ -6,6 +6,7 @@
 /* -------- Enumeration of Page Status -------- */
 /* 0 -- Zero-filled page (in Frame Table).      */
 /* 1 -- Non-zero-filled page (in Frame Table).  */
+/* 2 -- Code page.                              */
 /* 2 -- In swap slot.                           */
 /* 3 -- Memory Mapped (in disk).                */
 /* -------------------------------------------- */
@@ -13,6 +14,7 @@ enum page_status
   {
     PAGE_ZEROS,
     PAGE_NONZEROS,
+    PAGE_CODE,
     PAGE_SWAP,
     PAGE_MMAP
   };
