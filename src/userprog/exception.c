@@ -177,6 +177,8 @@ page_fault (struct intr_frame *f)
       return;
     }
 
+  /* Check in supplemental page table if fault_addr exists. If
+     not, it's a real page_fault and should exit. */
   struct page_table_entry *pte = page_lookup (pg_round_down (fault_addr));
   if (pte == NULL || (pte->page_read_only && write))
     {
@@ -190,6 +192,7 @@ page_fault (struct intr_frame *f)
       thread_exit ();
     }
   // TODO: call page_fetch_and_set
+  page_fetch_and_set (pte);
 
   /* Delete all below. */
   /* To implement virtual memory, delete the rest of the function
