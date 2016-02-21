@@ -140,7 +140,6 @@ page_fetch_and_set (struct page_table_entry *pte)
     }
   else if (status == PAGE_SWAP)
     {
-      // TODO handle swap slot case
       struct frame_entry *fe = get_frame (PAL_USER);
 
       lock_acquire (&cur->spt_lock);
@@ -157,6 +156,10 @@ page_fetch_and_set (struct page_table_entry *pte)
     {
       // TODO mmap file case
       success = true;
+    }
+  else if (status == PAGE_CODE)
+    {
+      // TODO read from executable
     }
   if (!success)
     {

@@ -669,12 +669,13 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
       pte->upage = pg_round_down (upage);
       pte->kpage = pg_round_down (kpage);
       pte->phys_frame = new_frame;
+      new_frame->pte = pte;
 
       /* If the page is all zeros. */
       if (zero_bytes == PGSIZE)
         pte->page_status = PAGE_ZEROS;
       else
-        pte->page_status = PAGE_NONZEROS;
+        pte->page_status = PAGE_CODE;
 
       pte->page_read_only = !writable;
 
@@ -727,6 +728,7 @@ setup_stack (void **esp)
       pte->upage = pg_round_down (((uint8_t *) PHYS_BASE) - PGSIZE);
       pte->kpage = pg_round_down (kpage);
       pte->phys_frame = new_frame;
+      new_frame->pte = pte;
       pte->page_read_only = false;
       pte->page_status = PAGE_ZEROS;
       success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
@@ -744,6 +746,7 @@ setup_stack (void **esp)
           free (pte);
         }
     }
+
   return success;
 }
 

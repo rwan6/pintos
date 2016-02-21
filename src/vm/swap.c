@@ -17,7 +17,7 @@ void
 swap_read (struct swap_slot* ss, struct frame_entry *fe)
 {
   int i = 0;
-  for(; i < 8; i++)
+  for(; i < BLOCKS_IN_PAGE; i++)
     block_read (swap_partition, ss->sector + i,
       fe->addr + i * BLOCK_SECTOR_SIZE);
   swap_free (ss);
@@ -28,7 +28,7 @@ swap_write (struct swap_slot* ss, struct frame_entry *fe)
 {
   swap_allocate (ss);
   int i = 0;
-  for(; i < 8; i++)
+  for(; i < BLOCKS_IN_PAGE; i++)
     block_write (swap_partition, ss->sector + i,
       fe->addr + i * BLOCK_SECTOR_SIZE);
 }

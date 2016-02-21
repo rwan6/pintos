@@ -178,7 +178,7 @@ page_fault (struct intr_frame *f)
   else if (fault_addr >= stack_pointer - 32)
     {
       //grow stack
-      extend_stack(fault_addr);
+      extend_stack (fault_addr);
       return;
     }
 
@@ -198,7 +198,8 @@ page_fault (struct intr_frame *f)
       
       thread_exit ();
     }
-  // TODO: call page_fetch_and_set
+
+  /* Fetch the page. */
   page_fetch_and_set (pte);
 
   /* Delete all below. */
