@@ -49,11 +49,12 @@ syscall_init (void)
   list_init (&opened_files);
   list_init (&used_fds);
   list_init (&mmapped_files);
+  lock_init (&mmap_lock);
   next_avail_fd = 2; /* 0 and 1 are reserved. */
   next_avail_mapid = 0;
+  
   /* Initialize frame table items. */
   init_frame ();
-  // init_swap_partition ();
 }
 
 /* Takes the interrupt frame as an argument and traces the stack
@@ -591,11 +592,11 @@ mmap (int fd, void *addr)
     num_pages++;
 
   /* Allocate sys_mmap for bookkeeping */
-  lock_acquire (&file_lock);
+  lock_acquire (&mmap_lock);
   struct sys_mmap *m = malloc (sizeof (struct sys_mmap));
   if (!m)
     {
-      lock_release (&file_lock);
+      lock_release (&mmap_lock);
       return MAP_FAILED;
     }
   m->mapid = next_avail_mapid++;
@@ -609,7 +610,7 @@ mmap (int fd, void *addr)
   /* Add the fd to the thread's mmapped_mapids list. */
   struct thread *t = thread_current ();
   list_push_back (&t->mmapped_mapids, &m->thread_mmapped_elem);
-  lock_release (&file_lock);
+  lock_release (&mmap_lock);
 
   int i;
   for (i = 0; i < num_pages; i++)
@@ -632,7 +633,7 @@ mmap (int fd, void *addr)
 void
 munmap (mapid_t m)
 {
-  lock_acquire (&file_lock);
+  lock_acquire (&mmap_lock);
   struct list_elem *e;
   struct sys_mmap *mmap_instance;
   for (e = list_begin (&mmapped_files);
@@ -658,6 +659,6 @@ munmap (mapid_t m)
             break;
         }
     }
-  lock_release (&file_lock);
+  lock_release (&mmap_lock);
   exit (-1);
 }

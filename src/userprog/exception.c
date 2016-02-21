@@ -6,6 +6,7 @@
 #include "userprog/process.h"
 #include "threads/interrupt.h"
 #include "threads/thread.h"
+#include "threads/synch.h"    /* In case a file system call page faults. */
 #include "threads/vaddr.h"    /* For validating the user address. */
 #include "vm/page.h"
 
@@ -180,6 +181,12 @@ page_fault (struct intr_frame *f)
   if (pte == NULL || (pte->page_read_only && write))
     {
       thread_current ()->return_status = -1;
+      
+      /* Release the file lock if it was holding it to avoid trying to
+         reaquire when closing fds. */
+      if (lock_held_by_current_thread (&file_lock))
+        lock_release (&file_lock);
+      
       thread_exit ();
     }
   // TODO: call page_fetch_and_set
