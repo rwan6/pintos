@@ -78,7 +78,7 @@ evict_frame (void)
               /* Update the pte for the evicted frame. */
               // TODO: mmap case; now it only takes care of ss cases
               struct swap_slot *ss = malloc (sizeof (struct swap_slot));
-              swap_write (ss, fe);printf("here1 pte=%x\n", fe->pte);
+              swap_write (ss, fe);//printf("here1 pte=%x\n", fe->pte);
               lock_acquire (&fe->t->spt_lock);
               fe->pte->ss = ss;
               fe->pte->page_status = PAGE_SWAP;
