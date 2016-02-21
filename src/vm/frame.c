@@ -88,11 +88,6 @@ evict_frame (void)
           // pagedir_clear_page (fe->t->pagedir, fe->pte->upage);
           fe->pte = NULL;
           fe->t = thread_current ();
-          // else
-          //   {
-          //     fe->pte = NULL;
-          //     fe->t = thread_current ();
-          //   }
         }
         /* Increment the clock_handle. */
         if (clock_handle == list_end (&all_frames))
