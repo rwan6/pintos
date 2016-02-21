@@ -157,8 +157,13 @@ page_fault (struct intr_frame *f)
       is_kernel_vaddr (fault_addr))
     {
       thread_current ()->return_status = -1;
+      
+     /* Release the file lock if the faulting thread was holding it to
+        avoid trying to mistakenly reaquire it when closing fds. */
+     if (lock_held_by_current_thread (&file_lock))
+       lock_release (&file_lock);      
+      
       thread_exit ();
-      //PANIC ("User memory access is illegal.");
     }
 
   /* Handle stack growth. */
@@ -184,8 +189,10 @@ page_fault (struct intr_frame *f)
     {
       thread_current ()->return_status = -1;
       
-      /* Release the file lock if it was holding it to avoid trying to
-         reaquire when closing fds. */
+      /* Release the file lock if the faulting thread was holding it to
+         avoid trying to mistakenly reaquire it when closing fds.
+         Note that we check this again as oppose to only one check
+         at the top since extending the stack shouldn't release the lock. */
       if (lock_held_by_current_thread (&file_lock))
         lock_release (&file_lock);
       
