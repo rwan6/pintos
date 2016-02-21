@@ -139,18 +139,20 @@ page_fetch_and_set (struct page_table_entry *pte)
         }
     }
   else if (status == PAGE_SWAP)
-    {
+    {//printf("2 %x\n", thread_current ());
       struct frame_entry *fe = get_frame (PAL_USER);
 
       lock_acquire (&cur->spt_lock);
       pte->kpage = fe->addr;
       pte->phys_frame = fe;
-      pte->ss = NULL;
       pte->page_status = PAGE_NONZEROS;
       lock_release (&cur->spt_lock);
 
       swap_read (pte->ss, fe);
-      success = true;
+      pte->ss = NULL;
+
+      success = pagedir_set_page (cur->pagedir, pte->upage,
+            pte->kpage, !pte->page_read_only);
     }
   else if (status == PAGE_MMAP)
     {

@@ -151,18 +151,18 @@ page_fault (struct intr_frame *f)
   not_present = (f->error_code & PF_P) == 0;
   write = (f->error_code & PF_W) != 0;
   user = (f->error_code & PF_U) != 0;
-
+// printf("user=%d write=%d not_present=%d t=%x\n", user, write, not_present, thread_current ());
   /* Verify the access is legal. If not, exit. */
   if (/*pte == NULL ||*/ !not_present || fault_addr == NULL ||
       is_kernel_vaddr (fault_addr))
     {
       thread_current ()->return_status = -1;
-      
+
      /* Release the file lock if the faulting thread was holding it to
         avoid trying to mistakenly reaquire it when closing fds. */
      if (lock_held_by_current_thread (&file_lock))
-       lock_release (&file_lock);      
-      
+       lock_release (&file_lock);
+
       thread_exit ();
     }
 
@@ -188,14 +188,14 @@ page_fault (struct intr_frame *f)
   if (pte == NULL || (pte->page_read_only && write))
     {
       thread_current ()->return_status = -1;
-      
+
       /* Release the file lock if the faulting thread was holding it to
          avoid trying to mistakenly reaquire it when closing fds.
          Note that we check this again as oppose to only one check
          at the top since extending the stack shouldn't release the lock. */
       if (lock_held_by_current_thread (&file_lock))
         lock_release (&file_lock);
-      
+
       thread_exit ();
     }
 

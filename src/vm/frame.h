@@ -34,5 +34,6 @@ struct list_elem *clock_handle;
 
 /* Global lock for frame table. */
 struct lock frame_table_lock;
+int cnt;
 
 #endif /* vm/frame.h */

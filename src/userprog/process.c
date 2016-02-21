@@ -84,7 +84,7 @@ process_execute (const char *file_name)
     &load_info);
 
   struct child_process *cp = NULL;
-
+// printf ("child:%d cur:%x\n", tid, thread_current ());
   /* If the child was spawned successfully, add it to the caller's
      list of children. */
   if (tid != TID_ERROR)
@@ -142,7 +142,7 @@ process_execute (const char *file_name)
    user memory stack. */
 static void
 start_process (void *load_info)
-{
+{printf("child t=%x\n", thread_current ());
   struct load *info = (struct load *) load_info;
   char *file_name = info->file_name;
 

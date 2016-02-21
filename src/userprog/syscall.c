@@ -52,7 +52,7 @@ syscall_init (void)
   lock_init (&mmap_lock);
   next_avail_fd = 2; /* 0 and 1 are reserved. */
   next_avail_mapid = 0;
-  
+
   /* Initialize frame table items. */
   init_frame ();
 }
@@ -63,7 +63,7 @@ syscall_init (void)
    address checks. */
 static void
 syscall_handler (struct intr_frame *f)
-{
+{printf("syscall_handler!\n");
   thread_current ()->esp = f->esp;
   /* If esp is a bad address, kill the process immediately. */
   if (!check_pointer ((const void *) (f->esp), 1))
@@ -77,7 +77,7 @@ syscall_handler (struct intr_frame *f)
       !check_pointer ((sp + 3), 1))
     exit (-1);
 
-  int syscall_num = *sp;
+  int syscall_num = *sp;printf("syscall_num=%d\n", syscall_num);
   int arg1 = *(sp + 1);
   int arg2 = *(sp + 2);
   int arg3 = *(sp + 3);
