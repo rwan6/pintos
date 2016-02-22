@@ -50,13 +50,13 @@ struct sys_mmap
     void *start_addr;
     int size;
     int num_pages;
-    struct list_elem sys_mmap_elem;
+    // struct list_elem sys_mmap_elem;
     struct list_elem thread_mmapped_elem;
   };
 
 struct list opened_files;       /* Global list of opened files. */
 struct list used_fds;           /* Global list of used fds values. */
-struct list mmapped_files;      /* Global list of memory mapped file */
+// struct list mmapped_files;      /* Global list of memory mapped file. */
 struct lock mmap_lock;          /* Lock for accessing mmapped_files. */
 
 #endif /* userprog/syscall.h */

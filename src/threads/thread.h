@@ -142,9 +142,9 @@ struct thread
     struct hash supp_page_table;        /* Supplemental page table map.
                                            Used to hold pages mapping to
                                            physical frames. */
-    struct list mmapped_mapids;         /* List of all memory mapped files */
-    struct lock spt_lock;               /* Supplemental page table lock */
-    void *esp;                          /* Stack pointer */
+    struct list mmapped_mapids;         /* List of all memory mapped files. */
+    struct lock spt_lock;               /* Supplemental page table lock. */
+    void *esp;                          /* Stack pointer. */
   };
 
 /* Holds the child thread, the child's status, and an element the

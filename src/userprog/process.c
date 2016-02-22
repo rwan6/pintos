@@ -305,7 +305,6 @@ process_exit (void)
 
   /* Unmaps any mapped files. */
   munmap_all (cur);
-
   /* Close any open file handles.  Closing a file also reenables
      writes. */
   close_fd (cur);

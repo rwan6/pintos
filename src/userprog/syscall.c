@@ -48,7 +48,7 @@ syscall_init (void)
   intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
   list_init (&opened_files);
   list_init (&used_fds);
-  list_init (&mmapped_files);
+  // list_init (&mmapped_files);
   lock_init (&mmap_lock);
   next_avail_fd = 2; /* 0 and 1 are reserved. */
   next_avail_mapid = 0;
@@ -606,7 +606,7 @@ mmap (int fd, void *addr)
   m->start_addr = addr;
   m->size = size;
   m->num_pages = num_pages;
-  list_push_back (&mmapped_files, &m->sys_mmap_elem);
+  // list_push_back (&mmapped_files, &m->sys_mmap_elem);
 
   /* Add the fd to the thread's mmapped_mapids list. */
   struct thread *t = thread_current ();
@@ -629,7 +629,6 @@ mmap (int fd, void *addr)
       /* Copy file into the page. */
       addr += PGSIZE;
     }
-
   return m->mapid;
 }
 
@@ -637,13 +636,15 @@ void
 munmap (mapid_t m)
 {
   lock_acquire (&mmap_lock);
+  struct thread *cur = thread_current ();
   struct list_elem *e;
+  struct list_elem *next;
   struct sys_mmap *mmap_instance;
-  for (e = list_begin (&mmapped_files);
-       e != list_end (&mmapped_files);
-       e = list_next(e))
+  for (e = list_begin (&cur->mmapped_mapids);
+       e != list_end (&cur->mmapped_mapids);)
     {
-      mmap_instance = list_entry (e, struct sys_mmap, sys_mmap_elem);
+      next = list_next(e);
+      mmap_instance = list_entry (e, struct sys_mmap, thread_mmapped_elem);
       if (mmap_instance->mapid == m)
         {
           if (mmap_instance->owner_tid == thread_current ()->tid)
@@ -655,13 +656,13 @@ munmap (mapid_t m)
                      the file */
                 }
               close (mmap_instance->fd);
-              list_remove (&mmap_instance->sys_mmap_elem);
+              list_remove (&mmap_instance->thread_mmapped_elem);
               free (mmap_instance);
             }
           else
             break;
         }
+        e = next;
     }
   lock_release (&mmap_lock);
-  exit (-1);
 }
