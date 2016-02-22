@@ -74,7 +74,6 @@ evict_frame (void)
         {
           found = true;
 
-<<<<<<< HEAD
           if (pagedir_is_dirty (fe->t->pagedir, fe->pte->upage))
             {
               /* Update the pte for the evicted frame.  Account for zero
@@ -95,19 +94,6 @@ evict_frame (void)
                                  PGSIZE, (off_t) fe->pte->offset);
                 }
             }
-=======
-          // if (pagedir_is_dirty (fe->t->pagedir, fe->pte->upage))
-            // {
-              /* Update the pte for the evicted frame. */
-              // TODO: mmap case; now it only takes care of ss cases
-              struct swap_slot *ss = malloc (sizeof (struct swap_slot));
-              swap_write (ss, fe);//printf("here1 pte=%x\n", fe->pte);
-              lock_acquire (&fe->t->spt_lock);
-              fe->pte->ss = ss;
-              fe->pte->page_status = PAGE_SWAP;
-              lock_release (&fe->t->spt_lock);
-            // }
->>>>>>> origin/master
 
           /* Unlink this pte and deactivate the page table.  This will
              cause a page fault when the page is next accessed. */
