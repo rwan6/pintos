@@ -63,7 +63,7 @@ syscall_init (void)
    address checks. */
 static void
 syscall_handler (struct intr_frame *f)
-{printf("syscall_handler!\n");
+{// printf("syscall_handler!\n");
   thread_current ()->esp = f->esp;
   /* If esp is a bad address, kill the process immediately. */
   if (!check_pointer ((const void *) (f->esp), 1))
@@ -77,7 +77,7 @@ syscall_handler (struct intr_frame *f)
       !check_pointer ((sp + 3), 1))
     exit (-1);
 
-  int syscall_num = *sp;printf("syscall_num=%d\n", syscall_num);
+  int syscall_num = *sp;// printf("syscall_num=%d\n", syscall_num);
   int arg1 = *(sp + 1);
   int arg2 = *(sp + 2);
   int arg3 = *(sp + 3);
@@ -588,6 +588,7 @@ mmap (int fd, void *addr)
 
   /* We need ceiling of (size / PGSIZE) pages */
   int num_pages = size / PGSIZE;
+  int num_zeros = PGSIZE - (size % PGSIZE);
   if (size % PGSIZE != 0)
     num_pages++;
 
@@ -615,15 +616,17 @@ mmap (int fd, void *addr)
   int i;
   for (i = 0; i < num_pages; i++)
     {
-      /* Address should not be in page table already */
+      /* Address should not be in page table already. */
       if (page_lookup(addr) != NULL)
         return -1;
 
-      /* Allocate page */
-      page_create_from_vaddr(addr);
+      /* Allocate page and complete last page with zeros. */
+      if (i == (num_pages - 1))
+        page_create_mmap(addr, sf->file, i*PGSIZE, num_zeros);
+      else
+        page_create_mmap(addr, sf->file, i*PGSIZE, 0);
 
-      /* Copy file into the page */
-
+      /* Copy file into the page. */
       addr += PGSIZE;
     }
 

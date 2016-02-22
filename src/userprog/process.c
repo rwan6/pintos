@@ -142,7 +142,7 @@ process_execute (const char *file_name)
    user memory stack. */
 static void
 start_process (void *load_info)
-{printf("child t=%x\n", thread_current ());
+{//printf("child t=%x\n", thread_current ());
   struct load *info = (struct load *) load_info;
   char *file_name = info->file_name;
 
@@ -644,6 +644,8 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
   ASSERT ((read_bytes + zero_bytes) % PGSIZE == 0);
   ASSERT (pg_ofs (upage) == 0);
   ASSERT (ofs % PGSIZE == 0);
+  
+  uint32_t offset = (uint32_t) ofs;
 
   file_seek (file, ofs);
   while (read_bytes > 0 || zero_bytes > 0)
@@ -657,7 +659,6 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
       /* Get a page of memory. */
       struct frame_entry *new_frame = get_frame(PAL_USER);
 
-      new_frame->offset = (uint32_t) ofs;
       uint8_t *kpage = new_frame->addr;
 
       if (kpage == NULL)
@@ -669,15 +670,23 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
       pte->upage = pg_round_down (upage);
       pte->kpage = pg_round_down (kpage);
       pte->phys_frame = new_frame;
+      pte->offset = offset;
+      pte->file = file;
+      pte->ss = NULL;
       new_frame->pte = pte;
+      pte->page_read_only = !writable;
 
       /* If the page is all zeros. */
       if (zero_bytes == PGSIZE)
-        pte->page_status = PAGE_ZEROS;
+        {
+          pte->page_status = PAGE_ZEROS;
+          pte->num_zeros = PGSIZE;
+        }
       else
-        pte->page_status = PAGE_CODE;
-
-      pte->page_read_only = !writable;
+        {
+          pte->page_status = PAGE_CODE;
+          pte->num_zeros = page_zero_bytes;
+        }
 
       lock_acquire (&thread_current ()->spt_lock);
       hash_insert (&thread_current ()->supp_page_table, &pte->pt_elem);
@@ -704,6 +713,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
       read_bytes -= page_read_bytes;
       zero_bytes -= page_zero_bytes;
       upage += PGSIZE;
+      offset += page_read_bytes;
     }
   return true;
 }
@@ -728,9 +738,13 @@ setup_stack (void **esp)
       pte->upage = pg_round_down (((uint8_t *) PHYS_BASE) - PGSIZE);
       pte->kpage = pg_round_down (kpage);
       pte->phys_frame = new_frame;
-      new_frame->pte = pte;
+      pte->offset = 0; /* Not a file, so this parameter does not matter. */
+      pte->file = NULL; /* No associated file. */
       pte->page_read_only = false;
       pte->page_status = PAGE_ZEROS;
+      pte->num_zeros = PGSIZE;
+      pte->ss = NULL;
+      new_frame->pte = pte;
       success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
       if (success)
         {

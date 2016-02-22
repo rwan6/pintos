@@ -12,9 +12,6 @@ struct frame_entry
   {
     struct list_elem frame_elem;      /* List element for frame page. */
     void *addr;                       /* Frame's address. */
-    uint32_t offset;                  /* Offset of read_bytes. */
-    uint32_t num_bytes;               /* Number of read_bytes for
-                                         this frame. */
     struct page_table_entry *pte;     /* Pointer to page table entry. */
     struct thread *t;                 /* Pointer to thread. */
   };

@@ -7,6 +7,8 @@
 #include "threads/vaddr.h"
 #include "userprog/process.h"
 #include "userprog/pagedir.h"
+#include "filesys/file.h"     /* For file operations. */
+
 
 /* hash_less_func for sorting the supplemental page table according
    to the page's virtual addresses. */
@@ -96,6 +98,10 @@ page_create_from_vaddr (const void *address)
   pte->kpage = pg_round_down (fe->addr);
   pte->upage = pg_round_down ((void *) address);
   pte->phys_frame = fe;
+  pte->page_status = PAGE_ZEROS;
+  pte->num_zeros = PGSIZE;
+  pte->offset = 0; /* Not used for non-file related pages. */
+  pte->file = NULL; /* Not used for non-file related pages. */
   memset (fe->addr, 0, PGSIZE);
   lock_acquire (&cur->spt_lock);
   hash_insert (&cur->supp_page_table, &pte->pt_elem);
@@ -111,11 +117,34 @@ page_create_from_vaddr (const void *address)
 }
 
 void
+page_create_mmap (const void *address, struct file *file,
+                  uint32_t offset, int num_zeros)
+{
+  struct page_table_entry *pte = malloc (sizeof (struct page_table_entry));
+  if (!pte)
+    PANIC ("Unable to allocate page table entry!");
+
+  struct thread *cur = thread_current ();
+  pte->kpage = NULL;  /* Doesn't exist in the frame table. */
+  pte->upage = pg_round_down ((void *) address);
+  pte->phys_frame = NULL;
+  pte->page_status = PAGE_MMAP;
+  pte->num_zeros = num_zeros;
+  pte->offset = offset;
+  pte->file = file;
+  lock_acquire (&cur->spt_lock);
+  hash_insert (&cur->supp_page_table, &pte->pt_elem);
+  lock_release (&cur->spt_lock);
+}
+
+void
 page_fetch_and_set (struct page_table_entry *pte)
 {
   enum page_status status = pte->page_status;
+  
+  ASSERT (pte->page_status != PAGE_NONZEROS);
+  
   struct thread *cur = thread_current ();
-
   bool success = false;
   if (status == PAGE_ZEROS)
     {
@@ -154,15 +183,27 @@ page_fetch_and_set (struct page_table_entry *pte)
       success = pagedir_set_page (cur->pagedir, pte->upage,
             pte->kpage, !pte->page_read_only);
     }
-  else if (status == PAGE_MMAP)
-    {
-      // TODO mmap file case
-      success = true;
+  else if (status == PAGE_MMAP || status == PAGE_CODE)
+    { 
+      struct frame_entry *fe = get_frame (PAL_USER);
+      
+      lock_acquire (&cur->spt_lock);
+      pte->kpage = fe->addr;
+      pte->phys_frame = fe;
+      lock_release (&cur->spt_lock);
+      
+      lock_acquire (&file_lock);
+      file_read_at (pte->file, pte->kpage, (PGSIZE - pte->num_zeros),
+                    (off_t) pte->offset);
+      lock_release (&file_lock);
+          
+      /* Set the rest of the page to be zeros. */
+      memset (pte->kpage + (PGSIZE - pte->num_zeros), 0, pte->num_zeros);
+      success = pagedir_set_page (cur->pagedir, pte->upage,
+            pte->kpage, !pte->page_read_only);
+      printf ("Done with PFS, success=%d\n", success);
     }
-  else if (status == PAGE_CODE)
-    {
-      // TODO read from executable
-    }
+    
   if (!success)
     {
       thread_current ()->return_status = -1;

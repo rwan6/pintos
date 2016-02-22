@@ -34,6 +34,10 @@ struct page_table_entry
     bool page_read_only;              /* Denotes whether page is
                                          read-only. */
     struct swap_slot *ss;             /* Swap slot for this page. */
+    int num_zeros;                    /* Number of zeros to fill page. */
+    uint32_t offset;                  /* Offset of read_bytes. */
+    struct file *file;                /* File pointer for MMAP files
+                                         (NULL otherwise). */
   };
 
 /* Prototypes for page.c functions. */
@@ -43,6 +47,7 @@ struct page_table_entry *page_lookup (const void *);
 void extend_stack (const void *);
 void page_fetch_and_set (struct page_table_entry *);
 void page_create_from_vaddr (const void *);
+void page_create_mmap (const void *, struct file *, uint32_t, int);
 void page_deallocate (struct hash_elem *, void *UNUSED);
 
 #endif /* vm/page.h */
