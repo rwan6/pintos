@@ -142,9 +142,9 @@ void
 page_fetch_and_set (struct page_table_entry *pte)
 {
   enum page_status status = pte->page_status;
-  
+
   ASSERT (pte->page_status != PAGE_NONZEROS);
-  
+
   struct thread *cur = thread_current ();
   bool success = false;
   if (status == PAGE_ZEROS)
@@ -159,6 +159,7 @@ page_fetch_and_set (struct page_table_entry *pte)
           struct frame_entry *fe = get_frame (PAL_USER);
           pte->kpage = fe->addr;
           pte->phys_frame = fe;
+          fe->pte = pte;
           memset (fe->addr, 0, PGSIZE);
           lock_acquire (&cur->spt_lock);
           hash_insert (&cur->supp_page_table, &pte->pt_elem);
@@ -175,6 +176,7 @@ page_fetch_and_set (struct page_table_entry *pte)
       lock_acquire (&cur->spt_lock);
       pte->kpage = fe->addr;
       pte->phys_frame = fe;
+      fe->pte = pte;
       pte->page_status = PAGE_NONZEROS;
       lock_release (&cur->spt_lock);
 
@@ -185,25 +187,27 @@ page_fetch_and_set (struct page_table_entry *pte)
             pte->kpage, !pte->page_read_only);
     }
   else if (status == PAGE_MMAP || status == PAGE_CODE)
-    { 
+    {
       struct frame_entry *fe = get_frame (PAL_USER);
-      
+// printf("here1\n");
       lock_acquire (&cur->spt_lock);
       pte->kpage = fe->addr;
       pte->phys_frame = fe;
+      fe->pte = pte;
       lock_release (&cur->spt_lock);
-      
+// printf("here2\n");
       lock_acquire (&file_lock);
-      file_read_at (pte->file, pte->kpage, (PGSIZE - pte->num_zeros),
-                    (off_t) pte->offset);
+      int rbytes = file_read_at (pte->file, pte->kpage, (PGSIZE - pte->num_zeros),
+                    (off_t) pte->offset);//printf("rbytes=%d\n", rbytes);
       lock_release (&file_lock);
-          
+// printf("here3\n");
       /* Set the rest of the page to be zeros. */
       memset (pte->kpage + (PGSIZE - pte->num_zeros), 0, pte->num_zeros);
       success = pagedir_set_page (cur->pagedir, pte->upage,
             pte->kpage, !pte->page_read_only);
+      //printf ("Done with PFS, success=%d\n", success);
     }
-    
+
   if (!success)
     {
       thread_current ()->return_status = -1;

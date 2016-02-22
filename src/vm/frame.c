@@ -63,7 +63,7 @@ evict_frame (void)
   while (!found)
     {
       fe = list_entry (clock_handle,
-        struct frame_entry, frame_elem);
+        struct frame_entry, frame_elem);//printf("1 %x %x %x\n", fe->t, fe->t->pagedir, fe->pte);
       bool accessed = pagedir_is_accessed (fe->t->pagedir,
         fe->pte->upage);
       if (accessed)
@@ -75,27 +75,26 @@ evict_frame (void)
         {
           found = true;
 
-          if (pagedir_is_dirty (fe->t->pagedir, fe->pte->upage))
+          bool dirty = pagedir_is_dirty (fe->t->pagedir, fe->pte->upage);
+          /* Update the pte for the evicted frame.  Account for zero
+             pages that were dirtied as well. */
+          if (fe->pte->page_status == PAGE_NONZEROS ||
+                (dirty && (fe->pte->page_status == PAGE_ZEROS ||
+                           fe->pte->page_status == PAGE_CODE)))
             {
-              /* Update the pte for the evicted frame.  Account for zero
-                 pages that were dirtied as well. */
-              if (fe->pte->page_status == PAGE_NONZEROS
-                  || fe->pte->page_status == PAGE_ZEROS)
-                {
-                  struct swap_slot *ss = malloc (sizeof (struct swap_slot));
-                  swap_write (ss, fe);
-                  lock_acquire (&fe->t->spt_lock);
-                  fe->pte->ss = ss;
-                  fe->pte->page_status = PAGE_SWAP;
-                  lock_release (&fe->t->spt_lock);
-                }
-              else if (fe->pte->page_status == PAGE_MMAP)
-                {
-                  lock_acquire (&file_lock);
-                  file_write_at (fe->pte->file, fe->addr, 
-                                 PGSIZE, (off_t) fe->pte->offset);
-                  lock_release (&file_lock);
-                }
+              struct swap_slot *ss = malloc (sizeof (struct swap_slot));
+              swap_write (ss, fe);
+              lock_acquire (&fe->t->spt_lock);
+              fe->pte->ss = ss;
+              fe->pte->page_status = PAGE_SWAP;
+              lock_release (&fe->t->spt_lock);
+            }
+          else if (fe->pte->page_status == PAGE_MMAP && dirty)
+            {
+              lock_acquire (&file_lock);
+              file_write_at (fe->pte->file, fe->addr,
+                             PGSIZE, (off_t) fe->pte->offset);
+              lock_release (&file_lock);
             }
 
           /* Unlink this pte and deactivate the page table.  This will

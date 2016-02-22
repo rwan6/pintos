@@ -643,7 +643,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
   ASSERT ((read_bytes + zero_bytes) % PGSIZE == 0);
   ASSERT (pg_ofs (upage) == 0);
   ASSERT (ofs % PGSIZE == 0);
-  
+
   uint32_t offset = (uint32_t) ofs;
 
   file_seek (file, ofs);
@@ -670,7 +670,8 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
       pte->kpage = pg_round_down (kpage);
       pte->phys_frame = new_frame;
       pte->offset = offset;
-      pte->file = file;
+      // pte->file = file;
+      pte->file = file_reopen (file);
       pte->ss = NULL;
       new_frame->pte = pte;
       pte->page_read_only = !writable;
