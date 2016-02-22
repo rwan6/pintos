@@ -22,6 +22,7 @@ enum page_status
 struct page_table_entry
   {
     struct hash_elem pt_elem;         /* Hash map page table element. */
+    struct list_elem mmap_elem;       /* Mmap list element. */
     void *kpage;                      /* Kernel page address of page table
                                          entry. */
     void *upage;                      /* User page address of page table
@@ -47,7 +48,8 @@ struct page_table_entry *page_lookup (const void *);
 void extend_stack (const void *);
 void page_fetch_and_set (struct page_table_entry *);
 void page_create_from_vaddr (const void *);
-void page_create_mmap (const void *, struct file *, uint32_t, int);
+struct page_table_entry * page_create_mmap (const void *, struct file *,
+                                            uint32_t, int);
 void page_deallocate (struct hash_elem *, void *UNUSED);
 
 #endif /* vm/page.h */

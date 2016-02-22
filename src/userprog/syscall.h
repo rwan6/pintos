@@ -49,9 +49,8 @@ struct sys_mmap
     tid_t owner_tid;
     void *start_addr;
     int size;
-    int num_pages;
-    // struct list_elem sys_mmap_elem;
     struct list_elem thread_mmapped_elem;
+    struct list file_mmap_list;
   };
 
 struct list opened_files;       /* Global list of opened files. */

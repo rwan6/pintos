@@ -596,17 +596,18 @@ mmap (int fd, void *addr)
   if (!m)
     return MAP_FAILED;
 
+  list_init (&m->file_mmap_list);
   m->mapid = next_avail_mapid++;
   m->fd = new_fd;
   m->owner_tid = thread_current ()->tid;
   m->start_addr = addr;
   m->size = size;
-  m->num_pages = num_pages;
 
   /* Add the fd to the thread's mmapped_mapids list. */
   struct thread *t = thread_current ();
   list_push_back (&t->mmapped_mapids, &m->thread_mmapped_elem);
 
+  struct page_table_entry *pte_mmap = NULL;
   int i;
   for (i = 0; i < num_pages; i++)
     {
@@ -616,10 +617,12 @@ mmap (int fd, void *addr)
 
       /* Allocate page and complete last page with zeros. */
       if (i == (num_pages - 1))
-        page_create_mmap(addr, sf->file, i*PGSIZE, num_zeros);
+        pte_mmap = page_create_mmap(addr, sf->file, i*PGSIZE, num_zeros);
       else
-        page_create_mmap(addr, sf->file, i*PGSIZE, 0);
+        pte_mmap = page_create_mmap(addr, sf->file, i*PGSIZE, 0);
 
+      list_push_back (&m->file_mmap_list, &pte_mmap->mmap_elem);
+      
       /* Copy file into the page. */
       addr += PGSIZE;
     }
@@ -630,23 +633,43 @@ void
 munmap (mapid_t m)
 {
   struct thread *cur = thread_current ();
-  struct list_elem *e;
-  struct list_elem *next;
+  struct list_elem *e_mmap;
+  struct list_elem *next_mmap;
+  struct list_elem *e_pte;
+  struct list_elem *next_pte;
   struct sys_mmap *mmap_instance;
-  for (e = list_begin (&cur->mmapped_mapids);
-       e != list_end (&cur->mmapped_mapids);)
+  struct page_table_entry *pte_instance;
+  for (e_mmap = list_begin (&cur->mmapped_mapids);
+       e_mmap != list_end (&cur->mmapped_mapids);)
     {
-      next = list_next(e);
-      mmap_instance = list_entry (e, struct sys_mmap, thread_mmapped_elem);
+      next_mmap = list_next(e_mmap);
+      mmap_instance = list_entry (e_mmap, struct sys_mmap,
+                                  thread_mmapped_elem);
       if (mmap_instance->mapid == m)
         {
           if (mmap_instance->owner_tid == thread_current ()->tid)
             {
-              int i;
-              for (i = 0; i < mmap_instance->num_pages; i++)
+              for (e_pte = list_begin (&mmap_instance->file_mmap_list);
+                   e_pte != list_end (&mmap_instance->file_mmap_list);)
                 {
-                  /* Evict the pages, which implicitly writes them back to
-                     the file */
+                  next_pte = list_next(e_pte);
+                  pte_instance = list_entry (e_pte, struct page_table_entry,
+                                              mmap_elem);
+                  /* First check if the file is not already in the disk.
+                     If it is, we do not need to perform any write-back. */
+                  if (pte_instance->phys_frame != NULL)
+                    {
+                      if (pagedir_is_dirty (cur->pagedir,
+                          pte_instance->upage))
+                        {
+                          file_write_at (pte_instance->file,
+                                         pte_instance->kpage,
+                                         PGSIZE,
+                                         (off_t) pte_instance->offset);
+                        }
+                    }
+                  list_remove (&pte_instance->mmap_elem);
+                  e_pte = next_pte;
                 }
               close (mmap_instance->fd);
               list_remove (&mmap_instance->thread_mmapped_elem);
@@ -655,6 +678,6 @@ munmap (mapid_t m)
           else
             break;
         }
-        e = next;
+        e_mmap = next_mmap;
     }
 }

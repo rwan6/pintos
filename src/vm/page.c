@@ -116,7 +116,7 @@ page_create_from_vaddr (const void *address)
     }
 }
 
-void
+struct page_table_entry *
 page_create_mmap (const void *address, struct file *file,
                   uint32_t offset, int num_zeros)
 {
@@ -135,6 +135,7 @@ page_create_mmap (const void *address, struct file *file,
   lock_acquire (&cur->spt_lock);
   hash_insert (&cur->supp_page_table, &pte->pt_elem);
   lock_release (&cur->spt_lock);
+  return pte;
 }
 
 void

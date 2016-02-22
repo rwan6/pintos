@@ -56,7 +56,7 @@ free_frame (struct page_table_entry *pte)
 
 struct frame_entry *
 evict_frame (void)
-{//printf("evict_frame t=%x clock_handle=%x\n", thread_current (), clock_handle);
+{
   bool found = false;
   struct frame_entry *fe = NULL;
   while (!found)
@@ -82,7 +82,7 @@ evict_frame (void)
                   || fe->pte->page_status == PAGE_ZEROS)
                 {
                   struct swap_slot *ss = malloc (sizeof (struct swap_slot));
-                  swap_write (ss, fe); //printf("here1 pte=%x\n", fe->pte);
+                  swap_write (ss, fe);
                   lock_acquire (&fe->t->spt_lock);
                   fe->pte->ss = ss;
                   fe->pte->page_status = PAGE_SWAP;
