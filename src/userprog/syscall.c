@@ -576,6 +576,7 @@ mmap (int fd, void *addr)
     return MAP_FAILED;
 
   int new_fd = open (sf->sys_file->name);
+  struct file *new_file = file_reopen (sf->file);
   int size = filesize (new_fd);
 
   /* Fails if fd has a length of zero bytes */
@@ -618,9 +619,9 @@ mmap (int fd, void *addr)
 
       /* Allocate page and complete last page with zeros. */
       if (i == (num_pages - 1))
-        pte_mmap = page_create_mmap(addr, sf->file, i*PGSIZE, num_zeros);
+        pte_mmap = page_create_mmap(addr, new_file, i*PGSIZE, num_zeros);
       else
-        pte_mmap = page_create_mmap(addr, sf->file, i*PGSIZE, 0);
+        pte_mmap = page_create_mmap(addr, new_file, i*PGSIZE, 0);
 
       list_push_back (&m->file_mmap_list, &pte_mmap->mmap_elem);
 
