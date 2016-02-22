@@ -48,8 +48,7 @@ syscall_init (void)
   intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
   list_init (&opened_files);
   list_init (&used_fds);
-  // list_init (&mmapped_files);
-  lock_init (&mmap_lock);
+
   next_avail_fd = 2; /* 0 and 1 are reserved. */
   next_avail_mapid = 0;
 
@@ -63,7 +62,7 @@ syscall_init (void)
    address checks. */
 static void
 syscall_handler (struct intr_frame *f)
-{// printf("syscall_handler!\n");
+{
   thread_current ()->esp = f->esp;
   /* If esp is a bad address, kill the process immediately. */
   if (!check_pointer ((const void *) (f->esp), 1))
@@ -77,7 +76,7 @@ syscall_handler (struct intr_frame *f)
       !check_pointer ((sp + 3), 1))
     exit (-1);
 
-  int syscall_num = *sp;// printf("syscall_num=%d\n", syscall_num);
+  int syscall_num = *sp;
   int arg1 = *(sp + 1);
   int arg2 = *(sp + 2);
   int arg3 = *(sp + 3);
@@ -593,25 +592,20 @@ mmap (int fd, void *addr)
     num_pages++;
 
   /* Allocate sys_mmap for bookkeeping */
-  lock_acquire (&mmap_lock);
   struct sys_mmap *m = malloc (sizeof (struct sys_mmap));
   if (!m)
-    {
-      lock_release (&mmap_lock);
-      return MAP_FAILED;
-    }
+    return MAP_FAILED;
+
   m->mapid = next_avail_mapid++;
   m->fd = new_fd;
   m->owner_tid = thread_current ()->tid;
   m->start_addr = addr;
   m->size = size;
   m->num_pages = num_pages;
-  // list_push_back (&mmapped_files, &m->sys_mmap_elem);
 
   /* Add the fd to the thread's mmapped_mapids list. */
   struct thread *t = thread_current ();
   list_push_back (&t->mmapped_mapids, &m->thread_mmapped_elem);
-  lock_release (&mmap_lock);
 
   int i;
   for (i = 0; i < num_pages; i++)
@@ -635,7 +629,6 @@ mmap (int fd, void *addr)
 void
 munmap (mapid_t m)
 {
-  lock_acquire (&mmap_lock);
   struct thread *cur = thread_current ();
   struct list_elem *e;
   struct list_elem *next;
@@ -664,5 +657,4 @@ munmap (mapid_t m)
         }
         e = next;
     }
-  lock_release (&mmap_lock);
 }
