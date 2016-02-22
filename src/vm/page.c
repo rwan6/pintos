@@ -163,6 +163,8 @@ page_fetch_and_set (struct page_table_entry *pte)
           hash_insert (&cur->supp_page_table, &pte->pt_elem);
           lock_release (&cur->spt_lock);
 
+          fe->pte = pte;
+
           success = pagedir_set_page (cur->pagedir, pte->upage,
             pte->kpage, !pte->page_read_only);
         }
@@ -179,6 +181,7 @@ page_fetch_and_set (struct page_table_entry *pte)
 
       swap_read (pte->ss, fe);
       pte->ss = NULL;
+      fe->pte = pte;
 
       success = pagedir_set_page (cur->pagedir, pte->upage,
             pte->kpage, !pte->page_read_only);

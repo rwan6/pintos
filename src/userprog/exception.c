@@ -151,7 +151,7 @@ page_fault (struct intr_frame *f)
   not_present = (f->error_code & PF_P) == 0;
   write = (f->error_code & PF_W) != 0;
   user = (f->error_code & PF_U) != 0;
-// printf("user=%d write=%d not_present=%d t=%x\n", user, write, not_present, thread_current ());
+
   /* Verify the access is legal. If not, exit. */
   if (/*pte == NULL ||*/ !not_present || fault_addr == NULL ||
       is_kernel_vaddr (fault_addr))

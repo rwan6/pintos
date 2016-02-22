@@ -142,7 +142,7 @@ process_execute (const char *file_name)
    user memory stack. */
 static void
 start_process (void *load_info)
-{//printf("child t=%x\n", thread_current ());
+{
   struct load *info = (struct load *) load_info;
   char *file_name = info->file_name;
 
