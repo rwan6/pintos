@@ -202,7 +202,6 @@ page_fetch_and_set (struct page_table_entry *pte)
       memset (pte->kpage + (PGSIZE - pte->num_zeros), 0, pte->num_zeros);
       success = pagedir_set_page (cur->pagedir, pte->upage,
             pte->kpage, !pte->page_read_only);
-      //printf ("Done with PFS, success=%d\n", success);
     }
     
   if (!success)
