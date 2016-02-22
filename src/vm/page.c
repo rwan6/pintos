@@ -169,7 +169,7 @@ page_fetch_and_set (struct page_table_entry *pte)
         }
     }
   else if (status == PAGE_SWAP)
-    {//printf("2 %x\n", thread_current ());
+    {
       struct frame_entry *fe = get_frame (PAL_USER);
 
       lock_acquire (&cur->spt_lock);

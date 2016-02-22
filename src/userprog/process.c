@@ -737,7 +737,7 @@ setup_stack (void **esp)
       pte->upage = pg_round_down (((uint8_t *) PHYS_BASE) - PGSIZE);
       pte->kpage = pg_round_down (kpage);
       pte->phys_frame = new_frame;
-      pte->offset = 0; /* Not a file, so this parameter does not matter. */
+      pte->offset = 0;  /* Not a file, so this parameter does not matter. */
       pte->file = NULL; /* No associated file. */
       pte->page_read_only = false;
       pte->page_status = PAGE_ZEROS;

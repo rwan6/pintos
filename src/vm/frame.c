@@ -3,6 +3,7 @@
 #include "vm/swap.h"
 #include "threads/palloc.h"
 #include "threads/malloc.h"
+#include "threads/thread.h"
 #include "userprog/syscall.h"
 #include "userprog/pagedir.h"
 #include "threads/synch.h"
@@ -90,8 +91,10 @@ evict_frame (void)
                 }
               else if (fe->pte->page_status == PAGE_MMAP)
                 {
+                  lock_acquire (&file_lock);
                   file_write_at (fe->pte->file, fe->addr, 
                                  PGSIZE, (off_t) fe->pte->offset);
+                  lock_release (&file_lock);
                 }
             }
 
