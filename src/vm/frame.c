@@ -16,8 +16,6 @@ init_frame (void)
   list_init (&all_frames);
   clock_handle = NULL;
   lock_init (&frame_table_lock);
-  // cnt = 0;
-
 }
 
 struct frame_entry *
@@ -63,7 +61,7 @@ evict_frame (void)
   while (!found)
     {
       fe = list_entry (clock_handle,
-        struct frame_entry, frame_elem);//printf("1 %x %x %x\n", fe->t, fe->t->pagedir, fe->pte);
+        struct frame_entry, frame_elem);
       bool accessed = pagedir_is_accessed (fe->t->pagedir,
         fe->pte->upage);
       if (accessed)
@@ -109,9 +107,6 @@ evict_frame (void)
         }
         else{
           clock_handle = list_next (clock_handle);
-          // cnt++;
-          // printf("clock_handle is now %x; cnt=%d\n", clock_handle, cnt);
-          // printf("list end=%x\n", list_end (&all_frames));
         }
     }
 

@@ -589,9 +589,12 @@ mmap (int fd, void *addr)
 
   /* We need ceiling of (size / PGSIZE) pages */
   int num_pages = size / PGSIZE;
-  int num_zeros = PGSIZE - (size % PGSIZE);
+  int num_zeros = 0;
   if (size % PGSIZE != 0)
-    num_pages++;
+    {
+      num_zeros = PGSIZE - (size % PGSIZE);
+      num_pages++;
+    }
 
   /* Allocate sys_mmap for bookkeeping */
   struct sys_mmap *m = malloc (sizeof (struct sys_mmap));
@@ -615,7 +618,7 @@ mmap (int fd, void *addr)
     {
       /* Address should not be in page table already. */
       if (page_lookup(addr) != NULL)
-        return -1;
+        return MAP_FAILED;
 
       /* Allocate page and complete last page with zeros. */
       if (i == (num_pages - 1))

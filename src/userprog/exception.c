@@ -174,10 +174,9 @@ page_fault (struct intr_frame *f)
       thread_current ()->return_status = -1;
       thread_exit ();
     }
-    // PANIC ("Stack went over size limit.");
   else if (fault_addr >= stack_pointer - 32)
     {
-      //grow stack
+      /* Grow stack */
       extend_stack (fault_addr);
       return;
     }
@@ -201,16 +200,5 @@ page_fault (struct intr_frame *f)
 
   /* Fetch the page. */
   page_fetch_and_set (pte);
-
-  /* Delete all below. */
-  /* To implement virtual memory, delete the rest of the function
-     body, and replace it with code that brings in the page to
-     which fault_addr refers. */
-  // printf ("Page fault at %p: %s error %s page in %s context.\n",
-  //         fault_addr,
-  //         not_present ? "not present" : "rights violation",
-  //         write ? "writing" : "reading",
-  //         user ? "user" : "kernel");
-  // kill (f);
 }
 

@@ -9,7 +9,6 @@
 #include "userprog/pagedir.h"
 #include "filesys/file.h"     /* For file operations. */
 
-
 /* hash_less_func for sorting the supplemental page table according
    to the page's virtual addresses. */
 static bool
@@ -74,13 +73,15 @@ page_lookup (const void *address)
 void
 extend_stack (const void *address)
 {
+  
   struct page_table_entry *pte = page_lookup (address);
-  if (pte != NULL)//page_lookup, if exists, fetch data.. (normal case)
+  if (pte != NULL)
     {
-      //set regular page table, and return
+      /* if page_lookup returns something, fetch data... (normal case)
+         Set regular page table, and return */
       page_fetch_and_set (pte);
     }
-  else //if doesn't exist, then create a new frame and pte, and return
+  else /* If doesn't exist, then create a new frame and pte, and return */
     {
       page_create_from_vaddr (address);
     }
@@ -102,6 +103,7 @@ page_create_from_vaddr (const void *address)
   pte->num_zeros = PGSIZE;
   pte->offset = 0; /* Not used for non-file related pages. */
   pte->file = NULL; /* Not used for non-file related pages. */
+  pte->page_read_only = false;
   memset (fe->addr, 0, PGSIZE);
   lock_acquire (&cur->spt_lock);
   hash_insert (&cur->supp_page_table, &pte->pt_elem);
@@ -189,25 +191,25 @@ page_fetch_and_set (struct page_table_entry *pte)
   else if (status == PAGE_MMAP || status == PAGE_CODE)
     {
       struct frame_entry *fe = get_frame (PAL_USER);
-// printf("here1\n");
       lock_acquire (&cur->spt_lock);
       pte->kpage = fe->addr;
       pte->phys_frame = fe;
       fe->pte = pte;
       lock_release (&cur->spt_lock);
-// printf("here2\n");
       lock_acquire (&file_lock);
       int rbytes = file_read_at (pte->file, pte->kpage, (PGSIZE - pte->num_zeros),
-                    (off_t) pte->offset);//printf("rbytes=%d\n", rbytes);
+                    (off_t) pte->offset);
       lock_release (&file_lock);
-// printf("here3\n");
-      /* Set the rest of the page to be zeros. */
-      memset (pte->kpage + (PGSIZE - pte->num_zeros), 0, pte->num_zeros);
-      success = pagedir_set_page (cur->pagedir, pte->upage,
-            pte->kpage, !pte->page_read_only);
-      //printf ("Done with PFS, success=%d\n", success);
+      if (rbytes != PGSIZE - pte->num_zeros)
+        success = false;
+      else
+        {
+          /* Set the rest of the page to be zeros. */
+          memset (pte->kpage + (PGSIZE - pte->num_zeros), 0, pte->num_zeros);
+          success = pagedir_set_page (cur->pagedir, pte->upage,
+                pte->kpage, !pte->page_read_only);
+        }
     }
-
   if (!success)
     {
       thread_current ()->return_status = -1;

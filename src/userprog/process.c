@@ -84,7 +84,6 @@ process_execute (const char *file_name)
     &load_info);
 
   struct child_process *cp = NULL;
-// printf ("child:%d cur:%x\n", tid, thread_current ());
   /* If the child was spawned successfully, add it to the caller's
      list of children. */
   if (tid != TID_ERROR)
@@ -352,7 +351,6 @@ process_exit (void)
   hash_destroy (&cur->supp_page_table, page_deallocate);
 
   lock_release (&exit_lock);
-  // printf ("After hash_destroy\n");
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
   pd = cur->pagedir;
@@ -670,7 +668,6 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
       pte->kpage = pg_round_down (kpage);
       pte->phys_frame = new_frame;
       pte->offset = offset;
-      // pte->file = file;
       pte->file = file_reopen (file);
       pte->ss = NULL;
       new_frame->pte = pte;

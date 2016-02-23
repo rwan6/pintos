@@ -14,6 +14,7 @@ typedef int mapid_t;
 void syscall_init (void);
 void close_fd (struct thread *);
 void munmap_all (struct thread *);
+struct file * get_file_from_fd (int);
 
 /* Struct to map system files to their list of open fd. */
 struct sys_file
