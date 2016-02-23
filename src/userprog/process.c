@@ -668,7 +668,9 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
       pte->kpage = pg_round_down (kpage);
       pte->phys_frame = new_frame;
       pte->offset = offset;
+      lock_acquire (&file_lock);
       pte->file = file_reopen (file);
+      lock_release (&file_lock);
       pte->ss = NULL;
       new_frame->pte = pte;
       pte->page_read_only = !writable;

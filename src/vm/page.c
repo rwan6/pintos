@@ -223,8 +223,10 @@ page_fetch_and_set (struct page_table_entry *pte)
 void
 page_deallocate (struct hash_elem *e, void *aux UNUSED)
 {
+  lock_acquire (&thread_current ()->spt_lock);
   struct page_table_entry *pte = hash_entry (e,
     struct page_table_entry, pt_elem);
+  lock_release (&thread_current ()->spt_lock);
   /* Determine page's status and deallocate respective resources. */
   enum page_status ps = pte->page_status;
   if (ps == PAGE_ZEROS || ps == PAGE_NONZEROS)

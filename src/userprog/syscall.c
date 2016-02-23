@@ -660,20 +660,22 @@ munmap (mapid_t m)
                                               mmap_elem);
                   /* First check if the file is not already in the disk.
                      If it is, we do not need to perform any write-back. */
-                  if (pte_instance->phys_frame != NULL)
-                    {
-                      if (pagedir_is_dirty (cur->pagedir,
+                  if (pte_instance->phys_frame != NULL &&
+                      pagedir_is_dirty (cur->pagedir,
                           pte_instance->upage))
-                        {
-                          file_write_at (pte_instance->file,
-                                         pte_instance->kpage,
-                                         PGSIZE,
-                                         (off_t) pte_instance->offset);
-                          free (pte_instance->phys_frame);
-                        }
+                    {
+                        file_write_at (pte_instance->file,
+                                       pte_instance->kpage,
+                                       PGSIZE,
+                                       (off_t) pte_instance->offset);
+                        free (pte_instance->phys_frame);
                     }
-                  hash_delete (&thread_current ()->supp_page_table, &pte_instance->pt_elem);
-                  pagedir_clear_page (thread_current ()->pagedir, pte_instance->upage);
+                  lock_acquire (&thread_current ()->spt_lock);
+                  hash_delete (&thread_current ()->supp_page_table,
+                    &pte_instance->pt_elem);
+                  lock_release (&thread_current ()->spt_lock);
+                  pagedir_clear_page (thread_current ()->pagedir,
+                    pte_instance->upage);
                   list_remove (&pte_instance->mmap_elem);
                   free (pte_instance);
                   e_pte = next_pte;
