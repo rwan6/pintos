@@ -154,7 +154,7 @@ page_fault (struct intr_frame *f)
 
   /* Verify the access is legal. If not, exit. */
   if (/*pte == NULL ||*/ !not_present || fault_addr == NULL ||
-      is_kernel_vaddr (fault_addr))
+      (user && is_kernel_vaddr (fault_addr)))
     {
       thread_current ()->return_status = -1;
 

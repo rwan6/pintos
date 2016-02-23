@@ -648,45 +648,43 @@ munmap (mapid_t m)
       next_mmap = list_next(e_mmap);
       mmap_instance = list_entry (e_mmap, struct sys_mmap,
                                   thread_mmapped_elem);
-      if (mmap_instance->mapid == m)
+      if (mmap_instance->mapid == m &&
+          mmap_instance->owner_tid == thread_current ()->tid)
         {
-          if (mmap_instance->owner_tid == thread_current ()->tid)
+          for (e_pte = list_begin (&mmap_instance->file_mmap_list);
+               e_pte != list_end (&mmap_instance->file_mmap_list);)
             {
-              for (e_pte = list_begin (&mmap_instance->file_mmap_list);
-                   e_pte != list_end (&mmap_instance->file_mmap_list);)
+              next_pte = list_next(e_pte);
+              pte_instance = list_entry (e_pte, struct page_table_entry,
+                                          mmap_elem);
+              /* First check if the file is not already in the disk.
+                 If it is, we do not need to perform any write-back. */
+              if (pte_instance->phys_frame != NULL &&
+                  pagedir_is_dirty (cur->pagedir,
+                      pte_instance->upage))
                 {
-                  next_pte = list_next(e_pte);
-                  pte_instance = list_entry (e_pte, struct page_table_entry,
-                                              mmap_elem);
-                  /* First check if the file is not already in the disk.
-                     If it is, we do not need to perform any write-back. */
-                  if (pte_instance->phys_frame != NULL &&
-                      pagedir_is_dirty (cur->pagedir,
-                          pte_instance->upage))
-                    {
-                        file_write_at (pte_instance->file,
-                                       pte_instance->kpage,
-                                       PGSIZE,
-                                       (off_t) pte_instance->offset);
-                        free (pte_instance->phys_frame);
-                    }
-                  lock_acquire (&thread_current ()->spt_lock);
-                  hash_delete (&thread_current ()->supp_page_table,
-                    &pte_instance->pt_elem);
-                  lock_release (&thread_current ()->spt_lock);
-                  pagedir_clear_page (thread_current ()->pagedir,
-                    pte_instance->upage);
-                  list_remove (&pte_instance->mmap_elem);
-                  free (pte_instance);
-                  e_pte = next_pte;
+                    file_write_at (pte_instance->file,
+                                   pte_instance->kpage,
+                                   PGSIZE,
+                                   (off_t) pte_instance->offset);
+                    free (pte_instance->phys_frame);
                 }
-              close (mmap_instance->fd);
-              list_remove (&mmap_instance->thread_mmapped_elem);
-              free (mmap_instance);
+              lock_acquire (&thread_current ()->spt_lock);
+              hash_delete (&thread_current ()->supp_page_table,
+                &pte_instance->pt_elem);
+              lock_release (&thread_current ()->spt_lock);
+              pagedir_clear_page (thread_current ()->pagedir,
+                pte_instance->upage);
+              list_remove (&pte_instance->mmap_elem);
+              free (pte_instance);
+              e_pte = next_pte;
             }
-          else
-            break;
+          close (mmap_instance->fd);
+          list_remove (&mmap_instance->thread_mmapped_elem);
+          free (mmap_instance);
         }
-        e_mmap = next_mmap;
+      else
+        break;
+      e_mmap = next_mmap;
     }
 }
