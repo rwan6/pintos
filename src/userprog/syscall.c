@@ -472,8 +472,6 @@ close (int fd)
 static bool
 check_pointer (const void *pointer, unsigned size)
 {
-  // struct thread *t = thread_current ();
-
   /* First validate end-cases.  If these do not fail, check
      everything.  Limits the number of checks that need to
      be made. */
