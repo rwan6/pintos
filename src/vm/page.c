@@ -99,6 +99,8 @@ page_create_from_vaddr (const void *address)
   pte->kpage = pg_round_down (fe->addr);
   pte->upage = pg_round_down ((void *) address);
   pte->phys_frame = fe;
+  fe->pte = pte;
+  pte->page_read_only = false;
   pte->page_status = PAGE_ZEROS;
   pte->num_zeros = PGSIZE;
   pte->offset = 0; /* Not used for non-file related pages. */
@@ -134,6 +136,7 @@ page_create_mmap (const void *address, struct file *file,
   pte->num_zeros = num_zeros;
   pte->offset = offset;
   pte->file = file;
+  pte->page_read_only = false;
   lock_acquire (&cur->spt_lock);
   hash_insert (&cur->supp_page_table, &pte->pt_elem);
   lock_release (&cur->spt_lock);
