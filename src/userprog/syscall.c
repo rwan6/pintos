@@ -475,19 +475,16 @@ check_pointer (const void *pointer, unsigned size)
   /* First validate end-cases.  If these do not fail, check
      everything.  Limits the number of checks that need to
      be made. */
-  if (pointer == NULL || is_kernel_vaddr (pointer) /*||
-    pagedir_get_page (t->pagedir, pointer) == NULL*/)
+  if (pointer == NULL || is_kernel_vaddr (pointer))
     return false;
   else if (pointer + (size-1) == NULL ||
-    is_kernel_vaddr (pointer + (size-1)) /*||
-    pagedir_get_page (t->pagedir, pointer + (size-1)) == NULL*/)
+    is_kernel_vaddr (pointer + (size-1)))
     return false;
 
   unsigned i;
   for (i = 1; i < (size - 1); i++)
     {
-      if (pointer + i == NULL || is_kernel_vaddr (pointer + i) /*||
-        pagedir_get_page (t->pagedir, pointer + i) == NULL*/)
+      if (pointer + i == NULL || is_kernel_vaddr (pointer + i))
         return false;
     }
   return true;

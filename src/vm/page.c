@@ -227,12 +227,13 @@ page_deallocate (struct hash_elem *e, void *aux UNUSED)
   struct page_table_entry *pte = hash_entry (e,
     struct page_table_entry, pt_elem);
   lock_release (&thread_current ()->spt_lock);
+  
   /* Determine page's status and deallocate respective resources. */
   enum page_status ps = pte->page_status;
   if (ps == PAGE_ZEROS || ps == PAGE_NONZEROS)
     {
       if (pte->phys_frame != NULL)
-        {
+        { 
           free_frame (pte);
           pagedir_clear_page (thread_current ()->pagedir, pte->upage);
         }

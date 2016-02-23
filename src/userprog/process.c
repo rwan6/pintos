@@ -304,6 +304,7 @@ process_exit (void)
 
   /* Unmaps any mapped files. */
   munmap_all (cur);
+
   /* Close any open file handles.  Closing a file also reenables
      writes. */
   close_fd (cur);
@@ -344,7 +345,7 @@ process_exit (void)
   /* Reallow writes to executable. */
   if (cur->executable != NULL)
     file_allow_write (cur->executable);
-
+  
   /* Page reclamation: remove pages and deallocate memory associated
      with frame entries, supplemental page table, and swap slots.
      Note that memory files have already been unmapped and deallocated. */
