@@ -58,6 +58,8 @@ free_frame (struct page_table_entry *pte)
 {
   lock_acquire (&frame_table_lock);
 	palloc_free_page (pte->kpage);
+  if (clock_handle == &pte->phys_frame->frame_elem)
+    move_clock_handle ();
   list_remove (&pte->phys_frame->frame_elem);
   free (pte->phys_frame);
   lock_release (&frame_table_lock);
