@@ -664,6 +664,7 @@ munmap (mapid_t m)
                                    pte_instance->kpage,
                                    PGSIZE,
                                    (off_t) pte_instance->offset);
+                    list_remove (&pte_instance->phys_frame->frame_elem);
                     free (pte_instance->phys_frame);
                 }
               lock_acquire (&thread_current ()->spt_lock);
