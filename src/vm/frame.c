@@ -77,7 +77,7 @@ evict_frame (void)
 
       bool accessed = pagedir_is_accessed (fe->t->pagedir,
         fe->pte->upage);
-        
+
       if (accessed)
         {
           pagedir_set_accessed (fe->t->pagedir,
@@ -93,7 +93,7 @@ evict_frame (void)
           if (fe->pte->page_status == PAGE_NONZEROS ||
                 (dirty && (fe->pte->page_status == PAGE_ZEROS ||
                            fe->pte->page_status == PAGE_CODE)))
-            { 
+            {
               struct swap_slot *ss = malloc (sizeof (struct swap_slot));
               swap_write (ss, fe);
               lock_acquire (&fe->t->spt_lock);
@@ -112,6 +112,7 @@ evict_frame (void)
           /* Unlink this pte and deactivate the page table.  This will
              cause a page fault when the page is next accessed. */
           pagedir_clear_page (fe->t->pagedir, fe->pte->upage);
+          fe->pte->phys_frame = NULL;
           fe->pte = NULL;
           fe->t = thread_current ();
         }
