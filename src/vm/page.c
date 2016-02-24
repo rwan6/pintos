@@ -73,7 +73,7 @@ page_lookup (const void *address)
 void
 extend_stack (const void *address)
 {
-  
+
   struct page_table_entry *pte = page_lookup (address);
   if (pte != NULL)
     {
@@ -230,15 +230,15 @@ page_deallocate (struct hash_elem *e, void *aux UNUSED)
 
   /* Determine page's status and deallocate respective resources. */
   enum page_status ps = pte->page_status;
-  if (ps == PAGE_ZEROS || ps == PAGE_NONZEROS || ps == PAGE_CODE)
-    { 
+  if (ps != PAGE_SWAP)
+    {
       if (pte->phys_frame != NULL)
         {
           free_frame (pte);
           pagedir_clear_page (thread_current ()->pagedir, pte->upage);
-        }        
+        }
     }
-  else if (ps == PAGE_SWAP)
+  else
     {
       swap_free (pte->ss);
       free (pte->ss);

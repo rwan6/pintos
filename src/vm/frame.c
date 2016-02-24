@@ -30,6 +30,7 @@ init_frame (void)
 struct frame_entry *
 get_frame (enum palloc_flags flags)
 {
+  // printf("acquireing frame lock1\n");
   lock_acquire (&frame_table_lock);
   void *frame = palloc_get_page (flags);
 
@@ -56,6 +57,7 @@ get_frame (enum palloc_flags flags)
 void
 free_frame (struct page_table_entry *pte)
 {
+  // printf("acquireing frame lock2\n");
   lock_acquire (&frame_table_lock);
 	palloc_free_page (pte->kpage);
   if (clock_handle == &pte->phys_frame->frame_elem)
@@ -74,14 +76,14 @@ evict_frame (void)
     {
       fe = list_entry (clock_handle,
         struct frame_entry, frame_elem);
-
+// printf("before %x %x %x\n", fe->t, fe->pte->upage, fe->t->pagedir);
       bool accessed = pagedir_is_accessed (fe->t->pagedir,
-        fe->pte->upage);
+        fe->pte->upage);/*printf("after1 ");*/
 
       if (accessed)
         {
           pagedir_set_accessed (fe->t->pagedir,
-            fe->pte->upage, false);
+            fe->pte->upage, false);/*printf("after 3\n");*/
         }
       else
         {
@@ -108,7 +110,7 @@ evict_frame (void)
                              PGSIZE, (off_t) fe->pte->offset);
               lock_release (&file_lock);
             }
-
+// printf("after 2\n");
           /* Unlink this pte and deactivate the page table.  This will
              cause a page fault when the page is next accessed. */
           pagedir_clear_page (fe->t->pagedir, fe->pte->upage);
@@ -117,10 +119,10 @@ evict_frame (void)
           fe->t = thread_current ();
         }
         /* Increment the clock_handle. */
-        move_clock_handle ();
+        move_clock_handle ();/*printf("after 5\n");*/
     }
-
-    lock_release (&frame_table_lock);
+// printf("after 6\n");
+    lock_release (&frame_table_lock);/*printf("after 4\n");*/
     return fe;
 }
 
