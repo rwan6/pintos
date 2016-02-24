@@ -10,6 +10,15 @@
 #include "filesys/file.h"     /* For file operations. */
 
 /* Initialize the frame table and all related structures. */
+static void
+move_clock_handle (void)
+{
+  if (list_next (clock_handle) == list_end (&all_frames))
+    clock_handle = list_begin (&all_frames);
+  else
+    clock_handle = list_next (clock_handle);
+}
+
 void
 init_frame (void)
 {
@@ -37,7 +46,7 @@ get_frame (enum palloc_flags flags)
     }
   list_push_back (&all_frames, &fe->frame_elem);
   if (clock_handle == NULL)
-    clock_handle = list_begin (&all_frames);
+  clock_handle = list_begin (&all_frames);
   fe->addr = pg_round_down (frame);
   fe->t = thread_current ();
   lock_release (&frame_table_lock);
@@ -49,6 +58,7 @@ free_frame (struct page_table_entry *pte)
 {
   lock_acquire (&frame_table_lock);
 	palloc_free_page (pte->kpage);
+  list_remove (&pte->phys_frame->frame_elem);
   free (pte->phys_frame);
   lock_release (&frame_table_lock);
 }
@@ -62,8 +72,10 @@ evict_frame (void)
     {
       fe = list_entry (clock_handle,
         struct frame_entry, frame_elem);
+
       bool accessed = pagedir_is_accessed (fe->t->pagedir,
         fe->pte->upage);
+        
       if (accessed)
         {
           pagedir_set_accessed (fe->t->pagedir,
@@ -79,7 +91,7 @@ evict_frame (void)
           if (fe->pte->page_status == PAGE_NONZEROS ||
                 (dirty && (fe->pte->page_status == PAGE_ZEROS ||
                            fe->pte->page_status == PAGE_CODE)))
-            {
+            { 
               struct swap_slot *ss = malloc (sizeof (struct swap_slot));
               swap_write (ss, fe);
               lock_acquire (&fe->t->spt_lock);
@@ -102,12 +114,7 @@ evict_frame (void)
           fe->t = thread_current ();
         }
         /* Increment the clock_handle. */
-        if (list_next (clock_handle) == list_end (&all_frames)){
-          clock_handle = list_begin (&all_frames);
-        }
-        else{
-          clock_handle = list_next (clock_handle);
-        }
+        move_clock_handle ();
     }
 
     lock_release (&frame_table_lock);

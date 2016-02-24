@@ -152,10 +152,10 @@ page_fault (struct intr_frame *f)
   not_present = (f->error_code & PF_P) == 0;
   write = (f->error_code & PF_W) != 0;
   user = (f->error_code & PF_U) != 0;
-
+    
   /* Verify the access is legal. If not, exit. */
   if (!not_present || fault_addr == NULL ||
-      (/*user && */is_kernel_vaddr (fault_addr)))
+      (user && is_kernel_vaddr (fault_addr)))
     {
       thread_current ()->return_status = -1;
 
@@ -164,16 +164,17 @@ page_fault (struct intr_frame *f)
      if (lock_held_by_current_thread (&file_lock))
        lock_release (&file_lock);
      
-    /* Release the frame lock if the faulting thread was holding it to
-       avoid trying to mistakenly reaquire it when calling free_frame. */
-    if (lock_held_by_current_thread (&frame_table_lock))
-      lock_release (&frame_table_lock);
+     /* Release the frame lock if the faulting thread was holding it to
+        avoid trying to mistakenly reaquire it when calling free_frame. */
+     if (lock_held_by_current_thread (&frame_table_lock))
+       lock_release (&frame_table_lock);
 
       thread_exit ();
     }
 
   /* Handle stack growth. */
   void *stack_pointer = user ? f->esp : thread_current ()->esp;
+  
   /* Impose an absolute limit on stack size. */
   if (stack_pointer < PHYS_BASE - STACK_SIZE_LIMIT)
     {
@@ -208,7 +209,7 @@ page_fault (struct intr_frame *f)
 
       thread_exit ();
     }
-
+   
   /* Fetch the page. */
   page_fetch_and_set (pte);
 }

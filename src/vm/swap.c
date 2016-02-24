@@ -1,3 +1,4 @@
+#include <stdio.h>
 #include "vm/frame.h"
 #include "vm/swap.h"
 #include <bitmap.h>
@@ -20,6 +21,7 @@ swap_read (struct swap_slot* ss, struct frame_entry *fe)
   for(; i < BLOCKS_IN_PAGE; i++)
     block_read (swap_partition, ss->sector + i,
       fe->addr + i * BLOCK_SECTOR_SIZE);
+
   swap_free (ss);
 }
 

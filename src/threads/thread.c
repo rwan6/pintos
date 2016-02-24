@@ -613,6 +613,7 @@ init_thread (struct thread *t, const char *name, int priority)
   lock_init (&t->wait_lock);
   cond_init (&t->wait_cond);
   lock_init (&t->spt_lock);
+  
   old_level = intr_disable ();
   list_push_back (&all_list, &t->allelem);
   intr_set_level (old_level);

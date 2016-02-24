@@ -147,7 +147,8 @@ void
 page_fetch_and_set (struct page_table_entry *pte)
 {
   enum page_status status = pte->page_status;
-
+  /* Should not be attempting to fetch a page that already lives in the
+     frame table. */
   ASSERT (pte->page_status != PAGE_NONZEROS);
 
   struct thread *cur = thread_current ();
@@ -177,7 +178,6 @@ page_fetch_and_set (struct page_table_entry *pte)
   else if (status == PAGE_SWAP)
     {
       struct frame_entry *fe = get_frame (PAL_USER);
-
       lock_acquire (&cur->spt_lock);
       pte->kpage = fe->addr;
       pte->phys_frame = fe;
@@ -200,8 +200,8 @@ page_fetch_and_set (struct page_table_entry *pte)
       fe->pte = pte;
       lock_release (&cur->spt_lock);
       lock_acquire (&file_lock);
-      int rbytes = file_read_at (pte->file, pte->kpage, (PGSIZE - pte->num_zeros),
-                    (off_t) pte->offset);
+      int rbytes = file_read_at (pte->file, pte->kpage,
+        (PGSIZE - pte->num_zeros), (off_t) pte->offset);
       lock_release (&file_lock);
       if (rbytes != PGSIZE - pte->num_zeros)
         success = false;
@@ -227,16 +227,16 @@ page_deallocate (struct hash_elem *e, void *aux UNUSED)
   struct page_table_entry *pte = hash_entry (e,
     struct page_table_entry, pt_elem);
   lock_release (&thread_current ()->spt_lock);
-  
+
   /* Determine page's status and deallocate respective resources. */
   enum page_status ps = pte->page_status;
-  if (ps == PAGE_ZEROS || ps == PAGE_NONZEROS)
-    {
+  if (ps == PAGE_ZEROS || ps == PAGE_NONZEROS || ps == PAGE_CODE)
+    { 
       if (pte->phys_frame != NULL)
-        { 
+        {
           free_frame (pte);
           pagedir_clear_page (thread_current ()->pagedir, pte->upage);
-        }
+        }        
     }
   else if (ps == PAGE_SWAP)
     {
