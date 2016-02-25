@@ -180,10 +180,10 @@ page_fetch_and_set (struct page_table_entry *pte)
           fe->pte = pte;
           memset (fe->addr, 0, PGSIZE);
           hash_insert (&cur->supp_page_table, &pte->pt_elem);
+          lock_release (&cur->spt_lock);
 
           success = pagedir_set_page (cur->pagedir, pte->upage,
             pte->kpage, !pte->page_read_only);
-          lock_release (&cur->spt_lock);            
         }
     }
   else if (status == PAGE_SWAP)
@@ -199,9 +199,9 @@ page_fetch_and_set (struct page_table_entry *pte)
 
       free(pte->ss);
       pte->ss = NULL;
+      lock_release (&cur->spt_lock);
       success = pagedir_set_page (cur->pagedir, pte->upage,
             pte->kpage, !pte->page_read_only);
-      lock_release (&cur->spt_lock);      
     }
   else if (status == PAGE_MMAP || status == PAGE_CODE)
     {
@@ -210,6 +210,7 @@ page_fetch_and_set (struct page_table_entry *pte)
       pte->kpage = fe->addr;
       pte->phys_frame = fe;
       fe->pte = pte;
+      lock_release (&cur->spt_lock);
 
       lock_acquire (&file_lock);
       int rbytes = file_read_at (pte->file, pte->kpage,
@@ -224,8 +225,7 @@ page_fetch_and_set (struct page_table_entry *pte)
           success = pagedir_set_page (cur->pagedir, pte->upage,
                 pte->kpage, !pte->page_read_only);
         }
-      lock_release (&cur->spt_lock);
-    }
+    }    
   if (!success)
     {
       thread_current ()->return_status = -1;
