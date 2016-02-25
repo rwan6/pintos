@@ -707,7 +707,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
         return false;
 
       /* If a new frame entry was successfully allocated, set up the
-         corresponding page table entry. */
+         corresponding page table entry. */      
       struct page_table_entry *pte = init_page_entry ();
       pte->upage = pg_round_down (upage);
       pte->kpage = pg_round_down (kpage);
@@ -764,7 +764,9 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 }
 
 /* Create a minimal stack by mapping a zeroed page at the top of
-   user virtual memory. */
+   user virtual memory.  Also sets up the metadata for the stack's
+   frame table entry (which is pinned) and the process's supplemental
+   page table. */
 static bool
 setup_stack (void **esp)
 {
@@ -778,7 +780,7 @@ setup_stack (void **esp)
   if (kpage != NULL)
     {
       /* If a new frame entry was successfully allocated, set up the
-         corresponding page table entry. */
+         corresponding page table entry. */      
       pte = init_page_entry ();
       pte->upage = pg_round_down (((uint8_t *) PHYS_BASE) - PGSIZE);
       pte->kpage = pg_round_down (kpage);

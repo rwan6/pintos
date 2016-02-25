@@ -48,6 +48,8 @@ get_frame (enum palloc_flags flags)
     }
   list_push_back (&all_frames, &fe->frame_elem);
   
+  /* If this is the first frame table entry, set up the
+     clock handle to point to the first entry. */
   if (clock_handle == NULL)
     clock_handle = list_begin (&all_frames);
   
@@ -119,10 +121,14 @@ evict_frame (void)
             }
           else if (fe->pte->page_status == PAGE_MMAP && dirty)
             {
+              /* Release the frame table lock while writing
+                 to the file and reacquire after complete. */
+              lock_release (&frame_table_lock);
               lock_acquire (&file_lock);
               file_write_at (fe->pte->file, fe->addr,
                              PGSIZE, (off_t) fe->pte->offset);
               lock_release (&file_lock);
+              lock_acquire (&frame_table_lock);
             }
 
           /* Unlink this pte and deactivate the page table.  This will
