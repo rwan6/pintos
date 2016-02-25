@@ -39,6 +39,7 @@ static bool check_pointer (const void *, unsigned);
 static struct sys_fd* get_fd_item (int);
 
 static void prefetch_user_memory (void *, size_t);
+static void unpin_user_memory (void *, size_t);
 
 static int next_avail_fd;       /* Tracks the next available fd. */
 static mapid_t next_avail_mapid; /* Tracks the next available mapid */
@@ -336,11 +337,10 @@ read (int fd, void *buffer, unsigned size)
     }
   else
     {
-// prefetch_user_memory (buffer, size);
-// prefetch_user_memory (fd_instance->file, 1);
+      prefetch_user_memory (buffer, size);
       // printf("got here? 0 %x\n", &file_lock);
       lock_acquire (&file_lock);
-      // printf("got here? 1\n");
+      // printf("got here? 1 %x\n", &file_lock);
       struct sys_fd *fd_instance = get_fd_item (fd);
       // printf("got here? 2\n");
       /* If the pointer returned to fd_instance is NULL, the fd was not
@@ -352,8 +352,9 @@ read (int fd, void *buffer, unsigned size)
         }
 
 
-// printf("buf=%x %d %x\n", buffer, size, fd_instance->file);
+      // printf ("About to read\n");
       num_read = file_read (fd_instance->file, buffer, size);
+      unpin_user_memory (buffer, size);
       lock_release (&file_lock);
       return num_read;
     }
@@ -703,27 +704,40 @@ static void
 prefetch_user_memory (void *pointer, size_t size)
 {
   size_t i;
-  size_t len = (size % PGSIZE) ? size / PGSIZE + 1 : size / PGSIZE;
+  void *sp = thread_current ()->esp;
+  size_t len = (size / PGSIZE) + 1;
+  // printf ("Size: %d size/Len: %d\n", size, size / PGSIZE);
   for (i = 0; i < len; i++)
     {
-      struct page_table_entry *pte = page_lookup (pointer + i * PGSIZE);
+      void *fa = pointer + i * PGSIZE;
+      struct page_table_entry *pte = page_lookup (fa);
+      
       if (pte == NULL)
-        exit (-1);
+        {
+          /* Impose an absolute limit on stack size. */
+          if (sp < PHYS_BASE - STACK_SIZE_LIMIT)
+            {
+              exit (-1);
+            }
+          else if (fa >= sp - 32)
+            {
+              /* Grow stack */
+              extend_stack (fa);
+              continue;
+            } 
+          else
+            exit (-1);
+              
+        }
       else if(pte->page_status != PAGE_NONZEROS && pte->phys_frame == NULL)
-      {
-        // printf("entering fetch %d %x\n", i, pointer + i * PGSIZE);
-        pte->pinned = true;
-        page_fetch_and_set (pte);
-
-        // printf("exiting fetch\n");
-      }
+        {
+          // printf("entering fetch %d %x\n", i, pointer + i * PGSIZE);
+          page_fetch_and_set (pte);
+          pte->pinned = true;
+          // printf("exiting fetch\n");
+        }
       else
-      {
-
         pte->pinned = true;
-        // printf("in fram table %d %x \n", i, pointer + i * PGSIZE);
-
-      }
     }
 }
 
@@ -731,19 +745,13 @@ static void
 unpin_user_memory (void *pointer, size_t size)
 {
   size_t i;
-  size_t len = (size % PGSIZE) ? size / PGSIZE + 1 : size / PGSIZE;
+  size_t len = (size / PGSIZE) + 1;
   for (i = 0; i < len; i++)
     {
       struct page_table_entry *pte = page_lookup (pointer + i * PGSIZE);
       if (pte == NULL)
         exit (-1);
-      else if(pte->page_status != PAGE_NONZEROS && pte->phys_frame == NULL)
-      {
-        // printf("entering fetch %d %x\n", i, pointer + i * PGSIZE);
+      else
         pte->pinned = false;
-        // page_fetch_and_set (pte);
-
-        // printf("exiting fetch\n");
-      }
     }
 }

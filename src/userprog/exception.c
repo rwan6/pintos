@@ -11,8 +11,6 @@
 #include "vm/page.h"
 #include "vm/frame.h"
 
-#define STACK_SIZE_LIMIT 0x800000 /* 8MB. */
-
 /* Number of page faults processed. */
 static long long page_fault_cnt;
 
@@ -152,7 +150,7 @@ page_fault (struct intr_frame *f)
   not_present = (f->error_code & PF_P) == 0;
   write = (f->error_code & PF_W) != 0;
   user = (f->error_code & PF_U) != 0;
-printf("entering pf FA=%x\n",fault_addr);
+// printf("entering pf FA=%x\n",fault_addr);
   /* Verify the access is legal. If not, exit. */
   if (!not_present || fault_addr == NULL ||
       (user && is_kernel_vaddr (fault_addr)))

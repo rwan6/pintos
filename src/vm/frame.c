@@ -31,7 +31,7 @@ init_frame (void)
 struct frame_entry *
 get_frame (enum palloc_flags flags)
 {
-  // printf("acquireing frame lock1\n");
+  // printf("acquiring frame lock1\n");
   lock_acquire (&frame_table_lock);
   // printf("acquireing frame lock2\n");
   void *frame = palloc_get_page (flags);

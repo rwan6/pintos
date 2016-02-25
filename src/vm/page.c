@@ -65,6 +65,7 @@ page_lookup (const void *address)
   lock_acquire (&cur->spt_lock);
   p.upage = pg_round_down ((void *) address);
   e = hash_find (&cur->supp_page_table, &p.pt_elem);
+  // printf ("PL: %x, HF: %x\n", p.upage, e);
   lock_release (&cur->spt_lock);
   return e != NULL ? hash_entry (e, struct page_table_entry, pt_elem)
     : NULL;
@@ -186,7 +187,7 @@ page_fetch_and_set (struct page_table_entry *pte)
       fe->pte = pte;
       pte->page_status = PAGE_NONZEROS;
       lock_release (&cur->spt_lock);
-// printf("fetching swap data1\n");
+      // printf("fetching swap data1\n");
       swap_read (pte->ss, fe);
 // printf("fetching swap data2\n");
       free(pte->ss);
@@ -204,7 +205,7 @@ page_fetch_and_set (struct page_table_entry *pte)
       pte->phys_frame = fe;
       fe->pte = pte;
       lock_release (&cur->spt_lock);
-      //printf("after1 %x\n", &file_lock);
+
       lock_acquire (&file_lock);
       //printf("after2\n");
       int rbytes = file_read_at (pte->file, pte->kpage,
