@@ -98,7 +98,7 @@ evict_frame (void)
       else
         {
           found = true;
-
+          lock_acquire (&fe->t->spt_lock);
           bool dirty = pagedir_is_dirty (fe->t->pagedir, fe->pte->upage);
           
           /* Update the pte for the evicted frame.  Account for zero
@@ -113,11 +113,9 @@ evict_frame (void)
                 
               swap_write (ss, fe);
               
-              lock_acquire (&fe->t->spt_lock);
               fe->pte->ss = ss;
               fe->pte->page_status = PAGE_SWAP;
               fe->pte->kpage = NULL;
-              lock_release (&fe->t->spt_lock);
             }
           else if (fe->pte->page_status == PAGE_MMAP && dirty)
             {
@@ -136,6 +134,7 @@ evict_frame (void)
           pagedir_clear_page (fe->t->pagedir, fe->pte->upage);
           fe->pte->phys_frame = NULL;
           fe->pte = NULL;
+          lock_release (&fe->t->spt_lock);
           fe->t = thread_current ();
         }
         
