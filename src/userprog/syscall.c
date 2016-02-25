@@ -731,20 +731,13 @@ prefetch_user_memory (void *pointer, size_t size)
              handler in order to determine if the read or write system
              call requires stack growth. */
           if (sp < PHYS_BASE - STACK_SIZE_LIMIT)
-            {
-              exit (-1);
-            }
+            exit (-1);
           else if (fa >= sp - 32)
-            {
-              /* Grow stack */
-              extend_stack (fa);
-              continue;
-            } 
+            extend_stack (fa);
           else
             exit (-1);
-              
         }
-      else if(pte->page_status != PAGE_NONZEROS && pte->phys_frame == NULL)
+      else if (pte->page_status != PAGE_NONZEROS && pte->phys_frame == NULL)
         {
           page_fetch_and_set (pte);
           pte->pinned = true;
