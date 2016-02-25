@@ -38,6 +38,8 @@ static void munmap (mapid_t);
 static bool check_pointer (const void *, unsigned);
 static struct sys_fd* get_fd_item (int);
 
+static void prefetch_user_memory (void *, size_t);
+
 static int next_avail_fd;       /* Tracks the next available fd. */
 static mapid_t next_avail_mapid; /* Tracks the next available mapid */
 
@@ -323,7 +325,7 @@ filesize (int fd)
    File system gets locked down with a coarse-grain lock. */
 static int
 read (int fd, void *buffer, unsigned size)
-{
+{//printf("read %x\n", thread_current ());
   int num_read;
   /* If SDIN_FILENO. */
   if (fd == 0)
@@ -334,9 +336,13 @@ read (int fd, void *buffer, unsigned size)
     }
   else
     {
+// prefetch_user_memory (buffer, size);
+// prefetch_user_memory (fd_instance->file, 1);
+      // printf("got here? 0 %x\n", &file_lock);
       lock_acquire (&file_lock);
+      // printf("got here? 1\n");
       struct sys_fd *fd_instance = get_fd_item (fd);
-
+      // printf("got here? 2\n");
       /* If the pointer returned to fd_instance is NULL, the fd was not
          found in the file list.  Thus, we should exit immediately. */
       if (fd_instance == NULL)
@@ -345,6 +351,8 @@ read (int fd, void *buffer, unsigned size)
           exit (-1);
         }
 
+
+// printf("buf=%x %d %x\n", buffer, size, fd_instance->file);
       num_read = file_read (fd_instance->file, buffer, size);
       lock_release (&file_lock);
       return num_read;
@@ -631,7 +639,7 @@ mmap (int fd, void *addr)
 
 void
 munmap (mapid_t m)
-{
+{//printf("mmap %x\n", thread_current ());
   struct thread *cur = thread_current ();
   struct list_elem *e_mmap;
   struct list_elem *next_mmap;
@@ -660,12 +668,16 @@ munmap (mapid_t m)
                   pagedir_is_dirty (cur->pagedir,
                       pte_instance->upage))
                 {
+                  lock_acquire (&file_lock);
                     file_write_at (pte_instance->file,
                                    pte_instance->kpage,
                                    PGSIZE,
                                    (off_t) pte_instance->offset);
+                  lock_release (&file_lock);
+                  lock_acquire (&frame_table_lock);
                     list_remove (&pte_instance->phys_frame->frame_elem);
                     free (pte_instance->phys_frame);
+                  lock_release (&frame_table_lock);
                 }
               lock_acquire (&thread_current ()->spt_lock);
               hash_delete (&thread_current ()->supp_page_table,
@@ -684,5 +696,54 @@ munmap (mapid_t m)
       else
         break;
       e_mmap = next_mmap;
+    }
+}
+
+static void
+prefetch_user_memory (void *pointer, size_t size)
+{
+  size_t i;
+  size_t len = (size % PGSIZE) ? size / PGSIZE + 1 : size / PGSIZE;
+  for (i = 0; i < len; i++)
+    {
+      struct page_table_entry *pte = page_lookup (pointer + i * PGSIZE);
+      if (pte == NULL)
+        exit (-1);
+      else if(pte->page_status != PAGE_NONZEROS && pte->phys_frame == NULL)
+      {
+        // printf("entering fetch %d %x\n", i, pointer + i * PGSIZE);
+        pte->pinned = true;
+        page_fetch_and_set (pte);
+
+        // printf("exiting fetch\n");
+      }
+      else
+      {
+
+        pte->pinned = true;
+        // printf("in fram table %d %x \n", i, pointer + i * PGSIZE);
+
+      }
+    }
+}
+
+static void
+unpin_user_memory (void *pointer, size_t size)
+{
+  size_t i;
+  size_t len = (size % PGSIZE) ? size / PGSIZE + 1 : size / PGSIZE;
+  for (i = 0; i < len; i++)
+    {
+      struct page_table_entry *pte = page_lookup (pointer + i * PGSIZE);
+      if (pte == NULL)
+        exit (-1);
+      else if(pte->page_status != PAGE_NONZEROS && pte->phys_frame == NULL)
+      {
+        // printf("entering fetch %d %x\n", i, pointer + i * PGSIZE);
+        pte->pinned = false;
+        // page_fetch_and_set (pte);
+
+        // printf("exiting fetch\n");
+      }
     }
 }

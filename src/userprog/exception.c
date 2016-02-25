@@ -152,7 +152,7 @@ page_fault (struct intr_frame *f)
   not_present = (f->error_code & PF_P) == 0;
   write = (f->error_code & PF_W) != 0;
   user = (f->error_code & PF_U) != 0;
-    
+printf("entering pf FA=%x\n",fault_addr);
   /* Verify the access is legal. If not, exit. */
   if (!not_present || fault_addr == NULL ||
       (user && is_kernel_vaddr (fault_addr)))
@@ -163,7 +163,7 @@ page_fault (struct intr_frame *f)
         avoid trying to mistakenly reaquire it when closing fds. */
      if (lock_held_by_current_thread (&file_lock))
        lock_release (&file_lock);
-     
+
      /* Release the frame lock if the faulting thread was holding it to
         avoid trying to mistakenly reaquire it when calling free_frame. */
      if (lock_held_by_current_thread (&frame_table_lock))
@@ -174,7 +174,7 @@ page_fault (struct intr_frame *f)
 
   /* Handle stack growth. */
   void *stack_pointer = user ? f->esp : thread_current ()->esp;
-  
+
   /* Impose an absolute limit on stack size. */
   if (stack_pointer < PHYS_BASE - STACK_SIZE_LIMIT)
     {
@@ -201,7 +201,7 @@ page_fault (struct intr_frame *f)
          at the top since extending the stack shouldn't release the lock. */
       if (lock_held_by_current_thread (&file_lock))
         lock_release (&file_lock);
-      
+
       /* Release the frame lock if the faulting thread was holding it to
          avoid trying to mistakenly reaquire it when calling free_frame. */
       if (lock_held_by_current_thread (&frame_table_lock))
@@ -209,8 +209,11 @@ page_fault (struct intr_frame *f)
 
       thread_exit ();
     }
-   
+
   /* Fetch the page. */
+    // printf("entering fetch and set\n");
   page_fetch_and_set (pte);
+    // printf("finished fetch and set\n");
+  // printf("exiting pf\n");
 }
 

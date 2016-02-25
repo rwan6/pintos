@@ -138,7 +138,6 @@ page_create_mmap (const void *address, struct file *file,
   pte->offset = offset;
   pte->file = file;
   pte->page_read_only = false;
-  pte->pinned = false;
   lock_acquire (&cur->spt_lock);
   hash_insert (&cur->supp_page_table, &pte->pt_elem);
   lock_release (&cur->spt_lock);
@@ -180,28 +179,34 @@ page_fetch_and_set (struct page_table_entry *pte)
   else if (status == PAGE_SWAP)
     {
       struct frame_entry *fe = get_frame (PAL_USER);
+      // printf("fetching swap data to %x\n", fe->addr);
       lock_acquire (&cur->spt_lock);
       pte->kpage = fe->addr;
       pte->phys_frame = fe;
       fe->pte = pte;
       pte->page_status = PAGE_NONZEROS;
       lock_release (&cur->spt_lock);
-
+// printf("fetching swap data1\n");
       swap_read (pte->ss, fe);
+// printf("fetching swap data2\n");
+      free(pte->ss);
       pte->ss = NULL;
-
+      // printf("setting pagedir upage=%x kpage=%x\n", pte->upage, pte->kpage);
       success = pagedir_set_page (cur->pagedir, pte->upage,
             pte->kpage, !pte->page_read_only);
     }
   else if (status == PAGE_MMAP || status == PAGE_CODE)
     {
+    //printf("fetching mmap data\n");
       struct frame_entry *fe = get_frame (PAL_USER);
       lock_acquire (&cur->spt_lock);
       pte->kpage = fe->addr;
       pte->phys_frame = fe;
       fe->pte = pte;
       lock_release (&cur->spt_lock);
+      //printf("after1 %x\n", &file_lock);
       lock_acquire (&file_lock);
+      //printf("after2\n");
       int rbytes = file_read_at (pte->file, pte->kpage,
         (PGSIZE - pte->num_zeros), (off_t) pte->offset);
       lock_release (&file_lock);
@@ -210,9 +215,11 @@ page_fetch_and_set (struct page_table_entry *pte)
       else
         {
           /* Set the rest of the page to be zeros. */
+      // printf("before\n");
           memset (pte->kpage + (PGSIZE - pte->num_zeros), 0, pte->num_zeros);
           success = pagedir_set_page (cur->pagedir, pte->upage,
                 pte->kpage, !pte->page_read_only);
+      // printf("after\n");
         }
     }
   if (!success)
