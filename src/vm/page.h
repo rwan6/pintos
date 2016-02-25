@@ -32,6 +32,8 @@ struct page_table_entry
     enum page_status page_status;     /* Gives the status of this frame
                                          entry.  See above for
                                          enumeration. */
+    bool pinned;                      /* Whether this page cannot be chosen
+                                         for eviction */
     bool page_read_only;              /* Denotes whether page is
                                          read-only. */
     struct swap_slot *ss;             /* Swap slot for this page. */
@@ -47,7 +49,7 @@ struct page_table_entry *init_page_entry (void);
 struct page_table_entry *page_lookup (const void *);
 void extend_stack (const void *);
 void page_fetch_and_set (struct page_table_entry *);
-void page_create_from_vaddr (const void *);
+void page_create_from_vaddr (const void *, bool);
 struct page_table_entry * page_create_mmap (const void *, struct file *,
                                             uint32_t, int);
 void page_deallocate (struct hash_elem *, void *UNUSED);

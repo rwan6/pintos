@@ -83,12 +83,12 @@ extend_stack (const void *address)
     }
   else /* If doesn't exist, then create a new frame and pte, and return */
     {
-      page_create_from_vaddr (address);
+      page_create_from_vaddr (address, true);
     }
 }
 
 void
-page_create_from_vaddr (const void *address)
+page_create_from_vaddr (const void *address, bool pinned)
 {
   struct page_table_entry *pte = malloc (sizeof (struct page_table_entry));
   if (!pte)
@@ -106,6 +106,7 @@ page_create_from_vaddr (const void *address)
   pte->offset = 0; /* Not used for non-file related pages. */
   pte->file = NULL; /* Not used for non-file related pages. */
   pte->page_read_only = false;
+  pte->pinned = pinned;
   memset (fe->addr, 0, PGSIZE);
   lock_acquire (&cur->spt_lock);
   hash_insert (&cur->supp_page_table, &pte->pt_elem);
@@ -137,6 +138,7 @@ page_create_mmap (const void *address, struct file *file,
   pte->offset = offset;
   pte->file = file;
   pte->page_read_only = false;
+  pte->pinned = false;
   lock_acquire (&cur->spt_lock);
   hash_insert (&cur->supp_page_table, &pte->pt_elem);
   lock_release (&cur->spt_lock);

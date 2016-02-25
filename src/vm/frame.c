@@ -76,6 +76,13 @@ evict_frame (void)
     {
       fe = list_entry (clock_handle,
         struct frame_entry, frame_elem);
+      bool pinned = fe->pte->pinned;
+      if (pinned)
+        {
+          move_clock_handle ();
+          continue;
+        }
+        
 // printf("before %x %x %x\n", fe->t, fe->pte->upage, fe->t->pagedir);
       bool accessed = pagedir_is_accessed (fe->t->pagedir,
         fe->pte->upage);/*printf("after1 ");*/

@@ -675,6 +675,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
       pte->ss = NULL;
       new_frame->pte = pte;
       pte->page_read_only = !writable;
+      pte->pinned = false;
 
       /* If the page is all zeros. */
       if (zero_bytes == PGSIZE)
@@ -741,6 +742,7 @@ setup_stack (void **esp)
       pte->offset = 0;  /* Not a file, so this parameter does not matter. */
       pte->file = NULL; /* No associated file. */
       pte->page_read_only = false;
+      pte->pinned = true;
       pte->page_status = PAGE_ZEROS;
       pte->num_zeros = PGSIZE;
       pte->ss = NULL;
