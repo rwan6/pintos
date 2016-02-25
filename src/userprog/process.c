@@ -25,6 +25,7 @@
 
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
+int num_spaces (char *s);
 void push_args_to_stack (void **esp, char *token, char **save_ptr);
 #define MAX_ARG_NUM 128  /* Assume there are at most 128 arguments, the max
                             length of command-line arguments that the pintos
@@ -189,16 +190,46 @@ start_process (void *load_info)
   NOT_REACHED ();
 }
 
+int
+num_spaces (char *s)
+{
+  int spaces = 0;
+  while (*s)
+    {
+      if (*s == ' ')
+        spaces++;
+      s++;
+    }
+  return spaces;
+}
+
+/* Populate the stack with arguments */
 void
 push_args_to_stack (void **esp, char *file_name, char **save_ptr)
 {
-  /* Populate the stack with arguments */
-  char *argv[MAX_ARG_NUM];
+  int total_args = num_spaces (file_name) + 1;
+  char **argv = malloc (sizeof (char *) * total_args);
+  if (argv == NULL)
+    {
+      palloc_free_page (file_name);
+      thread_current ()->return_status = -1;
+      thread_exit ();
+    }
   char *token;
   argv[0] = file_name;
+  size_t length_args = strlen (file_name) + 1;
   int argc = 1, i;
   while ((token = strtok_r (NULL," ", save_ptr)))
     {
+      length_args += strlen(token) + 1;
+      /* If there are too many arguments, exit out */
+      if (length_args > PGSIZE)
+        {
+          palloc_free_page (file_name);
+          free (argv);
+          thread_current ()->return_status = -1;
+          thread_exit ();
+        }
       argv[argc] = token;
       argc++;
     }
@@ -208,6 +239,7 @@ push_args_to_stack (void **esp, char *file_name, char **save_ptr)
   if (ptrs == NULL)
     {
       palloc_free_page (file_name);
+      free (argv);
       thread_current ()->return_status = -1;
       thread_exit ();
     }
@@ -249,6 +281,7 @@ push_args_to_stack (void **esp, char *file_name, char **save_ptr)
   *((void **) *esp) = 0;
 
   palloc_free_page (file_name);
+  free (argv);
   free (ptrs);
 }
 
