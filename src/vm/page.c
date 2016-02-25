@@ -70,23 +70,25 @@ page_lookup (const void *address)
     : NULL;
 }
 
+/* Extends the stack. Stack growth can occur either due to the page
+   fault handler or a read/write system call buffer handler that
+   determined valid stack growth was necessary. */
 void
 extend_stack (const void *address)
 {
-
   struct page_table_entry *pte = page_lookup (address);
+  
+  /* If page_lookup returns a valid entry, fetch the data and set up
+     the frame entry.  If the page does not exists, create a new frame
+     and page table entry. */
   if (pte != NULL)
-    {
-      /* if page_lookup returns a valid entry, fetch the data and set up
-         the frame entry. */
-      page_fetch_and_set (pte);
-    }
-  else /* If the page exist, create a new frame and page table entry. */
-    {
-      page_create_from_vaddr (address, true);
-    }
+    page_fetch_and_set (pte);
+  else
+    page_create_from_vaddr (address, true);
 }
 
+/* Create and set up a zero-filled page, for extending stack.  The page
+   immediately gets pinned to the frame table. */
 void
 page_create_from_vaddr (const void *address, bool pinned)
 {
@@ -96,10 +98,11 @@ page_create_from_vaddr (const void *address, bool pinned)
 
   struct thread *cur = thread_current ();
   struct frame_entry *fe = get_frame (PAL_USER);
+  fe->pte = pte;
+  
   pte->kpage = pg_round_down (fe->addr);
   pte->upage = pg_round_down ((void *) address);
   pte->phys_frame = fe;
-  fe->pte = pte;
   pte->page_read_only = false;
   pte->page_status = PAGE_ZEROS;
   pte->num_zeros = PGSIZE;
@@ -114,6 +117,7 @@ page_create_from_vaddr (const void *address, bool pinned)
 
   bool success = pagedir_set_page (cur->pagedir, pte->upage,
     pte->kpage, !pte->page_read_only);
+    
   if (!success)
     {
       cur->return_status = -1;
@@ -121,6 +125,9 @@ page_create_from_vaddr (const void *address, bool pinned)
     }
 }
 
+/* Create and set up a page for a memory-mapped file, and add it to the
+   process's supplemental page table.  For memory-mapped files, we do
+   not initially allocate a frame for the file. */
 struct page_table_entry *
 page_create_mmap (const void *address, struct file *file,
                   uint32_t offset, int num_zeros)
@@ -130,6 +137,7 @@ page_create_mmap (const void *address, struct file *file,
     PANIC ("Unable to allocate page table entry!");
 
   struct thread *cur = thread_current ();
+  
   pte->kpage = NULL;  /* Doesn't exist in the frame table. */
   pte->upage = pg_round_down ((void *) address);
   pte->phys_frame = NULL;
@@ -141,6 +149,7 @@ page_create_mmap (const void *address, struct file *file,
   lock_acquire (&cur->spt_lock);
   hash_insert (&cur->supp_page_table, &pte->pt_elem);
   lock_release (&cur->spt_lock);
+  
   return pte;
 }
 
@@ -224,6 +233,10 @@ page_fetch_and_set (struct page_table_entry *pte)
     }
 }
 
+/* Upon process termination, deallocate a page from a process's
+   supplemental page table, remove it from the frame table (if applicable),
+   and free the allocated swap metadata element.  Note that we are not
+   freeing a swap slot here, only the swap slot metadata. */
 void
 page_deallocate (struct hash_elem *e, void *aux UNUSED)
 {
