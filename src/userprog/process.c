@@ -25,6 +25,7 @@
 
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
+void push_args_to_stack (void **esp, char *token, char **save_ptr);
 #define MAX_ARG_NUM 128  /* Assume there are at most 128 arguments, the max
                             length of command-line arguments that the pintos
                             utility can pass to the kernel. */
@@ -176,12 +177,27 @@ start_process (void *load_info)
   else
     sema_up (&info->s);
 
+  push_args_to_stack (&if_.esp, file_name, &save_ptr);
+
+  /* Start the user process by simulating a return from an
+     interrupt, implemented by intr_exit (in
+     threads/intr-stubs.S).  Because intr_exit takes all of its
+     arguments on the stack in the form of a `struct intr_frame',
+     we just point the stack pointer (%esp) to our stack frame
+     and jump to it. */
+  asm volatile ("movl %0, %%esp; jmp intr_exit" : : "g" (&if_) : "memory");
+  NOT_REACHED ();
+}
+
+void
+push_args_to_stack (void **esp, char *file_name, char **save_ptr)
+{
   /* Populate the stack with arguments */
   char *argv[MAX_ARG_NUM];
   char *token;
   argv[0] = file_name;
   int argc = 1, i;
-  while ((token = strtok_r (NULL," ", &save_ptr)))
+  while ((token = strtok_r (NULL," ", save_ptr)))
     {
       argv[argc] = token;
       argc++;
@@ -192,7 +208,7 @@ start_process (void *load_info)
   if (ptrs == NULL)
     {
       palloc_free_page (file_name);
-      cur->return_status = -1;
+      thread_current ()->return_status = -1;
       thread_exit ();
     }
 
@@ -200,49 +216,40 @@ start_process (void *load_info)
   for (i = argc - 1; i >= 0; i--)
     {
       size_t len = strlen (argv[i]) + 1;
-      if_.esp = (void *) ((char *) if_.esp - len);
-      strlcpy ((char *) if_.esp, argv[i], len);
-      ptrs[i] = (char *) if_.esp;
+      *esp = (void *) ((char *) *esp - len);
+      strlcpy ((char *) *esp, argv[i], len);
+      ptrs[i] = (char *) *esp;
     }
 
   /* Word align the stack pointer to a multiple of 4. */
-  if_.esp = (void *) ((unsigned int) if_.esp & 0xfffffffc);
+  *esp = (void *) ((unsigned int) *esp & 0xfffffffc);
 
   /* Push null pointer sentinel. */
-  if_.esp = (void *) ((char **) if_.esp - 1);
-  *((char **) if_.esp) = 0;
+  *esp = (void *) ((char **) *esp - 1);
+  *((char **) *esp) = 0;
 
   /* Push addresses of each argument in reverse order. */
   for (i = argc - 1; i >= 0; i--)
     {
-      if_.esp = (void *) ((char **) if_.esp - 1);
-      *((char **) if_.esp) = ptrs[i];
+      *esp = (void *) ((char **) *esp - 1);
+      *((char **) *esp) = ptrs[i];
     }
 
   /* Push argv. */
-  char **argv0_ptr = (char **) if_.esp;
-  if_.esp = (void *) ((char **) if_.esp - 1);
-  *((char ***) if_.esp) = argv0_ptr;
+  char **argv0_ptr = (char **) *esp;
+  *esp = (void *) ((char **) *esp - 1);
+  *((char ***) *esp) = argv0_ptr;
 
   /* Push argc. */
-  if_.esp = (void *) ((int *) if_.esp - 1);
-  *((int *) if_.esp) = argc;
+  *esp = (void *) ((int *) *esp - 1);
+  *((int *) *esp) = argc;
 
   /* Push return address. */
-  if_.esp = ((void **) if_.esp - 1);
-  *((void **) if_.esp) = 0;
+  *esp = ((void **) *esp - 1);
+  *((void **) *esp) = 0;
 
   palloc_free_page (file_name);
   free (ptrs);
-
-  /* Start the user process by simulating a return from an
-     interrupt, implemented by intr_exit (in
-     threads/intr-stubs.S).  Because intr_exit takes all of its
-     arguments on the stack in the form of a `struct intr_frame',
-     we just point the stack pointer (%esp) to our stack frame
-     and jump to it. */
-  asm volatile ("movl %0, %%esp; jmp intr_exit" : : "g" (&if_) : "memory");
-  NOT_REACHED ();
 }
 
 /* Waits for thread TID to die and returns its exit status.  If
