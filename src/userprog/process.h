@@ -3,7 +3,8 @@
 
 #include "threads/thread.h"
 
-#define STACK_SIZE_LIMIT 0x800000 /* 8MB. */
+/* 8 MB stack size Limit. */
+#define STACK_SIZE_LIMIT 0x800000
 
 tid_t process_execute (const char *file_name);
 int process_wait (tid_t);

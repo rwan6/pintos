@@ -229,10 +229,6 @@ lock_acquire (struct lock *lock)
 {
   ASSERT (lock != NULL);
   ASSERT (!intr_context ());
-  // if (lock_held_by_current_thread (lock)) {
-  //   printf("%x %x t=%x\n", lock, lock->holder, thread_current ());//
-  //   debug_backtrace();
-  // }
   ASSERT (!lock_held_by_current_thread (lock));
 
   if (!thread_mlfqs)

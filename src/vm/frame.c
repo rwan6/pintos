@@ -7,9 +7,11 @@
 #include "userprog/syscall.h"
 #include "userprog/pagedir.h"
 #include "threads/synch.h"
-#include "filesys/file.h"     /* For file operations. */
+#include "filesys/file.h"
 
-/* Initialize the frame table and all related structures. */
+/* Move the clock handle to the next frame entry.  If the clock
+   handle is already pointing to the last entry, reset it to the
+   front of the frame table. */
 static void
 move_clock_handle (void)
 {
@@ -19,24 +21,21 @@ move_clock_handle (void)
     clock_handle = list_next (clock_handle);
 }
 
+/* Initialize the frame table and all related structures. */
 void
 init_frame (void)
 {
   list_init (&all_frames);
   clock_handle = NULL;
   lock_init (&frame_table_lock);
-  // printf("frame table lock=%x\n", & frame_table_lock);
 }
 
 struct frame_entry *
 get_frame (enum palloc_flags flags)
 {
-  // printf("acquiring frame lock1\n");
   lock_acquire (&frame_table_lock);
-  // printf("acquireing frame lock2\n");
   void *frame = palloc_get_page (flags);
 
-  /* If all frames are full, we need to evict. */
   if (!frame)
     return evict_frame ();
 
@@ -48,11 +47,12 @@ get_frame (enum palloc_flags flags)
       PANIC ("Unable to allocate page table entry!");
     }
   list_push_back (&all_frames, &fe->frame_elem);
+  
   if (clock_handle == NULL)
     clock_handle = list_begin (&all_frames);
+  
   fe->addr = pg_round_down (frame);
   fe->t = thread_current ();
-    // printf("frame lock released 1\n");
   lock_release (&frame_table_lock);
   return fe;
 }
@@ -60,13 +60,9 @@ get_frame (enum palloc_flags flags)
 void
 free_frame (struct page_table_entry *pte)
 {
-  // printf("acquireing frame lock2\n");
   lock_acquire (&frame_table_lock);
-	palloc_free_page (pte->kpage);
-  if (clock_handle == &pte->phys_frame->frame_elem)
-    move_clock_handle ();
+	palloc_free_page (pte->kpage);  
   list_remove (&pte->phys_frame->frame_elem);
-  // printf("frame_lock=%x\n", pte->phys_frame, frame_table_lock);
   free (pte->phys_frame);
   lock_release (&frame_table_lock);
 }
@@ -78,30 +74,31 @@ evict_frame (void)
   struct frame_entry *fe = NULL;
   while (!found)
     {
-    // printf("before %x\n", clock_handle);
       fe = list_entry (clock_handle,
         struct frame_entry, frame_elem);
       bool pinned = fe->pte->pinned;
+      
+      /* Skip over if the frame is pinned. */
       if (pinned)
         {
           move_clock_handle ();
           continue;
         }
         
-// printf("before %x %x %x\n", fe->t, fe->pte->upage, fe->t->pagedir);
       bool accessed = pagedir_is_accessed (fe->t->pagedir,
         fe->pte->upage);
 
       if (accessed)
         {
           pagedir_set_accessed (fe->t->pagedir,
-            fe->pte->upage, false);/*printf("after 3\n");*/
+            fe->pte->upage, false);
         }
       else
         {
           found = true;
 
           bool dirty = pagedir_is_dirty (fe->t->pagedir, fe->pte->upage);
+          
           /* Update the pte for the evicted frame.  Account for zero
              pages that were dirtied as well. */
           if (fe->pte->page_status == PAGE_NONZEROS ||
@@ -109,11 +106,11 @@ evict_frame (void)
                            fe->pte->page_status == PAGE_CODE)))
             {
               struct swap_slot *ss = malloc (sizeof (struct swap_slot));
-      // printf("%x swapped out to swap partition\n", fe->addr);
-  // lock_acquire (&file_lock);
+              if (!ss)
+                PANIC ("Unable to allocate swap slot entry!");
+                
               swap_write (ss, fe);
-  // lock_release (&file_lock);
-      // printf("after accessed3\n");
+              
               lock_acquire (&fe->t->spt_lock);
               fe->pte->ss = ss;
               fe->pte->page_status = PAGE_SWAP;
@@ -127,23 +124,20 @@ evict_frame (void)
                              PGSIZE, (off_t) fe->pte->offset);
               lock_release (&file_lock);
             }
-// printf("HERE\n");
+
           /* Unlink this pte and deactivate the page table.  This will
              cause a page fault when the page is next accessed. */
-  // printf("evict_frame: evicted %x, now ps=%d\n", fe->pte->upage, fe->pte->page_status);
           pagedir_clear_page (fe->t->pagedir, fe->pte->upage);
           fe->pte->phys_frame = NULL;
           fe->pte = NULL;
           fe->t = thread_current ();
         }
+        
         /* Increment the clock_handle. */
-        // printf("HERE 1\n");
         move_clock_handle ();
-        // printf("HERE 2\n");
     }
-// printf("after 6\n");
+
     lock_release (&frame_table_lock);
-    // printf("frame lock released 1\n");
     return fe;
 }
 

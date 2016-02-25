@@ -97,12 +97,12 @@ thread_init (void)
 {
   ASSERT (intr_get_level () == INTR_OFF);
 
-  lock_init (&tid_lock);//printf("tid lock=%x\n", &tid_lock);
+  lock_init (&tid_lock);
   list_init (&ready_list);
   list_init (&all_list);
 
-  lock_init (&file_lock);//printf("file lock=%x\n", &file_lock);
-  lock_init (&exit_lock);//printf("exit lock=%x\n", &exit_lock);
+  lock_init (&file_lock);
+  lock_init (&exit_lock);
 
   if (thread_mlfqs)
     {
@@ -610,9 +610,9 @@ init_thread (struct thread *t, const char *name, int priority)
   list_init (&t->opened_fds);
   list_init (&t->mmapped_mapids);
   list_init (&t->children);
-  lock_init (&t->wait_lock);//printf("wait lock=%x\n", &t->wait_lock);
+  lock_init (&t->wait_lock);
   cond_init (&t->wait_cond);
-  lock_init (&t->spt_lock);//printf("spt lock=%x\n", &t->spt_lock);
+  lock_init (&t->spt_lock);
   old_level = intr_disable ();
   list_push_back (&all_list, &t->allelem);
   intr_set_level (old_level);

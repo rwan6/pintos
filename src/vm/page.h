@@ -3,13 +3,16 @@
 
 #include <hash.h>
 
-/* -------- Enumeration of Page Status -------- */
-/* 0 -- Zero-filled page (in Frame Table).      */
-/* 1 -- Non-zero-filled page (in Frame Table).  */
-/* 2 -- Code page.                              */
-/* 2 -- In swap slot.                           */
-/* 3 -- Memory Mapped (in disk).                */
-/* -------------------------------------------- */
+/* ------------ Page Status Enumeration ------------ */
+/* 0 -- Zero-filled clean page.                      */
+/* 1 -- Non-zero-filled clean page in frame table.   */
+/* 2 -- Clean Code/Data page.                        */
+/* 3 -- Dirty page that is either in the frame       */
+/*      table and needs to be written to the         */
+/*      swap partition or lives in the swap          */
+/*      partition.                                   */
+/* 4 -- Memory Mapped Page.                          */
+/* ------------------------------------------------- */
 enum page_status
   {
     PAGE_ZEROS,
@@ -19,6 +22,9 @@ enum page_status
     PAGE_MMAP
   };
 
+/* Entry into the supplemental page table.  Holds metadata about the
+   page table entry and its corresponding frame entry, swap slot (if
+   applicable), and/or mapped file (if applicable). */
 struct page_table_entry
   {
     struct hash_elem pt_elem;         /* Hash map page table element. */
@@ -29,9 +35,7 @@ struct page_table_entry
                                          entry. */
     struct frame_entry *phys_frame;   /* Pointer to the frame entry
                                          corresponding to this page. */
-    enum page_status page_status;     /* Gives the status of this frame
-                                         entry.  See above for
-                                         enumeration. */
+    enum page_status page_status;     /* Status of this frame entry. */
     bool pinned;                      /* Whether this page cannot be chosen
                                          for eviction */
     bool page_read_only;              /* Denotes whether page is

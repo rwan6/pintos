@@ -26,7 +26,7 @@
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
 int num_spaces (char *s);
-void push_args_to_stack (void **esp, char *token, char **save_ptr);
+static void push_args_to_stack (void **esp, char *token, char **save_ptr);
 #define MAX_ARG_NUM 128  /* Assume there are at most 128 arguments, the max
                             length of command-line arguments that the pintos
                             utility can pass to the kernel. */
@@ -203,8 +203,8 @@ num_spaces (char *s)
   return spaces;
 }
 
-/* Populate the stack with arguments */
-void
+/* Populate the stack with arguments. */
+static void
 push_args_to_stack (void **esp, char *file_name, char **save_ptr)
 {
   int total_args = num_spaces (file_name) + 1;
@@ -222,7 +222,7 @@ push_args_to_stack (void **esp, char *file_name, char **save_ptr)
   while ((token = strtok_r (NULL," ", save_ptr)))
     {
       length_args += strlen(token) + 1;
-      /* If there are too many arguments, exit out */
+      /* If there are too many arguments, exit out. */
       if (length_args > PGSIZE)
         {
           palloc_free_page (file_name);
@@ -234,7 +234,7 @@ push_args_to_stack (void **esp, char *file_name, char **save_ptr)
       argc++;
     }
 
-  /* Array for keeping track of the pointers of each pushed argument */
+  /* Array for keeping track of the pointers of each pushed argument. */
   char **ptrs = (char **) malloc (sizeof (char*) * argc);
   if (ptrs == NULL)
     {
@@ -673,6 +673,10 @@ validate_segment (const struct Elf32_Phdr *phdr, struct file *file)
    The pages initialized by this function must be writable by the
    user process if WRITABLE is true, read-only otherwise.
 
+   Sets up the segment pages into the frame table and user's
+   supplemental page table, denoting whether the pages are all
+   zeros or code/data.
+
    Return true if successful, false if a memory allocation error
    or disk read error occurs. */
 static bool
@@ -782,7 +786,7 @@ setup_stack (void **esp)
       pte->offset = 0;  /* Not a file, so this parameter does not matter. */
       pte->file = NULL; /* No associated file. */
       pte->page_read_only = false;
-      pte->pinned = true;
+      pte->pinned = true; /* Pin to frame table for process duration. */
       pte->page_status = PAGE_ZEROS;
       pte->num_zeros = PGSIZE;
       pte->ss = NULL;

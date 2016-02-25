@@ -7,7 +7,7 @@
 #include "threads/vaddr.h"
 #include "userprog/process.h"
 #include "userprog/pagedir.h"
-#include "filesys/file.h"     /* For file operations. */
+#include "filesys/file.h"
 
 /* hash_less_func for sorting the supplemental page table according
    to the page's virtual addresses. */
@@ -65,7 +65,6 @@ page_lookup (const void *address)
   lock_acquire (&cur->spt_lock);
   p.upage = pg_round_down ((void *) address);
   e = hash_find (&cur->supp_page_table, &p.pt_elem);
-  // printf ("PL: %x, HF: %x\n", p.upage, e);
   lock_release (&cur->spt_lock);
   return e != NULL ? hash_entry (e, struct page_table_entry, pt_elem)
     : NULL;
@@ -78,11 +77,11 @@ extend_stack (const void *address)
   struct page_table_entry *pte = page_lookup (address);
   if (pte != NULL)
     {
-      /* if page_lookup returns something, fetch data... (normal case)
-         Set regular page table, and return */
+      /* if page_lookup returns a valid entry, fetch the data and set up
+         the frame entry. */
       page_fetch_and_set (pte);
     }
-  else /* If doesn't exist, then create a new frame and pte, and return */
+  else /* If the page exist, create a new frame and page table entry. */
     {
       page_create_from_vaddr (address, true);
     }
@@ -149,9 +148,10 @@ void
 page_fetch_and_set (struct page_table_entry *pte)
 {
   enum page_status status = pte->page_status;
+  
   /* Should not be attempting to fetch a page that already lives in the
      frame table. */
-  ASSERT (pte->page_status != PAGE_NONZEROS);
+  ASSERT (status != PAGE_NONZEROS);
 
   struct thread *cur = thread_current ();
   bool success = false;
@@ -180,25 +180,22 @@ page_fetch_and_set (struct page_table_entry *pte)
   else if (status == PAGE_SWAP)
     {
       struct frame_entry *fe = get_frame (PAL_USER);
-      // printf("fetching swap data to %x\n", fe->addr);
       lock_acquire (&cur->spt_lock);
       pte->kpage = fe->addr;
       pte->phys_frame = fe;
       fe->pte = pte;
       pte->page_status = PAGE_NONZEROS;
       lock_release (&cur->spt_lock);
-      // printf("fetching swap data1\n");
+
       swap_read (pte->ss, fe);
-// printf("fetching swap data2\n");
+
       free(pte->ss);
       pte->ss = NULL;
-      // printf("setting pagedir upage=%x kpage=%x\n", pte->upage, pte->kpage);
       success = pagedir_set_page (cur->pagedir, pte->upage,
             pte->kpage, !pte->page_read_only);
     }
   else if (status == PAGE_MMAP || status == PAGE_CODE)
     {
-    //printf("fetching mmap data\n");
       struct frame_entry *fe = get_frame (PAL_USER);
       lock_acquire (&cur->spt_lock);
       pte->kpage = fe->addr;
@@ -207,7 +204,6 @@ page_fetch_and_set (struct page_table_entry *pte)
       lock_release (&cur->spt_lock);
 
       lock_acquire (&file_lock);
-      //printf("after2\n");
       int rbytes = file_read_at (pte->file, pte->kpage,
         (PGSIZE - pte->num_zeros), (off_t) pte->offset);
       lock_release (&file_lock);
@@ -216,11 +212,9 @@ page_fetch_and_set (struct page_table_entry *pte)
       else
         {
           /* Set the rest of the page to be zeros. */
-      // printf("before\n");
           memset (pte->kpage + (PGSIZE - pte->num_zeros), 0, pte->num_zeros);
           success = pagedir_set_page (cur->pagedir, pte->upage,
                 pte->kpage, !pte->page_read_only);
-      // printf("after\n");
         }
     }
   if (!success)

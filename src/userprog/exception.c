@@ -150,7 +150,7 @@ page_fault (struct intr_frame *f)
   not_present = (f->error_code & PF_P) == 0;
   write = (f->error_code & PF_W) != 0;
   user = (f->error_code & PF_U) != 0;
-// printf("entering pf FA=%x\n",fault_addr);
+
   /* Verify the access is legal. If not, exit. */
   if (!not_present || fault_addr == NULL ||
       (user && is_kernel_vaddr (fault_addr)))
@@ -181,7 +181,7 @@ page_fault (struct intr_frame *f)
     }
   else if (fault_addr >= stack_pointer - 32)
     {
-      /* Grow stack */
+      /* Grow stack. */
       extend_stack (fault_addr);
       return;
     }
@@ -209,9 +209,6 @@ page_fault (struct intr_frame *f)
     }
 
   /* Fetch the page. */
-    // printf("entering fetch and set\n");
   page_fetch_and_set (pte);
-    // printf("finished fetch and set\n");
-  // printf("exiting pf\n");
 }
 

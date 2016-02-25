@@ -8,12 +8,15 @@
 #include "threads/thread.h"
 #include "threads/vaddr.h"
 
+/* Entry into the frame table.  Holds metadata related to the frame
+   table entry's address, the corresponding virtual page, and the
+   thread that owns the frame. */
 struct frame_entry
   {
     struct list_elem frame_elem;      /* List element for frame page. */
     void *addr;                       /* Frame's address. */
     struct page_table_entry *pte;     /* Pointer to page table entry. */
-    struct thread *t;                 /* Pointer to thread. */
+    struct thread *t;                 /* Pointer to the owner thread. */
   };
 
 /* Prototypes for frame.c functions. */
@@ -31,6 +34,5 @@ struct list_elem *clock_handle;
 
 /* Global lock for frame table. */
 struct lock frame_table_lock;
-int cnt;
 
 #endif /* vm/frame.h */
