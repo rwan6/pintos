@@ -9,6 +9,10 @@
 #include "userprog/pagedir.h"
 #include "filesys/file.h"
 
+bool create_zero_page (struct page_table_entry *, struct thread *);
+bool fetch_from_swap (struct page_table_entry *, struct thread *);
+bool fetch_from_file (struct page_table_entry *, struct thread *);
+
 /* hash_less_func for sorting the supplemental page table according
    to the page's virtual addresses. */
 static bool
@@ -77,7 +81,7 @@ void
 extend_stack (const void *address)
 {
   struct page_table_entry *pte = page_lookup (address);
-  
+
   /* If page_lookup returns a valid entry, fetch the data and set up
      the frame entry.  If the page does not exists, create a new frame
      and page table entry. */
@@ -99,7 +103,7 @@ page_create_from_vaddr (const void *address, bool pinned)
   struct thread *cur = thread_current ();
   struct frame_entry *fe = get_frame (PAL_USER);
   fe->pte = pte;
-  
+
   pte->kpage = pg_round_down (fe->addr);
   pte->upage = pg_round_down ((void *) address);
   pte->phys_frame = fe;
@@ -117,7 +121,7 @@ page_create_from_vaddr (const void *address, bool pinned)
 
   bool success = pagedir_set_page (cur->pagedir, pte->upage,
     pte->kpage, !pte->page_read_only);
-    
+
   if (!success)
     {
       cur->return_status = -1;
@@ -137,7 +141,7 @@ page_create_mmap (const void *address, struct file *file,
     PANIC ("Unable to allocate page table entry!");
 
   struct thread *cur = thread_current ();
-  
+
   pte->kpage = NULL;  /* Doesn't exist in the frame table. */
   pte->upage = pg_round_down ((void *) address);
   pte->phys_frame = NULL;
@@ -146,10 +150,12 @@ page_create_mmap (const void *address, struct file *file,
   pte->offset = offset;
   pte->file = file;
   pte->page_read_only = false;
+  /* Needs to be pinned when brought into the frame table for read/write */
+  pte->pinned = true;
   lock_acquire (&cur->spt_lock);
   hash_insert (&cur->supp_page_table, &pte->pt_elem);
   lock_release (&cur->spt_lock);
-  
+
   return pte;
 }
 
@@ -157,7 +163,7 @@ void
 page_fetch_and_set (struct page_table_entry *pte)
 {
   enum page_status status = pte->page_status;
-  
+
   /* Should not be attempting to fetch a page that already lives in the
      frame table. */
   ASSERT (status != PAGE_NONZEROS);
@@ -167,65 +173,16 @@ page_fetch_and_set (struct page_table_entry *pte)
   if (status == PAGE_ZEROS)
     {
       if (pte->phys_frame != NULL)
-        {
-          success = pagedir_set_page (cur->pagedir, pte->upage,
-            pte->kpage, !pte->page_read_only);
-        }
+        success = pagedir_set_page (cur->pagedir, pte->upage,
+          pte->kpage, !pte->page_read_only);
       else
-        {
-          struct frame_entry *fe = get_frame (PAL_USER);
-          lock_acquire (&cur->spt_lock);
-          pte->kpage = fe->addr;
-          pte->phys_frame = fe;
-          fe->pte = pte;
-          memset (fe->addr, 0, PGSIZE);
-          hash_insert (&cur->supp_page_table, &pte->pt_elem);
-          lock_release (&cur->spt_lock);
-
-          success = pagedir_set_page (cur->pagedir, pte->upage,
-            pte->kpage, !pte->page_read_only);
-        }
+        success = create_zero_page (pte, cur);
     }
   else if (status == PAGE_SWAP)
-    {
-      struct frame_entry *fe = get_frame (PAL_USER);
-      lock_acquire (&cur->spt_lock);
-      pte->kpage = fe->addr;
-      pte->phys_frame = fe;
-      fe->pte = pte;
-      pte->page_status = PAGE_NONZEROS;
-
-      swap_read (pte->ss, fe);
-
-      free(pte->ss);
-      pte->ss = NULL;
-      lock_release (&cur->spt_lock);
-      success = pagedir_set_page (cur->pagedir, pte->upage,
-            pte->kpage, !pte->page_read_only);
-    }
+    success = fetch_from_swap (pte, cur);
   else if (status == PAGE_MMAP || status == PAGE_CODE)
-    {
-      struct frame_entry *fe = get_frame (PAL_USER);
-      lock_acquire (&cur->spt_lock);
-      pte->kpage = fe->addr;
-      pte->phys_frame = fe;
-      fe->pte = pte;
-      lock_release (&cur->spt_lock);
+    success = fetch_from_file (pte, cur);
 
-      lock_acquire (&file_lock);
-      int rbytes = file_read_at (pte->file, pte->kpage,
-        (PGSIZE - pte->num_zeros), (off_t) pte->offset);
-      lock_release (&file_lock);
-      if (rbytes != PGSIZE - pte->num_zeros)
-        success = false;
-      else
-        {
-          /* Set the rest of the page to be zeros. */
-          memset (pte->kpage + (PGSIZE - pte->num_zeros), 0, pte->num_zeros);
-          success = pagedir_set_page (cur->pagedir, pte->upage,
-                pte->kpage, !pte->page_read_only);
-        }
-    }    
   if (!success)
     {
       thread_current ()->return_status = -1;
@@ -262,4 +219,71 @@ page_deallocate (struct hash_elem *e, void *aux UNUSED)
     }
   if (pte != NULL)
     free (pte);
+}
+
+/* Create a all-zeroed page and link to the frame table. */
+bool
+create_zero_page (struct page_table_entry *pte, struct thread *cur)
+{
+  struct frame_entry *fe = get_frame (PAL_USER);
+  lock_acquire (&cur->spt_lock);
+  pte->kpage = fe->addr;
+  pte->phys_frame = fe;
+  fe->pte = pte;
+  memset (fe->addr, 0, PGSIZE);
+  hash_insert (&cur->supp_page_table, &pte->pt_elem);
+  lock_release (&cur->spt_lock);
+
+  bool success = pagedir_set_page (cur->pagedir, pte->upage,
+    pte->kpage, !pte->page_read_only);
+  return success;
+}
+
+/* Fetch data from the swap partition and link to the frame table. */
+bool
+fetch_from_swap (struct page_table_entry *pte, struct thread *cur)
+{
+  struct frame_entry *fe = get_frame (PAL_USER);
+  lock_acquire (&cur->spt_lock);
+  pte->kpage = fe->addr;
+  pte->phys_frame = fe;
+  fe->pte = pte;
+  pte->page_status = PAGE_NONZEROS;
+
+  swap_read (pte->ss, fe);
+
+  free(pte->ss);
+  pte->ss = NULL;
+  lock_release (&cur->spt_lock);
+  bool success = pagedir_set_page (cur->pagedir, pte->upage,
+        pte->kpage, !pte->page_read_only);
+  return success;
+}
+
+/* Fetch data from the file and link to the frame table. */
+bool
+fetch_from_file (struct page_table_entry *pte, struct thread *cur)
+{
+  bool success = false;
+  struct frame_entry *fe = get_frame (PAL_USER);
+  lock_acquire (&cur->spt_lock);
+  pte->kpage = fe->addr;
+  pte->phys_frame = fe;
+  fe->pte = pte;
+  lock_release (&cur->spt_lock);
+
+  lock_acquire (&file_lock);
+  int rbytes = file_read_at (pte->file, pte->kpage,
+    (PGSIZE - pte->num_zeros), (off_t) pte->offset);
+  lock_release (&file_lock);
+  if (rbytes != PGSIZE - pte->num_zeros)
+    success = false;
+  else
+    {
+      /* Set the rest of the page to be zeros. */
+      memset (pte->kpage + (PGSIZE - pte->num_zeros), 0, pte->num_zeros);
+      success = pagedir_set_page (cur->pagedir, pte->upage,
+            pte->kpage, !pte->page_read_only);
+    }
+  return success;
 }

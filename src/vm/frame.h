@@ -23,7 +23,6 @@ struct frame_entry
 void init_frame (void);
 struct frame_entry *get_frame (enum palloc_flags);
 void free_frame (struct page_table_entry *);
-struct frame_entry *evict_frame (void);
 
 /* List of all frames currently in use.
    Owned by frame.c, userprog/syscall.c, and userprog/process.c. */

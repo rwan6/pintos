@@ -172,10 +172,9 @@ page_fault (struct intr_frame *f)
 
   /* Handle stack growth. */
   void *stack_pointer = user ? f->esp : thread_current ()->esp;
-
-  /* Impose an absolute limit on stack size. */
   if (stack_pointer < PHYS_BASE - STACK_SIZE_LIMIT)
     {
+      /* Impose an absolute limit on stack size. */
       thread_current ()->return_status = -1;
       thread_exit ();
     }
