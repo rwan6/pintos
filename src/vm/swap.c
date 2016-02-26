@@ -5,7 +5,7 @@
 
 #define BLOCKS_IN_PAGE 8  /* Number of block in one page 4K/512. */
 
-/* Initialize the swap partition, corresponding bitmap and lock. */
+/* Initialize the swap partition, corresponding bitmap, and lock. */
 void
 init_swap_partition (void)
 {
@@ -15,8 +15,8 @@ init_swap_partition (void)
   lock_init (&swap_lock);
 }
 
-/* Swap in a frame. Read blocks from the swap partition and copy to the
-   physical memory, given the address in the frame entry. */
+/* Swap in a frame.  Read blocks from the swap partition and copy to the
+   physical memory given the address in the frame entry. */
 void
 swap_read (struct swap_slot* ss, struct frame_entry *fe)
 {
@@ -28,8 +28,8 @@ swap_read (struct swap_slot* ss, struct frame_entry *fe)
   swap_free (ss);
 }
 
-/* Swap out a frame. Copy physical memory and write to blocks in the
-   swap partition, given the address in the frame entry. */
+/* Swap out a frame.  Copy physical memory and write to blocks in the
+   swap partition given the address in the frame entry. */
 void
 swap_write (struct swap_slot* ss, struct frame_entry *fe)
 {
@@ -40,12 +40,12 @@ swap_write (struct swap_slot* ss, struct frame_entry *fe)
       fe->addr + i * BLOCK_SECTOR_SIZE);
 }
 
-/* Allocate a swap slot in the swap partition. Set the corresponding
+/* Allocate a swap slot in the swap partition.  Set the corresponding
    bits in the bitmap and record the sector number for bookkeeping. */
 void
 swap_allocate (struct swap_slot *ss)
 {
-  /* Panic the kernel, if we need to swap but the swap is full. */
+  /* Panic the kernel if we need to swap but the swap is full. */
   ASSERT (!bitmap_all (swap_bitmap, 0, block_size (swap_partition)));
   lock_acquire (&swap_lock);
   ss->sector = bitmap_scan_and_flip (swap_bitmap, 0, BLOCKS_IN_PAGE, false);
@@ -53,8 +53,8 @@ swap_allocate (struct swap_slot *ss)
 }
 
 
-/* Deallocate a swap slot in the swap partition. Reset the corresponding
-   bits in the bitmap to mark it's free. */
+/* Deallocate a swap slot in the swap partition.  Reset the corresponding
+   bits in the bitmap to mark it as free. */
 void
 swap_free (struct swap_slot *ss)
 {
