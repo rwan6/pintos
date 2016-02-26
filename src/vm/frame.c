@@ -104,6 +104,7 @@ evict_frame (void)
         {
           found = true;
           lock_acquire (&fe->t->spt_lock);
+          pagedir_clear_page (fe->t->pagedir, fe->pte->upage);
           bool dirty = pagedir_is_dirty (fe->t->pagedir, fe->pte->upage);
           enum page_status status = fe->pte->page_status;
 
@@ -167,7 +168,6 @@ unlink_page_table_entry (struct frame_entry *fe)
 {
   /* Unlink this pte and deactivate the page table.  This will cause a
      page fault when the page is next accessed. */
-  pagedir_clear_page (fe->t->pagedir, fe->pte->upage);
   fe->pte->phys_frame = NULL;
   fe->pte = NULL;
 }

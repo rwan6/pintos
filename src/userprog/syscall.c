@@ -339,7 +339,7 @@ read (int fd, void *buffer, unsigned size)
       prefetch_user_memory (buffer, size);
       lock_acquire (&file_lock);
       struct sys_fd *fd_instance = get_fd_item (fd);
-      
+
       /* If the pointer returned to fd_instance is NULL, the fd was not
          found in the file list.  Thus, we should exit immediately. */
       if (fd_instance == NULL)
@@ -347,7 +347,7 @@ read (int fd, void *buffer, unsigned size)
           lock_release (&file_lock);
           exit (-1);
         }
-        
+
       num_read = file_read (fd_instance->file, buffer, size);
       unpin_user_memory (buffer, size);
       lock_release (&file_lock);
@@ -486,13 +486,6 @@ check_pointer (const void *pointer, unsigned size)
   else if (pointer + (size-1) == NULL ||
     is_kernel_vaddr (pointer + (size-1)))
     return false;
-
-  unsigned i;
-  for (i = 1; i < (size - 1); i++)
-    {
-      if (pointer + i == NULL || is_kernel_vaddr (pointer + i))
-        return false;
-    }
   return true;
 }
 
@@ -597,7 +590,7 @@ mmap (int fd, void *addr)
       num_zeros = PGSIZE - (size % PGSIZE);
       num_pages++;
     }
-    
+
   int i;
   void *addr_copy = addr;
   for (i = 0; i < num_pages; i++)
@@ -605,7 +598,7 @@ mmap (int fd, void *addr)
       /* Address should not be in page table already. */
       if (page_lookup (addr_copy) != NULL)
         return MAP_FAILED;
-      
+
       addr_copy += PGSIZE;
     }
 
@@ -652,7 +645,7 @@ munmap (mapid_t m)
   struct list_elem *next_pte;
   struct sys_mmap *mmap_instance;
   struct page_table_entry *pte_instance;
-  
+
   /* Iterate over all of the current thread's memory mapped file IDs
      to find the matching mapid_t m. */
   for (e_mmap = list_begin (&cur->mmapped_mapids);
@@ -665,7 +658,7 @@ munmap (mapid_t m)
           mmap_instance->owner_tid == thread_current ()->tid)
         {
           /* Once located, iterate over the correspond mapped instance's
-             list of pages corresponding to it to properly unmap 
+             list of pages corresponding to it to properly unmap
              and deallocate it. */
           for (e_pte = list_begin (&mmap_instance->file_mmap_list);
                e_pte != list_end (&mmap_instance->file_mmap_list);)
@@ -726,7 +719,7 @@ prefetch_user_memory (void *pointer, size_t size)
     {
       void *fa = pointer + i * PGSIZE;
       struct page_table_entry *pte = page_lookup (fa);
-      
+
       if (pte == NULL)
         {
           /* Perform the same stack growth checks as the page fault
