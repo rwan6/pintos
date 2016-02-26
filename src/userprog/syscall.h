@@ -46,16 +46,16 @@ struct sys_fd
 /* Struct to map a mapid to its base address, fd, and page table entries. */
 struct sys_mmap
   {
-    mapid_t mapid;                        /* The map id for this mapping */
-    int fd;                               /* The fd value created by mmap */
-    tid_t owner_tid;                      /* The tid of the owner */
+    mapid_t mapid;                        /* The map id for this mapping. */
+    int fd;                               /* The fd value created by mmap. */
+    tid_t owner_tid;                      /* The tid of the owner, */
     void *start_addr;                     /* The base address that the file
-                                             maps to */
-    int size;                             /* The size of the file */
-    struct list_elem thread_mmapped_elem; /* List element for the thread’s
-                                             personal list of mmapped files */
+                                             maps to. */
+    int size;                             /* The size of the file. */
+    struct list_elem thread_mmapped_elem; /* List element for the thread's
+                                             personal list of mmapped files. */
     struct list file_mmap_list;           /* List of page table entries
-                                             belonging to this file */
+                                             belonging to this file. */
   };
 
 struct list opened_files;       /* Global list of opened files. */

@@ -147,8 +147,8 @@ evict_to_swap (struct frame_entry *fe)
 void
 evict_to_file (struct frame_entry *fe)
 {
-  /* Release the frame table lock while writing
-     to the file and reacquire after complete. */
+  /* Release the frame table lock while writing to the file and reacquire
+     after complete. */
   lock_release (&frame_table_lock);
   lock_acquire (&file_lock);
   file_write_at (fe->pte->file, fe->addr,
@@ -161,8 +161,8 @@ evict_to_file (struct frame_entry *fe)
 void
 unlink_page_table_entry (struct frame_entry *fe)
 {
-  /* Unlink this pte and deactivate the page table.  This will
-     cause a page fault when the page is next accessed. */
+  /* Unlink this pte and deactivate the page table.  This will cause a
+     page fault when the page is next accessed. */
   pagedir_clear_page (fe->t->pagedir, fe->pte->upage);
   fe->pte->phys_frame = NULL;
   fe->pte = NULL;
