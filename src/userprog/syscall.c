@@ -473,14 +473,10 @@ close (int fd)
 
 /* Function to check all pointers that are passed to system calls.
    Returns false if the pointer is found to be invalid, and true
-   if the pointer is valid.  Note that all pointers are checked
-   in the event that a buffer is passed. */
+   if the pointer is valid.  Bound cases are checked. */
 static bool
 check_pointer (const void *pointer, unsigned size)
 {
-  /* First validate end-cases.  If these do not fail, check
-     everything.  Limits the number of checks that need to
-     be made. */
   if (pointer == NULL || is_kernel_vaddr (pointer))
     return false;
   else if (pointer + (size-1) == NULL ||
