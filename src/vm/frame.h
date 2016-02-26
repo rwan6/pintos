@@ -24,14 +24,9 @@ void init_frame (void);
 struct frame_entry *get_frame (enum palloc_flags);
 void free_frame (struct page_table_entry *);
 
-/* List of all frames currently in use.
-   Owned by frame.c, userprog/syscall.c, and userprog/process.c. */
-struct list all_frames;
-
-/* The clock handle for clock algorithm. Points to frame entry. */
-struct list_elem *clock_handle;
-
-/* Global lock for frame table. */
-struct lock frame_table_lock;
+struct list all_frames;         /* List of all frames currently in use. */
+struct list_elem *clock_handle; /* The clock handle for clock algorithm.
+                                   Points to frame entry. */
+struct lock frame_table_lock;   /* Global lock for frame table. */
 
 #endif /* vm/frame.h */
