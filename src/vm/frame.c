@@ -10,9 +10,9 @@
 #include "filesys/file.h"
 
 struct frame_entry *evict_frame (void);
-void evict_to_swap (struct frame_entry *);
-void evict_to_file (struct frame_entry *);
-void unlink_page_table_entry (struct frame_entry *);
+static void evict_to_swap (struct frame_entry *);
+static void evict_to_file (struct frame_entry *, bool);
+static void unlink_page_table_entry (struct frame_entry *);
 
 /* Move the clock handle to the next frame entry.  If the clock
    handle is already pointing to the last entry, reset it to the
@@ -112,8 +112,8 @@ evict_frame (void)
           if (fe->pte->page_status == PAGE_NONZEROS ||
                 (dirty && (status == PAGE_ZEROS || status == PAGE_CODE)))
               evict_to_swap (fe);
-          else if (status == PAGE_MMAP && dirty)
-              evict_to_file (fe);
+          else if (status == PAGE_MMAP)
+              evict_to_file (fe, dirty);
 
           unlink_page_table_entry (fe);
           lock_release (&fe->t->spt_lock);
@@ -129,7 +129,7 @@ evict_frame (void)
 }
 
 /* Evict a frame to the swap partition. */
-void
+static void
 evict_to_swap (struct frame_entry *fe)
 {
   struct swap_slot *ss = malloc (sizeof (struct swap_slot));
@@ -143,22 +143,26 @@ evict_to_swap (struct frame_entry *fe)
   fe->pte->kpage = NULL;
 }
 
-/* Evict a frame to the file system. */
-void
-evict_to_file (struct frame_entry *fe)
+/* Evict a frame to the file system.  First, we lock down the
+   file system and proceed to check whether we need to write
+   to the disk.  This prevents a process from evicting a file
+   that is currently being read in via page_fetch_and_set. */
+static void
+evict_to_file (struct frame_entry *fe, bool dirty)
 {
   /* Release the frame table lock while writing to the file and reacquire
      after complete. */
   lock_release (&frame_table_lock);
   lock_acquire (&file_lock);
-  file_write_at (fe->pte->file, fe->addr,
-                 PGSIZE, (off_t) fe->pte->offset);
+  if (dirty)
+    file_write_at (fe->pte->file, fe->addr,
+                   PGSIZE, (off_t) fe->pte->offset);
   lock_release (&file_lock);
   lock_acquire (&frame_table_lock);
 }
 
-/* Unlink a frame entry's supplemental page table entry . */
-void
+/* Unlink a frame entry's supplemental page table entry. */
+static void
 unlink_page_table_entry (struct frame_entry *fe)
 {
   /* Unlink this pte and deactivate the page table.  This will cause a

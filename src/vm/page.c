@@ -270,9 +270,10 @@ fetch_from_file (struct page_table_entry *pte, struct thread *cur)
   pte->kpage = fe->addr;
   pte->phys_frame = fe;
   fe->pte = pte;
-  lock_release (&cur->spt_lock);
 
   lock_acquire (&file_lock);
+  lock_release (&cur->spt_lock);
+  
   int rbytes = file_read_at (pte->file, pte->kpage,
     (PGSIZE - pte->num_zeros), (off_t) pte->offset);
   lock_release (&file_lock);
