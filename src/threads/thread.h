@@ -145,7 +145,8 @@ struct thread
     struct lock spt_lock;               /* Supplemental page table lock. */
       
     /* Owned by userprog/syscall.c. */
-    struct list mmapped_mapids;         /* List of all memory mapped files. */
+    struct list mmapped_mapids;         /* List of all memory-mapped
+                                           files. */
     
     /* Owned by userprog/syscall.c and userprog/exception.c. */
     void *esp;                          /* Stack pointer. */
