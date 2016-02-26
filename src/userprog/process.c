@@ -321,7 +321,6 @@ process_wait (tid_t child_tid)
               cond_wait (&t->wait_cond, &t->wait_lock);
               lock_release (&t->wait_lock);
             }
-            // printf("pwait returning...\n");
           return cp->status;
         }
     }

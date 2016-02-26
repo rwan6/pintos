@@ -325,7 +325,7 @@ filesize (int fd)
    File system gets locked down with a coarse-grain lock. */
 static int
 read (int fd, void *buffer, unsigned size)
-{//printf("read %x\n", thread_current ());
+{
   int num_read;
   /* If SDIN_FILENO. */
   if (fd == 0)
@@ -337,11 +337,9 @@ read (int fd, void *buffer, unsigned size)
   else
     {
       prefetch_user_memory (buffer, size);
-      // printf("got here? 0 %x\n", &file_lock);
       lock_acquire (&file_lock);
-      // printf("got here? 1 %x\n", &file_lock);
       struct sys_fd *fd_instance = get_fd_item (fd);
-      // printf("got here? 2\n");
+      
       /* If the pointer returned to fd_instance is NULL, the fd was not
          found in the file list.  Thus, we should exit immediately. */
       if (fd_instance == NULL)
@@ -349,9 +347,7 @@ read (int fd, void *buffer, unsigned size)
           lock_release (&file_lock);
           exit (-1);
         }
-
-
-      // printf ("About to read\n");
+        
       num_read = file_read (fd_instance->file, buffer, size);
       unpin_user_memory (buffer, size);
       lock_release (&file_lock);
@@ -601,6 +597,17 @@ mmap (int fd, void *addr)
       num_zeros = PGSIZE - (size % PGSIZE);
       num_pages++;
     }
+    
+  int i;
+  void *addr_copy = addr;
+  for (i = 0; i < num_pages; i++)
+    {
+      /* Address should not be in page table already. */
+      if (page_lookup (addr_copy) != NULL)
+        return MAP_FAILED;
+      
+      addr_copy += PGSIZE;
+    }
 
   /* Allocate sys_mmap for bookkeeping. */
   struct sys_mmap *m = malloc (sizeof (struct sys_mmap));
@@ -619,13 +626,8 @@ mmap (int fd, void *addr)
   list_push_back (&t->mmapped_mapids, &m->thread_mmapped_elem);
 
   struct page_table_entry *pte_mmap = NULL;
-  int i;
   for (i = 0; i < num_pages; i++)
     {
-      /* Address should not be in page table already. */
-      if (page_lookup(addr) != NULL)
-        return MAP_FAILED;
-
       /* Allocate page and complete last page with zeros. */
       if (i == (num_pages - 1))
         pte_mmap = page_create_mmap(addr, new_file, i*PGSIZE, num_zeros);
