@@ -138,12 +138,16 @@ struct thread
     struct file *executable;            /* Executable file. */
 #endif
 
-    /* Owned by userprog/process.c and vm/page.c */
+    /* Owned by vm/page.c, vm/swap.c, and vm/frame.c. */
     struct hash supp_page_table;        /* Supplemental page table map.
                                            Used to hold pages mapping to
                                            physical frames. */
-    struct list mmapped_mapids;         /* List of all memory mapped files. */
     struct lock spt_lock;               /* Supplemental page table lock. */
+      
+    /* Owned by userprog/syscall.c. */
+    struct list mmapped_mapids;         /* List of all memory mapped files. */
+    
+    /* Owned by userprog/syscall.c and userprog/exception.c. */
     void *esp;                          /* Stack pointer. */
   };
 

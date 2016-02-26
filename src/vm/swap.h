@@ -7,10 +7,11 @@
    and the beginning of the sector at which the page will live in the
    swap slot. */
 struct swap_slot
-{
-  struct page_table_entry *pte;
-  block_sector_t sector;
-};
+  {
+    struct page_table_entry *pte; /* Pointer to the page living in the
+                                     swap slot. */
+    block_sector_t sector;        /* Beginning of swap slot sector. */
+  };
 
 struct block *swap_partition;   /* Memory block for the swap partition. */
 struct bitmap *swap_bitmap;     /* Swap slot bitmap to track free memory. */
