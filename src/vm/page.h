@@ -7,10 +7,7 @@
 /* 0 -- Zero-filled clean page.                      */
 /* 1 -- Non-zero-filled clean page in frame table.   */
 /* 2 -- Clean Code/Data page.                        */
-/* 3 -- Dirty page that is either in the frame       */
-/*      table and needs to be written to the         */
-/*      swap partition or lives in the swap          */
-/*      partition.                                   */
+/* 3 -- Dirty page that lives in the swap partition. */
 /* 4 -- Memory Mapped Page.                          */
 /* ------------------------------------------------- */
 enum page_status
@@ -37,7 +34,7 @@ struct page_table_entry
                                          corresponding to this page. */
     enum page_status page_status;     /* Status of this frame entry. */
     bool pinned;                      /* Whether this page cannot be chosen
-                                         for eviction */
+                                         for eviction. */
     bool page_read_only;              /* Denotes whether page is
                                          read-only. */
     struct swap_slot *ss;             /* Swap slot for this page. */
