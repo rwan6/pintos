@@ -552,8 +552,8 @@ munmap_all (struct thread *t)
     }
 }
 
-/* Maps the file pointed to by fd to the address pointed to by addr. Returns
-   the mapid of the mapping. Creates a new file descriptor for the memory
+/* Maps the file pointed to by fd to the address pointed to by addr.  Returns
+   the mapid of the mapping.  Creates a new file descriptor for the memory
    mapping. Returns -1 if mmap fails */
 static mapid_t
 mmap (int fd, void *addr)
@@ -581,9 +581,9 @@ mmap (int fd, void *addr)
   if (pg_ofs (addr) != 0 || addr == 0)
     return MAP_FAILED;
 
-  /* The number of pages is the ceiling of (size / PGSIZE). If the file size
+  /* The number of pages is the ceiling of (size / PGSIZE).  If the file size
      does not evenly divide into PGSIZE, the number of useful bytes in the
-     last page is size % PGSIZE. The rest of the page is zero bytes. */
+     last page is size % PGSIZE.  The rest of the page is zero bytes. */
   int num_pages = size / PGSIZE;
   int num_zeros = 0;
   if (size % PGSIZE != 0)
@@ -592,7 +592,7 @@ mmap (int fd, void *addr)
       num_pages++;
     }
 
-  /* None of the pages should already exist in the page table */
+  /* None of the pages should already exist in the page table. */
   int i;
   void *addr_copy = addr;
   for (i = 0; i < num_pages; i++)
@@ -634,7 +634,7 @@ mmap (int fd, void *addr)
   return m->mapid;
 }
 
-/* Unmaps the file and pages corresponding to the mapid */
+/* Unmaps the file and pages corresponding to the mapid. */
 static void
 munmap (mapid_t m)
 {
