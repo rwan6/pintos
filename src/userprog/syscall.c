@@ -552,7 +552,10 @@ munmap_all (struct thread *t)
     }
 }
 
-mapid_t
+/* Maps the file pointed to by fd to the address pointed to by addr. Returns
+   the mapid of the mapping. Creates a new file descriptor for the memory
+   mapping. Returns -1 if mmap fails */
+static mapid_t
 mmap (int fd, void *addr)
 {
   /* STDIN and STDOUT are not mappable. */
@@ -578,7 +581,9 @@ mmap (int fd, void *addr)
   if (pg_ofs (addr) != 0 || addr == 0)
     return MAP_FAILED;
 
-  /* Take the ceiling of (size / PGSIZE) pages. */
+  /* The number of pages is the ceiling of (size / PGSIZE). If the file size
+     does not evenly divide into PGSIZE, the number of useful bytes in the
+     last page is size % PGSIZE. The rest of the page is zero bytes. */
   int num_pages = size / PGSIZE;
   int num_zeros = 0;
   if (size % PGSIZE != 0)
@@ -587,11 +592,11 @@ mmap (int fd, void *addr)
       num_pages++;
     }
 
+  /* None of the pages should already exist in the page table */
   int i;
   void *addr_copy = addr;
   for (i = 0; i < num_pages; i++)
     {
-      /* Address should not be in page table already. */
       if (page_lookup (addr_copy) != NULL)
         return MAP_FAILED;
 
@@ -614,24 +619,23 @@ mmap (int fd, void *addr)
   struct thread *t = thread_current ();
   list_push_back (&t->mmapped_mapids, &m->thread_mmapped_elem);
 
-  struct page_table_entry *pte_mmap = NULL;
+  struct page_table_entry *pte_mmap;
   for (i = 0; i < num_pages; i++)
     {
       /* Allocate page and complete last page with zeros. */
       if (i == (num_pages - 1))
-        pte_mmap = page_create_mmap(addr, new_file, i*PGSIZE, num_zeros);
+        pte_mmap = page_create_mmap (addr, new_file, i * PGSIZE, num_zeros);
       else
-        pte_mmap = page_create_mmap(addr, new_file, i*PGSIZE, 0);
+        pte_mmap = page_create_mmap (addr, new_file, i * PGSIZE, 0);
 
       list_push_back (&m->file_mmap_list, &pte_mmap->mmap_elem);
-
-      /* Copy file into the page. */
       addr += PGSIZE;
     }
   return m->mapid;
 }
 
-void
+/* Unmaps the file and pages corresponding to the mapid */
+static void
 munmap (mapid_t m)
 {
   struct thread *cur = thread_current ();
@@ -665,18 +669,17 @@ munmap (mapid_t m)
               /* First check if the file is not already in the disk.
                  If it is, we do not need to perform any write-back. */
               if (pte_instance->phys_frame != NULL &&
-                  pagedir_is_dirty (cur->pagedir,
-                      pte_instance->upage))
+                  pagedir_is_dirty (cur->pagedir, pte_instance->upage))
                 {
                   lock_acquire (&file_lock);
-                    file_write_at (pte_instance->file,
-                                   pte_instance->kpage,
-                                   PGSIZE,
-                                   (off_t) pte_instance->offset);
+                  file_write_at (pte_instance->file,
+                                 pte_instance->kpage,
+                                 PGSIZE,
+                                 (off_t) pte_instance->offset);
                   lock_release (&file_lock);
                   lock_acquire (&frame_table_lock);
-                    list_remove (&pte_instance->phys_frame->frame_elem);
-                    free (pte_instance->phys_frame);
+                  list_remove (&pte_instance->phys_frame->frame_elem);
+                  free (pte_instance->phys_frame);
                   lock_release (&frame_table_lock);
                 }
               /* Remove the page and clear the page table entry. */
@@ -694,9 +697,8 @@ munmap (mapid_t m)
           close (mmap_instance->fd);
           list_remove (&mmap_instance->thread_mmapped_elem);
           free (mmap_instance);
+          break;
         }
-      else
-        break;
       e_mmap = next_mmap;
     }
 }
