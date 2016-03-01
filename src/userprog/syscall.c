@@ -466,13 +466,6 @@ check_pointer (const void *pointer, unsigned size)
     pagedir_get_page (t->pagedir, pointer + (size-1)) == NULL)
     return false;
 
-  unsigned i;
-  for (i = 1; i < (size - 1); i++)
-    {
-      if (pointer + i == NULL || is_kernel_vaddr (pointer + i) ||
-        pagedir_get_page (t->pagedir, pointer + i) == NULL)
-        return false;
-    }
   return true;
 }
 
