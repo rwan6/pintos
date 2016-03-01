@@ -19,14 +19,9 @@
 #include "threads/malloc.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
-#include "vm/frame.h"
-#include "vm/page.h"
-#include "vm/swap.h"
 
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
-int num_spaces (char *s);
-static void push_args_to_stack (void **esp, char *token, char **save_ptr);
 #define MAX_ARG_NUM 128  /* Assume there are at most 128 arguments, the max
                             length of command-line arguments that the pintos
                             utility can pass to the kernel. */
@@ -86,6 +81,7 @@ process_execute (const char *file_name)
     &load_info);
 
   struct child_process *cp = NULL;
+
   /* If the child was spawned successfully, add it to the caller's
      list of children. */
   if (tid != TID_ERROR)
@@ -154,9 +150,6 @@ start_process (void *load_info)
 
   file_name = strtok_r (file_name, " ", &save_ptr);
 
-  /* Initialize the supplementary page table. */
-  init_supp_page_table (&thread_current ()->supp_page_table);
-
   /* Initialize interrupt frame and load executable. */
   memset (&if_, 0, sizeof if_);
   if_.gs = if_.fs = if_.es = if_.ds = if_.ss = SEL_UDSEG;
@@ -178,7 +171,64 @@ start_process (void *load_info)
   else
     sema_up (&info->s);
 
-  push_args_to_stack (&if_.esp, file_name, &save_ptr);
+  /* Populate the stack with arguments */
+  char *argv[MAX_ARG_NUM];
+  char *token;
+  argv[0] = file_name;
+  int argc = 1, i;
+  while ((token = strtok_r (NULL," ", &save_ptr)))
+    {
+      argv[argc] = token;
+      argc++;
+    }
+
+  /* Array for keeping track of the pointers of each pushed argument */
+  char **ptrs = (char **) malloc (sizeof (char*) * argc);
+  if (ptrs == NULL)
+    {
+      palloc_free_page (file_name);
+      cur->return_status = -1;
+      thread_exit ();
+    }
+
+  /* Push each argument in reverse order. */
+  for (i = argc - 1; i >= 0; i--)
+    {
+      size_t len = strlen (argv[i]) + 1;
+      if_.esp = (void *) ((char *) if_.esp - len);
+      strlcpy ((char *) if_.esp, argv[i], len);
+      ptrs[i] = (char *) if_.esp;
+    }
+
+  /* Word align the stack pointer to a multiple of 4. */
+  if_.esp = (void *) ((unsigned int) if_.esp & 0xfffffffc);
+
+  /* Push null pointer sentinel. */
+  if_.esp = (void *) ((char **) if_.esp - 1);
+  *((char **) if_.esp) = 0;
+
+  /* Push addresses of each argument in reverse order. */
+  for (i = argc - 1; i >= 0; i--)
+    {
+      if_.esp = (void *) ((char **) if_.esp - 1);
+      *((char **) if_.esp) = ptrs[i];
+    }
+
+  /* Push argv. */
+  char **argv0_ptr = (char **) if_.esp;
+  if_.esp = (void *) ((char **) if_.esp - 1);
+  *((char ***) if_.esp) = argv0_ptr;
+
+  /* Push argc. */
+  if_.esp = (void *) ((int *) if_.esp - 1);
+  *((int *) if_.esp) = argc;
+
+  /* Push return address. */
+  if_.esp = ((void **) if_.esp - 1);
+  *((void **) if_.esp) = 0;
+
+  palloc_free_page (file_name);
+  free (ptrs);
 
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in
@@ -188,101 +238,6 @@ start_process (void *load_info)
      and jump to it. */
   asm volatile ("movl %0, %%esp; jmp intr_exit" : : "g" (&if_) : "memory");
   NOT_REACHED ();
-}
-
-int
-num_spaces (char *s)
-{
-  int spaces = 0;
-  while (*s)
-    {
-      if (*s == ' ')
-        spaces++;
-      s++;
-    }
-  return spaces;
-}
-
-/* Populate the stack with arguments. */
-static void
-push_args_to_stack (void **esp, char *file_name, char **save_ptr)
-{
-  int total_args = num_spaces (file_name) + 1;
-  char **argv = malloc (sizeof (char *) * total_args);
-  if (argv == NULL)
-    {
-      palloc_free_page (file_name);
-      thread_current ()->return_status = -1;
-      thread_exit ();
-    }
-  char *token;
-  argv[0] = file_name;
-  size_t length_args = strlen (file_name) + 1;
-  int argc = 1, i;
-  while ((token = strtok_r (NULL," ", save_ptr)))
-    {
-      length_args += strlen(token) + 1;
-      /* If there are too many arguments, exit out. */
-      if (length_args > PGSIZE)
-        {
-          palloc_free_page (file_name);
-          free (argv);
-          thread_current ()->return_status = -1;
-          thread_exit ();
-        }
-      argv[argc] = token;
-      argc++;
-    }
-
-  /* Array for keeping track of the pointers of each pushed argument. */
-  char **ptrs = (char **) malloc (sizeof (char*) * argc);
-  if (ptrs == NULL)
-    {
-      palloc_free_page (file_name);
-      free (argv);
-      thread_current ()->return_status = -1;
-      thread_exit ();
-    }
-
-  /* Push each argument in reverse order. */
-  for (i = argc - 1; i >= 0; i--)
-    {
-      size_t len = strlen (argv[i]) + 1;
-      *esp = (void *) ((char *) *esp - len);
-      strlcpy ((char *) *esp, argv[i], len);
-      ptrs[i] = (char *) *esp;
-    }
-
-  /* Word align the stack pointer to a multiple of 4. */
-  *esp = (void *) ((unsigned int) *esp & 0xfffffffc);
-
-  /* Push null pointer sentinel. */
-  *esp = (void *) ((char **) *esp - 1);
-  *((char **) *esp) = 0;
-
-  /* Push addresses of each argument in reverse order. */
-  for (i = argc - 1; i >= 0; i--)
-    {
-      *esp = (void *) ((char **) *esp - 1);
-      *((char **) *esp) = ptrs[i];
-    }
-
-  /* Push argv. */
-  char **argv0_ptr = (char **) *esp;
-  *esp = (void *) ((char **) *esp - 1);
-  *((char ***) *esp) = argv0_ptr;
-
-  /* Push argc. */
-  *esp = (void *) ((int *) *esp - 1);
-  *((int *) *esp) = argc;
-
-  /* Push return address. */
-  *esp = ((void **) *esp - 1);
-  *((void **) *esp) = 0;
-
-  palloc_free_page (file_name);
-  free (argv);
-  free (ptrs);
 }
 
 /* Waits for thread TID to die and returns its exit status.  If
@@ -324,6 +279,7 @@ process_wait (tid_t child_tid)
           return cp->status;
         }
     }
+
   /* If the chld was already waited on or not found in this process'
      list of children, -1 should be returned. */
   return -1;
@@ -340,9 +296,6 @@ process_exit (void)
   struct thread *cur = thread_current ();
   uint32_t *pd;
   printf ("%s: exit(%d)\n", cur->name, cur->return_status);
-
-  /* Unmaps any mapped files. */
-  munmap_all (cur);
 
   /* Close any open file handles.  Closing a file also reenables
      writes. */
@@ -384,11 +337,6 @@ process_exit (void)
   /* Reallow writes to executable. */
   if (cur->executable != NULL)
     file_allow_write (cur->executable);
-
-  /* Page reclamation: remove pages and deallocate memory associated
-     with frame entries, supplemental page table, and swap slots.
-     Note that memory files have already been unmapped and deallocated. */
-  hash_destroy (&cur->supp_page_table, page_deallocate);
 
   lock_release (&exit_lock);
   /* Destroy the current process's page directory and switch back
@@ -672,10 +620,6 @@ validate_segment (const struct Elf32_Phdr *phdr, struct file *file)
    The pages initialized by this function must be writable by the
    user process if WRITABLE is true, read-only otherwise.
 
-   Sets up the segment pages into the frame table and user's
-   supplemental page table, denoting whether the pages are all
-   zeros or code/data.
-
    Return true if successful, false if a memory allocation error
    or disk read error occurs. */
 static bool
@@ -685,8 +629,6 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
   ASSERT ((read_bytes + zero_bytes) % PGSIZE == 0);
   ASSERT (pg_ofs (upage) == 0);
   ASSERT (ofs % PGSIZE == 0);
-
-  uint32_t offset = (uint32_t) ofs;
 
   file_seek (file, ofs);
   while (read_bytes > 0 || zero_bytes > 0)
@@ -698,49 +640,14 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
       size_t page_zero_bytes = PGSIZE - page_read_bytes;
 
       /* Get a page of memory. */
-      struct frame_entry *new_frame = get_frame(PAL_USER);
-
-      uint8_t *kpage = new_frame->addr;
-
+      uint8_t *kpage = palloc_get_page (PAL_USER);
       if (kpage == NULL)
         return false;
-
-      /* If a new frame entry was successfully allocated, set up the
-         corresponding page table entry. */      
-      struct page_table_entry *pte = init_page_entry ();
-      pte->upage = pg_round_down (upage);
-      pte->kpage = pg_round_down (kpage);
-      pte->phys_frame = new_frame;
-      pte->offset = offset;
-      lock_acquire (&file_lock);
-      pte->file = file_reopen (file);
-      lock_release (&file_lock);
-      pte->ss = NULL;
-      new_frame->pte = pte;
-      pte->page_read_only = !writable;
-      pte->pinned = false;
-
-      /* If the page is all zeros. */
-      if (zero_bytes == PGSIZE)
-        {
-          pte->page_status = PAGE_ZEROS;
-          pte->num_zeros = PGSIZE;
-        }
-      else
-        {
-          pte->page_status = PAGE_CODE;
-          pte->num_zeros = page_zero_bytes;
-        }
-
-      lock_acquire (&thread_current ()->spt_lock);
-      hash_insert (&thread_current ()->supp_page_table, &pte->pt_elem);
-      lock_release (&thread_current ()->spt_lock);
 
       /* Load this page. */
       if (file_read (file, kpage, page_read_bytes) != (int) page_read_bytes)
         {
-          free_frame (pte);
-          free (pte);
+          palloc_free_page (kpage);
           return false;
         }
       memset (kpage + page_read_bytes, 0, page_zero_bytes);
@@ -748,8 +655,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
       /* Add the page to the process's address space. */
       if (!install_page (upage, kpage, writable))
         {
-          free_frame (pte);
-          free (pte);
+          palloc_free_page (kpage);
           return false;
         }
 
@@ -757,57 +663,27 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
       read_bytes -= page_read_bytes;
       zero_bytes -= page_zero_bytes;
       upage += PGSIZE;
-      offset += page_read_bytes;
     }
   return true;
 }
 
 /* Create a minimal stack by mapping a zeroed page at the top of
-   user virtual memory.  Also sets up the metadata for the stack's
-   frame table entry (which is pinned) and the process's supplemental
-   page table. */
+   user virtual memory. */
 static bool
 setup_stack (void **esp)
 {
   uint8_t *kpage;
-  struct page_table_entry *pte = NULL;
   bool success = false;
 
-  struct frame_entry * new_frame = get_frame (PAL_USER | PAL_ZERO);
-  kpage = new_frame->addr;
-
+  kpage = palloc_get_page (PAL_USER | PAL_ZERO);
   if (kpage != NULL)
     {
-      /* If a new frame entry was successfully allocated, set up the
-         corresponding page table entry. */      
-      pte = init_page_entry ();
-      pte->upage = pg_round_down (((uint8_t *) PHYS_BASE) - PGSIZE);
-      pte->kpage = pg_round_down (kpage);
-      pte->phys_frame = new_frame;
-      pte->offset = 0;  /* Not a file, so this parameter does not matter. */
-      pte->file = NULL; /* No associated file. */
-      pte->page_read_only = false;
-      pte->pinned = true; /* Pin to frame table for process duration. */
-      pte->page_status = PAGE_ZEROS;
-      pte->num_zeros = PGSIZE;
-      pte->ss = NULL;
-      new_frame->pte = pte;
       success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
       if (success)
-        {
-          /* Link to a frame table entry. */
-          lock_acquire (&thread_current ()->spt_lock);
-          hash_insert (&thread_current ()->supp_page_table, &pte->pt_elem);
-          lock_release (&thread_current ()->spt_lock);
-          *esp = PHYS_BASE;
-        }
+        *esp = PHYS_BASE;
       else
-        {
-          free_frame (pte);
-          free (pte);
-        }
+        palloc_free_page (kpage);
     }
-
   return success;
 }
 

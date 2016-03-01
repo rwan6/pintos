@@ -2,14 +2,8 @@
 #include <inttypes.h>
 #include <stdio.h>
 #include "userprog/gdt.h"
-#include "userprog/syscall.h"
-#include "userprog/process.h"
 #include "threads/interrupt.h"
 #include "threads/thread.h"
-#include "threads/synch.h"    /* In case a file system call page faults. */
-#include "threads/vaddr.h"    /* For validating the user address. */
-#include "vm/page.h"
-#include "vm/frame.h"
 
 /* Number of page faults processed. */
 static long long page_fault_cnt;
@@ -33,7 +27,7 @@ static void page_fault (struct intr_frame *);
    Refer to [IA32-v3a] section 5.15 "Exception and Interrupt
    Reference" for a description of each of these exceptions. */
 void
-exception_init (void)
+exception_init (void) 
 {
   /* These exceptions can be raised explicitly by a user program,
      e.g. via the INT, INT3, INTO, and BOUND instructions.  Thus,
@@ -68,14 +62,14 @@ exception_init (void)
 
 /* Prints exception statistics. */
 void
-exception_print_stats (void)
+exception_print_stats (void) 
 {
   printf ("Exception: %lld page faults\n", page_fault_cnt);
 }
 
 /* Handler for an exception (probably) caused by a user process. */
 static void
-kill (struct intr_frame *f)
+kill (struct intr_frame *f) 
 {
   /* This interrupt is one (probably) caused by a user process.
      For example, the process might have tried to access unmapped
@@ -84,7 +78,7 @@ kill (struct intr_frame *f)
      the kernel.  Real Unix-like operating systems pass most
      exceptions back to the process via signals, but we don't
      implement them. */
-
+     
   /* The interrupt frame's code segment value tells us where the
      exception originated. */
   switch (f->cs)
@@ -95,7 +89,7 @@ kill (struct intr_frame *f)
       printf ("%s: dying due to interrupt %#04x (%s).\n",
               thread_name (), f->vec_no, intr_name (f->vec_no));
       intr_dump_frame (f);
-      thread_exit ();
+      thread_exit (); 
 
     case SEL_KCSEG:
       /* Kernel's code segment, which indicates a kernel bug.
@@ -103,7 +97,7 @@ kill (struct intr_frame *f)
          may cause kernel exceptions--but they shouldn't arrive
          here.)  Panic the kernel to make the point.  */
       intr_dump_frame (f);
-      PANIC ("Kernel bug - unexpected interrupt in kernel");
+      PANIC ("Kernel bug - unexpected interrupt in kernel"); 
 
     default:
       /* Some other code segment?  Shouldn't happen.  Panic the
@@ -114,7 +108,10 @@ kill (struct intr_frame *f)
     }
 }
 
-/* Page fault handler.
+/* Page fault handler.  This is a skeleton that must be filled in
+   to implement virtual memory.  Some solutions to project 2 may
+   also require modifying this code.
+
    At entry, the address that faulted is in CR2 (Control Register
    2) and information about the fault, formatted as described in
    the PF_* macros in exception.h, is in F's error_code member.  The
@@ -123,7 +120,7 @@ kill (struct intr_frame *f)
    description of "Interrupt 14--Page Fault Exception (#PF)" in
    [IA32-v3a] section 5.15 "Exception and Interrupt Reference". */
 static void
-page_fault (struct intr_frame *f)
+page_fault (struct intr_frame *f) 
 {
   bool not_present;  /* True: not-present page, false: writing r/o page. */
   bool write;        /* True: access was write, false: access was read. */
@@ -151,63 +148,14 @@ page_fault (struct intr_frame *f)
   write = (f->error_code & PF_W) != 0;
   user = (f->error_code & PF_U) != 0;
 
-  /* Verify the access is legal. If not, exit. */
-  if (!not_present || fault_addr == NULL ||
-      (user && is_kernel_vaddr (fault_addr)))
-    {
-      thread_current ()->return_status = -1;
-
-     /* Release the file lock if the faulting thread was holding it to
-        avoid trying to mistakenly reaquire it when closing fds. */
-     if (lock_held_by_current_thread (&file_lock))
-       lock_release (&file_lock);
-
-     /* Release the frame lock if the faulting thread was holding it to
-        avoid trying to mistakenly reaquire it when calling free_frame. */
-     if (lock_held_by_current_thread (&frame_table_lock))
-       lock_release (&frame_table_lock);
-
-      thread_exit ();
-    }
-
-  /* Handle stack growth. */
-  void *stack_pointer = user ? f->esp : thread_current ()->esp;
-  if (stack_pointer < PHYS_BASE - STACK_SIZE_LIMIT)
-    {
-      /* Impose an absolute limit on stack size. */
-      thread_current ()->return_status = -1;
-      thread_exit ();
-    }
-  else if (fault_addr >= stack_pointer - 32)
-    {
-      /* Grow stack. */
-      extend_stack (fault_addr);
-      return;
-    }
-
-  /* Check in supplemental page table if fault_addr exists. If
-     not, it's a real page_fault and should exit. */
-  struct page_table_entry *pte = page_lookup (pg_round_down (fault_addr));
-  if (pte == NULL || (pte->page_read_only && write))
-    {
-      thread_current ()->return_status = -1;
-
-      /* Release the file lock if the faulting thread was holding it to
-         avoid trying to mistakenly reaquire it when closing fds.
-         Note that we check this again as oppose to only one check
-         at the top since extending the stack shouldn't release the lock. */
-      if (lock_held_by_current_thread (&file_lock))
-        lock_release (&file_lock);
-
-      /* Release the frame lock if the faulting thread was holding it to
-         avoid trying to mistakenly reaquire it when calling free_frame. */
-      if (lock_held_by_current_thread (&frame_table_lock))
-        lock_release (&frame_table_lock);
-
-      thread_exit ();
-    }
-
-  /* Fetch the page. */
-  page_fetch_and_set (pte);
+  /* To implement virtual memory, delete the rest of the function
+     body, and replace it with code that brings in the page to
+     which fault_addr refers. */
+  printf ("Page fault at %p: %s error %s page in %s context.\n",
+          fault_addr,
+          not_present ? "not present" : "rights violation",
+          write ? "writing" : "reading",
+          user ? "user" : "kernel");
+  kill (f);
 }
 

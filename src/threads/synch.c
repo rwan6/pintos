@@ -135,7 +135,7 @@ sema_up (struct semaphore *sema)
          is being used.  This produces unwanted behavior when
          interfacing with user programs, but was left in due to
          functionality in the first project. */
-
+      
       /* if ((!thread_mlfqs && thread_max->priority >
          thread_current ()->priority) ||
          (thread_mlfqs && thread_max->mlfqs_priority >
@@ -205,6 +205,7 @@ void
 lock_init (struct lock *lock)
 {
   ASSERT (lock != NULL);
+
   lock->holder = NULL;
   sema_init (&lock->semaphore, 1);
 }

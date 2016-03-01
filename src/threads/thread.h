@@ -3,7 +3,6 @@
 
 #include <debug.h>
 #include <list.h>
-#include <hash.h>
 #include <stdint.h>
 #include "threads/synch.h"
 #include "threads/fixed-point.h"
@@ -137,19 +136,6 @@ struct thread
     int return_status;                  /* Return status of this thread. */
     struct file *executable;            /* Executable file. */
 #endif
-
-    /* Owned by vm/page.c, vm/swap.c, and vm/frame.c. */
-    struct hash supp_page_table;        /* Supplemental page table map.
-                                           Used to hold pages mapping to
-                                           physical frames. */
-    struct lock spt_lock;               /* Supplemental page table lock. */
-      
-    /* Owned by userprog/syscall.c. */
-    struct list mmapped_mapids;         /* List of all memory-mapped
-                                           files. */
-    
-    /* Owned by userprog/syscall.c and userprog/exception.c. */
-    void *esp;                          /* Stack pointer. */
   };
 
 /* Holds the child thread, the child's status, and an element the
