@@ -4,7 +4,6 @@
 #include <stdio.h>
 #include <syscall-nr.h>
 #include <string.h>
-#include <hash.h>
 #include "threads/interrupt.h"
 #include "threads/thread.h"
 #include "threads/malloc.h"
@@ -14,9 +13,6 @@
 #include "devices/input.h"    /* For input_putc(). */
 #include "filesys/file.h"     /* For file operations. */
 #include "filesys/filesys.h"  /* For filesys operations. */
-#include "vm/frame.h"         /* For frame page. */
-#include "vm/page.h"          /* For page tables. */
-#include "vm/swap.h"          /* For swap slots. */
 
 /* Prototypes for system call functions and helper functions. */
 static void syscall_handler (struct intr_frame *);
@@ -33,15 +29,10 @@ static int write (int, const void *, unsigned);
 static void seek (int, unsigned);
 static unsigned tell (int);
 static void close (int);
-static mapid_t mmap (int, void *);
-static void munmap (mapid_t);
 static bool check_pointer (const void *, unsigned);
 static struct sys_fd* get_fd_item (int);
-static void prefetch_user_memory (void *, size_t);
-static void unpin_user_memory (void *, size_t);
 
 static int next_avail_fd;       /* Tracks the next available fd. */
-static mapid_t next_avail_mapid; /* Tracks the next available mapid */
 
 /* Initialize the system call interrupt, as well as the next available
    file descriptor and the file lists. */
@@ -51,12 +42,7 @@ syscall_init (void)
   intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
   list_init (&opened_files);
   list_init (&used_fds);
-
   next_avail_fd = 2; /* 0 and 1 are reserved. */
-  next_avail_mapid = 0;
-
-  /* Initialize frame table items. */
-  init_frame ();
 }
 
 /* Takes the interrupt frame as an argument and traces the stack
@@ -66,7 +52,6 @@ syscall_init (void)
 static void
 syscall_handler (struct intr_frame *f)
 {
-  thread_current ()->esp = f->esp;
   /* If esp is a bad address, kill the process immediately. */
   if (!check_pointer ((const void *) (f->esp), 1))
     exit (-1);
@@ -139,12 +124,6 @@ syscall_handler (struct intr_frame *f)
         break;
       case SYS_CLOSE :
         close (arg1);
-        break;
-      case SYS_MMAP :
-        f->eax = mmap (arg1, (void *) arg2);
-        break;
-      case SYS_MUNMAP :
-        munmap (arg1);
         break;
       default :
         exit (-1);
@@ -336,7 +315,6 @@ read (int fd, void *buffer, unsigned size)
     }
   else
     {
-      prefetch_user_memory (buffer, size);
       lock_acquire (&file_lock);
       struct sys_fd *fd_instance = get_fd_item (fd);
 
@@ -349,7 +327,6 @@ read (int fd, void *buffer, unsigned size)
         }
 
       num_read = file_read (fd_instance->file, buffer, size);
-      unpin_user_memory (buffer, size);
       lock_release (&file_lock);
       return num_read;
     }
@@ -372,7 +349,6 @@ write (int fd, const void *buffer, unsigned size)
     }
   else
     {
-      prefetch_user_memory ( (void *) buffer, size);
       lock_acquire (&file_lock);
       struct sys_fd *fd_instance = get_fd_item (fd);
 
@@ -385,7 +361,6 @@ write (int fd, const void *buffer, unsigned size)
         }
 
       num_written = file_write (fd_instance->file, buffer, size);
-      unpin_user_memory ((void *) buffer, size);
       lock_release (&file_lock);
       return num_written;
     }
@@ -477,11 +452,16 @@ close (int fd)
 static bool
 check_pointer (const void *pointer, unsigned size)
 {
-  if (pointer == NULL || is_kernel_vaddr (pointer))
+  struct thread *t = thread_current ();
+
+  if (pointer == NULL || is_kernel_vaddr (pointer) ||
+    pagedir_get_page (t->pagedir, pointer) == NULL)
     return false;
   else if (pointer + (size-1) == NULL ||
-    is_kernel_vaddr (pointer + (size-1)))
+    is_kernel_vaddr (pointer + (size-1)) ||
+    pagedir_get_page (t->pagedir, pointer + (size-1)) == NULL)
     return false;
+
   return true;
 }
 
@@ -527,235 +507,5 @@ close_fd (struct thread *t)
       int fd = list_entry (e, struct sys_fd, thread_opened_elem)->value;
       close (fd);
       e = next;
-    }
-}
-
-/* Helper function to close all memory mapped files.  This
-   function can be called whether or not a thread dies "gracefully"
-   (i.e. via exit) or abruptly (directly to process_exit). */
-void
-munmap_all (struct thread *t)
-{
-  struct list_elem *e;
-  struct list_elem *next;
-  e = list_begin (&t->mmapped_mapids);
-  while (!list_empty (&t->mmapped_mapids) &&
-         e != list_end (&t->mmapped_mapids))
-    {
-      /* Since we're deleting an item, we need to save the next pointer,
-         since otherwise we might page fault. */
-      next = list_next (e);
-      struct sys_mmap *m = list_entry (e, struct sys_mmap, thread_mmapped_elem);
-      mapid_t mapid = m->mapid;
-      munmap (mapid);
-      e = next;
-    }
-}
-
-/* Maps the file pointed to by fd to the address pointed to by addr. Returns
-   the mapid of the mapping. Creates a new file descriptor for the memory
-   mapping. Returns -1 if mmap fails */
-static mapid_t
-mmap (int fd, void *addr)
-{
-  /* STDIN and STDOUT are not mappable. */
-  if (fd == 0 || fd == 1)
-    return MAP_FAILED;
-
-  lock_acquire (&file_lock);
-  struct sys_fd *sf = get_fd_item (fd);
-  lock_release (&file_lock);
-
-  if (!sf)
-    return MAP_FAILED;
-
-  int new_fd = open (sf->sys_file->name);
-  struct file *new_file = file_reopen (sf->file);
-  int size = filesize (new_fd);
-
-  /* Fails if fd has a length of zero bytes. */
-  if (size == 0)
-    return MAP_FAILED;
-
-  /* addr needs to be page-aligned and cannot be 0. */
-  if (pg_ofs (addr) != 0 || addr == 0)
-    return MAP_FAILED;
-
-  /* The number of pages is the ceiling of (size / PGSIZE). If the file size
-     does not evenly divide into PGSIZE, the number of useful bytes in the
-     last page is size % PGSIZE. The rest of the page is zero bytes. */
-  int num_pages = size / PGSIZE;
-  int num_zeros = 0;
-  if (size % PGSIZE != 0)
-    {
-      num_zeros = PGSIZE - (size % PGSIZE);
-      num_pages++;
-    }
-
-  /* None of the pages should already exist in the page table */
-  int i;
-  void *addr_copy = addr;
-  for (i = 0; i < num_pages; i++)
-    {
-      if (page_lookup (addr_copy) != NULL)
-        return MAP_FAILED;
-
-      addr_copy += PGSIZE;
-    }
-
-  /* Allocate sys_mmap for bookkeeping. */
-  struct sys_mmap *m = malloc (sizeof (struct sys_mmap));
-  if (!m)
-    return MAP_FAILED;
-
-  list_init (&m->file_mmap_list);
-  m->mapid = next_avail_mapid++;
-  m->fd = new_fd;
-  m->owner_tid = thread_current ()->tid;
-  m->start_addr = addr;
-  m->size = size;
-
-  /* Add the fd to the thread's mmapped_mapids list. */
-  struct thread *t = thread_current ();
-  list_push_back (&t->mmapped_mapids, &m->thread_mmapped_elem);
-
-  struct page_table_entry *pte_mmap;
-  for (i = 0; i < num_pages; i++)
-    {
-      /* Allocate page and complete last page with zeros. */
-      if (i == (num_pages - 1))
-        pte_mmap = page_create_mmap (addr, new_file, i * PGSIZE, num_zeros);
-      else
-        pte_mmap = page_create_mmap (addr, new_file, i * PGSIZE, 0);
-
-      list_push_back (&m->file_mmap_list, &pte_mmap->mmap_elem);
-      addr += PGSIZE;
-    }
-  return m->mapid;
-}
-
-/* Unmaps the file and pages corresponding to the mapid */
-static void
-munmap (mapid_t m)
-{
-  struct thread *cur = thread_current ();
-  struct list_elem *e_mmap;
-  struct list_elem *next_mmap;
-  struct list_elem *e_pte;
-  struct list_elem *next_pte;
-  struct sys_mmap *mmap_instance;
-  struct page_table_entry *pte_instance;
-
-  /* Iterate over all of the current thread's memory mapped file IDs
-     to find the matching mapid_t m. */
-  for (e_mmap = list_begin (&cur->mmapped_mapids);
-       e_mmap != list_end (&cur->mmapped_mapids);)
-    {
-      next_mmap = list_next(e_mmap);
-      mmap_instance = list_entry (e_mmap, struct sys_mmap,
-                                  thread_mmapped_elem);
-      if (mmap_instance->mapid == m &&
-          mmap_instance->owner_tid == thread_current ()->tid)
-        {
-          /* Once located, iterate over the correspond mapped instance's
-             list of pages corresponding to it to properly unmap
-             and deallocate it. */
-          for (e_pte = list_begin (&mmap_instance->file_mmap_list);
-               e_pte != list_end (&mmap_instance->file_mmap_list);)
-            {
-              next_pte = list_next(e_pte);
-              pte_instance = list_entry (e_pte, struct page_table_entry,
-                                          mmap_elem);
-              /* First check if the file is not already in the disk.
-                 If it is, we do not need to perform any write-back. */
-              if (pte_instance->phys_frame != NULL &&
-                  pagedir_is_dirty (cur->pagedir, pte_instance->upage))
-                {
-                  lock_acquire (&file_lock);
-                  file_write_at (pte_instance->file,
-                                 pte_instance->kpage,
-                                 PGSIZE,
-                                 (off_t) pte_instance->offset);
-                  lock_release (&file_lock);
-                  lock_acquire (&frame_table_lock);
-                  list_remove (&pte_instance->phys_frame->frame_elem);
-                  free (pte_instance->phys_frame);
-                  lock_release (&frame_table_lock);
-                }
-              /* Remove the page and clear the page table entry. */
-              lock_acquire (&thread_current ()->spt_lock);
-              hash_delete (&thread_current ()->supp_page_table,
-                &pte_instance->pt_elem);
-              lock_release (&thread_current ()->spt_lock);
-              pagedir_clear_page (thread_current ()->pagedir,
-                pte_instance->upage);
-              list_remove (&pte_instance->mmap_elem);
-              free (pte_instance);
-              e_pte = next_pte;
-            }
-          /* Close the corresponding file descriptor. */
-          close (mmap_instance->fd);
-          list_remove (&mmap_instance->thread_mmapped_elem);
-          free (mmap_instance);
-          break;
-        }
-      e_mmap = next_mmap;
-    }
-}
-
-/* Ensure that all pages needed for a file read or write are located
-   in the frame table upon the file system call by paging it in and
-   pinning the frame to the frame table. */
-static void
-prefetch_user_memory (void *pointer, size_t size)
-{
-  size_t i;
-  void *sp = thread_current ()->esp;
-  size_t len = (size / PGSIZE) + 1;
-
-  for (i = 0; i < len; i++)
-    {
-      void *fa = pointer + i * PGSIZE;
-      struct page_table_entry *pte = page_lookup (fa);
-
-      if (pte == NULL)
-        {
-          /* Perform the same stack growth checks as the page fault
-             handler in order to determine if the read or write system
-             call requires stack growth. */
-          if (sp < PHYS_BASE - STACK_SIZE_LIMIT)
-            exit (-1);
-          else if (fa >= sp - 32)
-            extend_stack (fa);
-          else
-            exit (-1);
-        }
-      else if (pte->page_status != PAGE_NONZEROS && pte->phys_frame == NULL)
-        {
-          page_fetch_and_set (pte);
-          pte->pinned = true;
-        }
-      else
-        pte->pinned = true;
-    }
-}
-
-/* Unpin the user memory from the frame table that was used in read or
-   write.  All pages that are passed to this function were originally
-   pinned and, as a result, need to be unpinned.  The case when a page
-   table entry is not found should never occur, but it is checked
-   anyways. */
-static void
-unpin_user_memory (void *pointer, size_t size)
-{
-  size_t i;
-  size_t len = (size / PGSIZE) + 1;
-  for (i = 0; i < len; i++)
-    {
-      struct page_table_entry *pte = page_lookup (pointer + i * PGSIZE);
-      if (pte == NULL)
-        exit (-1);
-      else
-        pte->pinned = false;
     }
 }

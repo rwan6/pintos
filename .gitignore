@@ -7,20 +7,4 @@ src/userprog/DESIGNDOC.txt
 
 src/userprog/proj2_proof.png
 
-src/userprog/exception.c
-
-src/userprog/exception.c
-
-src/userprog/process.c
-
-src/vm/page.c
-
-src/vm/page.h
-
-src/userprog/exception.c
-
-src/userprog/process.c
-
-src/vm/page.c
-
-src/vm/page.h
+src/vm/proj3_proof.png
