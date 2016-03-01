@@ -1,15 +1,24 @@
+#include <string.h>
 #include "filesys/cache.h"
 #include "filesys/filesys.h"
 #include "threads/malloc.h"
-#include <string.h>
+#include "threads/thread.h"
+#include "threads/synch.h"
+#include "devices/timer.h"
 
 static int num_slots;
 
+struct condition readahead_cond;  /* Readahead thread wakeup condition. */
+struct lock readahead_lock;       /* Lock associated with readahead_cond. */
+
+/* Function prototypes. */
 int cache_lookup (block_sector_t sector_idx);
 int cache_fetch (block_sector_t);
 int cache_evict (void);
 void cache_flush (void);
 void cache_readahead (void);
+void periodic_write_behind (void *);
+void read_ahead (void *);
 
 void
 cache_init (void)
@@ -22,6 +31,43 @@ cache_init (void)
       cache_table[i].dirty = false;
       cache_table[i].sector_idx = 0;
       cache_table[i].free = true;
+    }
+    
+  lock_init (&readahead_lock);
+  cond_init (&readahead_cond);
+  
+  /* Spawn threads that will write back to cache periodically and will
+     manage readahead in the background. */
+  thread_create ("write-behind", PRI_DEFAULT, periodic_write_behind, NULL);
+  thread_create ("read-ahead", PRI_DEFAULT, read_ahead, NULL);
+}
+
+/* One thread is in charge of periodically being awoken and flushing
+   the cache back to disk.  This process is repeated for the duration
+   of the program. */
+void
+periodic_write_behind (void *aux UNUSED)
+{
+  /* Thread CANNOT terminate, so it is wrapped in an infinite while loop. */
+  while (1)
+    {
+      timer_msleep (WRITE_BEHIND_WAIT);
+      cache_flush();
+    }
+}
+
+/* One thread is in charge of reading ahead by one block from the disk
+   after the intended block was returned.  The thread will wait to
+   be awoken by the original file reader so that it does not busy
+   wait in the background. */
+void
+read_ahead (void *aux UNUSED)
+{
+  /* Thread CANNOT terminate, so it is wrapped in an infinite while loop. */
+  while (1)
+    {
+      /* TODO: Implement read_ahead */
+      cond_wait (&readahead_cond, &readahead_lock);
     }
 }
 
@@ -63,10 +109,14 @@ cache_write (block_sector_t sector_idx, void *buffer)
       memcpy (cache + index, buffer, BLOCK_SECTOR_SIZE);
       cache_table[index].accessed = true;
       cache_table[index].dirty = true;
+      
+      /* Signal readahead thread to fetch next block in the background. */
+      cond_signal (&readahead_cond, &readahead_lock);
     }
 }
 
-int cache_fetch (block_sector_t sector_idx)
+int
+cache_fetch (block_sector_t sector_idx)
 {
   int index = -1;
   int i = 0;
