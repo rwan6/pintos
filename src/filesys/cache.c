@@ -6,7 +6,7 @@
 #include "threads/synch.h"
 #include "devices/timer.h"
 
-static int num_slots;
+static int num_taken_slots;
 
 struct condition readahead_cond;  /* Readahead thread wakeup condition. */
 struct lock readahead_lock;       /* Lock associated with readahead_cond. */
@@ -25,7 +25,7 @@ void read_ahead (void *);
 void
 cache_init (void)
 {
-  num_slots = 0;
+  num_taken_slots = 0;
   int i = 0;
   for (; i < CACHE_SIZE; i++)
     {
@@ -78,7 +78,8 @@ read_ahead (void *aux UNUSED)
       next_elem = list_pop_front (&readahead_list);
       struct readahead_entry *next_readahead = list_entry (next_elem,
         struct readahead_entry, readahead_elem);
-      cache_fetch (next_readahead->next_sector);
+      if (cache_lookup (next_readahead->next_sector) == -1)
+        cache_fetch (next_readahead->next_sector);
       lock_release (&readahead_lock);
     }
 }
@@ -128,21 +129,24 @@ int
 cache_fetch (block_sector_t sector_idx)
 {
   int index = -1;
-  int i = 0;
-  for (; i < CACHE_SIZE; i++)
-    {
-      if (cache_table[i].free)
-        {
-          index = i;
-          break;
-        }
-    }
-  if (index == -1)
-    {
-      index = cache_evict ();
-    }
+  
+  /* If cache is already full, immediately call evict. */
+  if (num_taken_slots == CACHE_SIZE)
+    index = cache_evict ();
   else
-      num_slots++;
+    {
+      int i = 0;
+      for (; i < CACHE_SIZE; i++)
+        {
+          if (cache_table[i].free)
+            {
+              index = i;
+              break;
+            }
+        }
+      num_taken_slots++;
+    }
+
   block_read (fs_device, sector_idx, cache_table[index].data + index);
   cache_table[index].free = false;
   cache_table[index].sector_idx = sector_idx;
