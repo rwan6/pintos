@@ -34,7 +34,7 @@ struct cache_entry cache_table[CACHE_SIZE];
 
 /* Prototypes for cache.c functions. */
 void cache_init (void);
-void cache_read (block_sector_t, void *);
-void cache_write (block_sector_t, void *);
+void cache_read (block_sector_t, void *, int, int);
+void cache_write (block_sector_t, void *, int);
 
 #endif /* filesys/cache.h */

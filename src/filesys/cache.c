@@ -34,17 +34,18 @@ cache_init (void)
       cache_table[i].dirty = false;
       cache_table[i].sector_idx = 0;
       cache_table[i].free = true;
+      cache_table[i].sector_idx = -1;
       lock_init (&cache_table[i].entry_lock);
     }
-  
-  list_init (&readahead_list);
-  lock_init (&readahead_lock);
-  cond_init (&readahead_cond);
-  
+
+  // list_init (&readahead_list);
+  // lock_init (&readahead_lock);
+  // cond_init (&readahead_cond);
+
   /* Spawn threads that will write back to cache periodically and will
      manage readahead in the background. */
-  thread_create ("write-behind", PRI_DEFAULT, periodic_write_behind, NULL);
-  thread_create ("read-ahead", PRI_DEFAULT, read_ahead, NULL);
+  // thread_create ("write-behind", PRI_DEFAULT, periodic_write_behind, NULL);
+  // thread_create ("read-ahead", PRI_DEFAULT, read_ahead, NULL);
 }
 
 /* One thread is in charge of periodically being awoken and flushing
@@ -76,7 +77,7 @@ read_ahead (void *aux UNUSED)
       lock_acquire (&readahead_lock);
       if (list_empty (&readahead_list))
         cond_wait (&readahead_cond, &readahead_lock);
-      
+
       next_elem = list_pop_front (&readahead_list);
       struct readahead_entry *next_readahead = list_entry (next_elem,
         struct readahead_entry, readahead_elem);
@@ -101,29 +102,38 @@ cache_lookup (block_sector_t sector_idx)
 }
 
 void
-cache_read (block_sector_t sector_idx, void *buffer)
+cache_read (block_sector_t sector_idx, void *buffer, int chunk_size, int sector_ofs)
 {
+  // printf("reading sector %d\n", sector_idx);
   int index = cache_lookup (sector_idx);
   if (index != -1)
-    memcpy (buffer, cache_table[index].data, BLOCK_SECTOR_SIZE);
+    {
+      // index = cache_fetch (sector_idx);
+      // printf("in cache.. index = %d\n", index);
+    memcpy (buffer, cache_table[index].data + sector_ofs, chunk_size);
+    }
   else
     {
       index = cache_fetch (sector_idx);
-      memcpy (buffer, cache_table[index].data, BLOCK_SECTOR_SIZE);
+      // printf("index = %d, chunk_size=%d, sector_ofs=%d\n", index, chunk_size, sector_ofs);
+      memcpy (buffer, cache_table[index].data + sector_ofs, chunk_size);
       cache_table[index].accessed = true;
     }
+
+          // block_read (fs_device, sector_idx, cache_table[11].data);
+          // memcpy (buffer, cache_table[11].data + sector_ofs, chunk_size);
 }
 
 void
-cache_write (block_sector_t sector_idx, void *buffer)
+cache_write (block_sector_t sector_idx, void *buffer, int chunk_size)
 {
   int index = cache_lookup (sector_idx);
   if (index != -1)
-    memcpy (cache_table[index].data, buffer, BLOCK_SECTOR_SIZE);
+    memcpy (cache_table[index].data, buffer, chunk_size);
   else
     {
       index = cache_fetch (sector_idx);
-      memcpy (cache_table[index].data, buffer, BLOCK_SECTOR_SIZE);
+      memcpy (cache_table[index].data, buffer, chunk_size);
       cache_table[index].accessed = true;
       cache_table[index].dirty = true;
     }
@@ -133,7 +143,7 @@ int
 cache_fetch (block_sector_t sector_idx)
 {
   int index = -1;
-  
+
   /* If cache is already full, immediately call evict. */
   if (num_taken_slots == CACHE_SIZE)
     index = cache_evict ();
@@ -151,8 +161,10 @@ cache_fetch (block_sector_t sector_idx)
       num_taken_slots++;
     }
 
+  ASSERT (index != -1);
+
   block_read (fs_device, sector_idx, cache_table[index].data);
-  
+
   cache_table[index].free = false;
   cache_table[index].accessed = false;
   cache_table[index].dirty = false;
@@ -192,7 +204,7 @@ cache_evict (void)
           cache_writeback_if_dirty (cache_clock_handle);
           evicted_idx = cache_clock_handle;
         }
-      
+
       lock_release (&cache_table[cache_clock_handle].entry_lock);
       if (cache_clock_handle == CACHE_SIZE - 1)
         cache_clock_handle = 0;
