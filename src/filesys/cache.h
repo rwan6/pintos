@@ -36,9 +36,5 @@ struct cache_entry cache_table[CACHE_SIZE];
 void cache_init (void);
 void cache_read (block_sector_t, void *);
 void cache_write (block_sector_t, void *);
-void cache_writeback_if_dirty (int);
-int cache_evict (void);
-void periodic_write_behind (void *);
-void read_ahead (void *);
 
 #endif /* filesys/cache.h */

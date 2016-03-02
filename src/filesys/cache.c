@@ -16,6 +16,7 @@ static struct list readahead_list; /* Readahead queue. */
 /* Function prototypes. */
 int cache_lookup (block_sector_t sector_idx);
 int cache_fetch (block_sector_t);
+void cache_writeback_if_dirty (int);
 int cache_evict (void);
 void cache_flush (void);
 void cache_readahead (void);
@@ -103,7 +104,7 @@ void
 cache_read (block_sector_t sector_idx, void *buffer)
 {
   int index = cache_lookup (sector_idx);
-  if (index >= 0 && index < CACHE_SIZE)
+  if (index != -1)
     memcpy (buffer, cache_table[index].data, BLOCK_SECTOR_SIZE);
   else
     {
@@ -117,7 +118,7 @@ void
 cache_write (block_sector_t sector_idx, void *buffer)
 {
   int index = cache_lookup (sector_idx);
-  if (index >= 0 && index < CACHE_SIZE)
+  if (index != -1)
     memcpy (cache_table[index].data, buffer, BLOCK_SECTOR_SIZE);
   else
     {
@@ -159,13 +160,17 @@ cache_fetch (block_sector_t sector_idx)
   return index;
 }
 
-/* Writes the cache block back to disk if the cache block is dirty */
+/* Writes the cache block back to disk if the cache block is dirty. Also
+   clears the dirty bit associated with that cache entry. */
 void
 cache_writeback_if_dirty (int index)
 {
   if (cache_table[index].dirty)
-    block_write (fs_device, cache_table[index].sector_idx,
+    {
+      block_write (fs_device, cache_table[index].sector_idx,
           cache_table[index].data);
+      cache_table[index].dirty = false;
+    }
 }
 
 /* Evicts the appropriate cache element and returns the index of the
@@ -203,7 +208,7 @@ cache_flush (void)
   int i = 0;
   for (; i < CACHE_SIZE; i++)
     {
-      if (!cache_table[i].free && cache_table[i].dirty)
+      if (!cache_table[i].free)
         {
           lock_acquire (&cache_table[i].entry_lock);
           cache_writeback_if_dirty (i);
