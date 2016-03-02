@@ -15,15 +15,10 @@ struct cache_entry
     bool dirty;
     block_sector_t sector_idx;
     bool free;
+    char data [BLOCK_SECTOR_SIZE];
   };
 
-struct cache_slot
-  {
-    char data[BLOCK_SECTOR_SIZE];
-  };
-
-static struct cache_entry cache_table[CACHE_SIZE];
-static struct cache_slot cache[CACHE_SIZE];
+static struct cache_entry cache_table [CACHE_SIZE];
 
 /* Prototypes for cache.c functions. */
 void cache_init (void);
