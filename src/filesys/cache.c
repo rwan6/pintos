@@ -173,7 +173,7 @@ cache_evict (void)
   static int cache_clock_handle = 0;
   cache_writeback_if_dirty (cache_clock_handle);
   int evicted_idx = cache_clock_handle;
-  if (cache_clock_handle == CACHE_SIZE)
+  if (cache_clock_handle == CACHE_SIZE - 1)
     cache_clock_handle = 0;
   else
     cache_clock_handle++;
