@@ -10,13 +10,15 @@
                                    thread sleeps before flushing cache
                                    to disk. */
 
+/* Entry into the cache.  Holds metadata about the entry in addition to
+   the data block. */
 struct cache_entry
   {
-    bool accessed;
-    bool dirty;
-    block_sector_t sector_idx;
-    bool free;
-    char data[BLOCK_SECTOR_SIZE];
+    bool accessed;            /* Whether the entry was recently accessed. */
+    bool dirty;               /* Whether the entry was recently modified. */
+    block_sector_t sector_idx;  /* Block sector index. */
+    bool free;                  /* Whether the cache entry is free. */
+    char data[BLOCK_SECTOR_SIZE]; /* Cache data block. */
   };
 
 /* Entry into the readahead list for the next block to be fetched. */
