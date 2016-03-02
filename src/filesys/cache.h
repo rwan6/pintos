@@ -4,6 +4,7 @@
 #include <stdbool.h>
 #include <list.h>
 #include "devices/block.h"
+#include "threads/synch.h"
 
 #define CACHE_SIZE 64 /* Size limit for the buffer cache. */
 #define WRITE_BEHIND_WAIT 10000 /* Period of time (in ms) write behind
@@ -19,6 +20,7 @@ struct cache_entry
     block_sector_t sector_idx;  /* Block sector index. */
     bool free;                  /* Whether the cache entry is free. */
     char data[BLOCK_SECTOR_SIZE]; /* Cache data block. */
+    struct lock entry_lock;       /* Per-entry lock. */
   };
 
 /* Entry into the readahead list for the next block to be fetched. */

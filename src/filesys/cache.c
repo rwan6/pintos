@@ -33,6 +33,7 @@ cache_init (void)
       cache_table[i].dirty = false;
       cache_table[i].sector_idx = 0;
       cache_table[i].free = true;
+      lock_init (&cache_table[i].entry_lock);
     }
   
   list_init (&readahead_list);
@@ -90,8 +91,10 @@ cache_lookup (block_sector_t sector_idx)
   int i = 0;
   for (; i < CACHE_SIZE; i++)
     {
+      lock_acquire (&cache_table[i].entry_lock);
       if (!cache_table[i].free && cache_table[i].sector_idx == sector_idx)
         return i;
+      lock_release (&cache_table[i].entry_lock);
     }
   return -1;
 }
@@ -175,6 +178,7 @@ cache_evict (void)
   int evicted_idx;
   while (!found)
     {
+      lock_acquire (&cache_table[cache_clock_handle].entry_lock);
       if (cache_table[cache_clock_handle].accessed)
         cache_table[cache_clock_handle].accessed = false;
       else
@@ -182,11 +186,13 @@ cache_evict (void)
           found = true;
           cache_writeback_if_dirty (cache_clock_handle);
           evicted_idx = cache_clock_handle;
-          if (cache_clock_handle == CACHE_SIZE - 1)
-            cache_clock_handle = 0;
-          else
-            cache_clock_handle++;
         }
+      
+      lock_release (&cache_table[cache_clock_handle].entry_lock);
+      if (cache_clock_handle == CACHE_SIZE - 1)
+        cache_clock_handle = 0;
+      else
+        cache_clock_handle++;
     }
   return evicted_idx;
 }
@@ -198,6 +204,10 @@ cache_flush (void)
   for (; i < CACHE_SIZE; i++)
     {
       if (!cache_table[i].free && cache_table[i].dirty)
-        cache_writeback_if_dirty (i);
+        {
+          lock_acquire (&cache_table[i].entry_lock);
+          cache_writeback_if_dirty (i);
+          lock_release (&cache_table[i].entry_lock);
+        }
     }
 }
