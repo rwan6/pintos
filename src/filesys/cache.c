@@ -6,16 +6,12 @@
 #include "threads/synch.h"
 #include "devices/timer.h"
 
-#define READAHEAD_LIMIT 4
-
 static int num_slots;
 
 struct condition readahead_cond;  /* Readahead thread wakeup condition. */
 struct lock readahead_lock;       /* Lock associated with readahead_cond. */
 
-static int readahead_queue [READAHEAD_LIMIT]; /* Readahead queue. */
-int next_readahead_slot; /* Next readahead slot to write into. */
-
+static struct list readahead_list; /* Readahead queue. */
 
 /* Function prototypes. */
 int cache_lookup (block_sector_t sector_idx);
@@ -33,16 +29,13 @@ cache_init (void)
   int i = 0;
   for (; i < CACHE_SIZE; i++)
     {
-      cache_table [i].accessed = false;
-      cache_table [i].dirty = false;
-      cache_table [i].sector_idx = 0;
-      cache_table [i].free = true;
+      cache_table[i].accessed = false;
+      cache_table[i].dirty = false;
+      cache_table[i].sector_idx = 0;
+      cache_table[i].free = true;
     }
   
-  /* Initialize to all -1, which indicates the slot is empty. */
-  for (; i < READAHEAD_LIMIT; i++)
-    readahead_queue [i] = -1;
-    
+  list_init (&readahead_list);
   lock_init (&readahead_lock);
   cond_init (&readahead_cond);
   
@@ -73,22 +66,20 @@ periodic_write_behind (void *aux UNUSED)
 void
 read_ahead (void *aux UNUSED)
 {
-  int ra_index = 0;
+  struct list_elem *next_elem;
 
   /* Thread CANNOT terminate, so it is wrapped in an infinite while loop. */
   while (1)
     {
       lock_acquire (&readahead_lock);
-      if (readahead_queue [ra_index] == -1)
+      if (list_empty (&readahead_list))
         cond_wait (&readahead_cond, &readahead_lock);
       
-      ra_index = ra_index % READAHEAD_LIMIT;
-      cache_fetch ((block_sector_t) readahead_queue [ra_index]);
+      next_elem = list_pop_front (&readahead_list);
+      struct readahead_entry *next_readahead = list_entry (next_elem,
+        struct readahead_entry, readahead_elem);
+      cache_fetch (next_readahead->next_sector);
       lock_release (&readahead_lock);
-      
-      /* Indicate that the slot is empty. */
-      readahead_queue [ra_index] = -1;
-      ra_index++;
     }
 }
 
@@ -98,7 +89,7 @@ cache_lookup (block_sector_t sector_idx)
   int i = 0;
   for (; i < CACHE_SIZE; i++)
     {
-      if (!cache_table [i].free && cache_table [i].sector_idx == sector_idx)
+      if (!cache_table[i].free && cache_table[i].sector_idx == sector_idx)
         return i;
     }
   return -1;
@@ -109,12 +100,12 @@ cache_read (block_sector_t sector_idx, void *buffer)
 {
   int index = cache_lookup (sector_idx);
   if (index >= 0 && index < CACHE_SIZE)
-    memcpy (buffer, cache_table [index].data + index, BLOCK_SECTOR_SIZE);
+    memcpy (buffer, cache_table[index].data + index, BLOCK_SECTOR_SIZE);
   else
     {
       index = cache_fetch (sector_idx);
-      memcpy (buffer, cache_table [index].data + index, BLOCK_SECTOR_SIZE);
-      cache_table [index].accessed = true;
+      memcpy (buffer, cache_table[index].data + index, BLOCK_SECTOR_SIZE);
+      cache_table[index].accessed = true;
     }
 }
 
@@ -123,13 +114,13 @@ cache_write (block_sector_t sector_idx, void *buffer)
 {
   int index = cache_lookup (sector_idx);
   if (index >= 0 && index < CACHE_SIZE)
-    memcpy (cache_table [index].data + index, buffer, BLOCK_SECTOR_SIZE);
+    memcpy (cache_table[index].data + index, buffer, BLOCK_SECTOR_SIZE);
   else
     {
       index = cache_fetch (sector_idx);
-      memcpy (cache_table [index].data + index, buffer, BLOCK_SECTOR_SIZE);
-      cache_table [index].accessed = true;
-      cache_table [index].dirty = true;
+      memcpy (cache_table[index].data + index, buffer, BLOCK_SECTOR_SIZE);
+      cache_table[index].accessed = true;
+      cache_table[index].dirty = true;
     }
 }
 
@@ -140,7 +131,7 @@ cache_fetch (block_sector_t sector_idx)
   int i = 0;
   for (; i < CACHE_SIZE; i++)
     {
-      if (cache_table [i].free)
+      if (cache_table[i].free)
         {
           index = i;
           break;
@@ -152,9 +143,9 @@ cache_fetch (block_sector_t sector_idx)
     }
   else
       num_slots++;
-  block_read (fs_device, sector_idx, cache_table [index].data + index);
-  cache_table [index].free = false;
-  cache_table [index].sector_idx = sector_idx;
+  block_read (fs_device, sector_idx, cache_table[index].data + index);
+  cache_table[index].free = false;
+  cache_table[index].sector_idx = sector_idx;
   return index;
 }
 
@@ -170,8 +161,8 @@ cache_flush (void)
   int i = 0;
   for (; i < CACHE_SIZE; i++)
     {
-      if (!cache_table [i].free && cache_table [i].dirty)
-        block_write (fs_device, cache_table [i].sector_idx,
-          cache_table [i].data + i);
+      if (!cache_table[i].free && cache_table[i].dirty)
+        block_write (fs_device, cache_table[i].sector_idx,
+          cache_table[i].data + i);
     }
 }
