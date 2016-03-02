@@ -147,7 +147,7 @@ cache_fetch (block_sector_t sector_idx)
       num_taken_slots++;
     }
 
-  block_read (fs_device, sector_idx, cache_table[index].data + index);
+  block_read (fs_device, sector_idx, cache_table[index].data);
   
   cache_table[index].free = false;
   cache_table[index].accessed = false;
@@ -171,13 +171,23 @@ int
 cache_evict (void)
 {
   static int cache_clock_handle = 0;
-  cache_writeback_if_dirty (cache_clock_handle);
-  int evicted_idx = cache_clock_handle;
-  if (cache_clock_handle == CACHE_SIZE - 1)
-    cache_clock_handle = 0;
-  else
-    cache_clock_handle++;
-  
+  bool found = false;
+  int evicted_idx;
+  while (!found)
+    {
+      if (cache_table[cache_clock_handle].accessed)
+        cache_table[cache_clock_handle].accessed = false;
+      else
+        {
+          found = true;
+          cache_writeback_if_dirty (cache_clock_handle);
+          evicted_idx = cache_clock_handle;
+          if (cache_clock_handle == CACHE_SIZE - 1)
+            cache_clock_handle = 0;
+          else
+            cache_clock_handle++;
+        }
+    }
   return evicted_idx;
 }
 
