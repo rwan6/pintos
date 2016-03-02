@@ -101,11 +101,11 @@ cache_read (block_sector_t sector_idx, void *buffer)
 {
   int index = cache_lookup (sector_idx);
   if (index >= 0 && index < CACHE_SIZE)
-    memcpy (buffer, cache_table[index].data + index, BLOCK_SECTOR_SIZE);
+    memcpy (buffer, cache_table[index].data, BLOCK_SECTOR_SIZE);
   else
     {
       index = cache_fetch (sector_idx);
-      memcpy (buffer, cache_table[index].data + index, BLOCK_SECTOR_SIZE);
+      memcpy (buffer, cache_table[index].data, BLOCK_SECTOR_SIZE);
       cache_table[index].accessed = true;
     }
 }
@@ -115,11 +115,11 @@ cache_write (block_sector_t sector_idx, void *buffer)
 {
   int index = cache_lookup (sector_idx);
   if (index >= 0 && index < CACHE_SIZE)
-    memcpy (cache_table[index].data + index, buffer, BLOCK_SECTOR_SIZE);
+    memcpy (cache_table[index].data, buffer, BLOCK_SECTOR_SIZE);
   else
     {
       index = cache_fetch (sector_idx);
-      memcpy (cache_table[index].data + index, buffer, BLOCK_SECTOR_SIZE);
+      memcpy (cache_table[index].data, buffer, BLOCK_SECTOR_SIZE);
       cache_table[index].accessed = true;
       cache_table[index].dirty = true;
     }
@@ -148,15 +148,37 @@ cache_fetch (block_sector_t sector_idx)
     }
 
   block_read (fs_device, sector_idx, cache_table[index].data + index);
+  
   cache_table[index].free = false;
+  cache_table[index].accessed = false;
+  cache_table[index].dirty = false;
   cache_table[index].sector_idx = sector_idx;
   return index;
 }
 
+/* Writes the cache block back to disk if the cache block is dirty */
+void
+cache_writeback_if_dirty (int index)
+{
+  if (cache_table[index].dirty)
+    block_write (fs_device, cache_table[index].sector_idx,
+          cache_table[index].data);
+}
+
+/* Evicts the appropriate cache element and returns the index of the
+   evicted element */
 int
 cache_evict (void)
 {
-  return 0;
+  static int cache_clock_handle = 0;
+  cache_writeback_if_dirty (cache_clock_handle);
+  int evicted_idx = cache_clock_handle;
+  if (cache_clock_handle == CACHE_SIZE)
+    cache_clock_handle = 0;
+  else
+    cache_clock_handle++;
+  
+  return evicted_idx;
 }
 
 void
@@ -166,7 +188,6 @@ cache_flush (void)
   for (; i < CACHE_SIZE; i++)
     {
       if (!cache_table[i].free && cache_table[i].dirty)
-        block_write (fs_device, cache_table[i].sector_idx,
-          cache_table[i].data + i);
+        cache_writeback_if_dirty (i);
     }
 }
