@@ -17,8 +17,8 @@ struct cache_entry
   {
     bool accessed;            /* Whether the entry was recently accessed. */
     bool dirty;               /* Whether the entry was recently modified. */
-    block_sector_t sector_idx;  /* Block sector index. */
-    bool free;                  /* Whether the cache entry is free. */
+    int sector_idx;           /* Block sector index. */
+    bool free;                /* Whether the cache entry is free. */
     char data[BLOCK_SECTOR_SIZE]; /* Cache data block. */
     struct lock entry_lock;       /* Per-entry lock. */
   };
@@ -26,8 +26,8 @@ struct cache_entry
 /* Entry into the readahead list for the next block to be fetched. */
 struct readahead_entry
   {
-    block_sector_t next_sector;      /* Next sector to fetch. */
-    struct list_elem readahead_elem; /* readahead_list entry. */
+    int next_sector;                  /* Next sector to fetch. */
+    struct list_elem readahead_elem;  /* readahead_list entry. */
   };
 
 struct cache_entry cache_table[CACHE_SIZE];
@@ -35,6 +35,6 @@ struct cache_entry cache_table[CACHE_SIZE];
 /* Prototypes for cache.c functions. */
 void cache_init (void);
 void cache_read (block_sector_t, void *, int, int);
-void cache_write (block_sector_t, void *, int);
+void cache_write (block_sector_t, void *, int, int);
 
 #endif /* filesys/cache.h */
