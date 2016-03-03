@@ -29,6 +29,14 @@ static int write (int, const void *, unsigned);
 static void seek (int, unsigned);
 static unsigned tell (int);
 static void close (int);
+static bool chdir (const char *);
+static bool mkdir (const char *);
+static bool readdir (int, char *);
+static bool isdir (int);
+static int inumber (int);
+static bool filename_ends_in_slash (const char *);
+static char *get_cleaned_absolute_path (char *);
+static void clean_filename (char *, char *);
 static bool check_pointer (const void *, unsigned);
 static struct sys_fd* get_fd_item (int);
 
@@ -124,6 +132,21 @@ syscall_handler (struct intr_frame *f)
         break;
       case SYS_CLOSE :
         close (arg1);
+        break;
+      case SYS_CHDIR :
+        f->eax = chdir ((char *) arg1);
+        break;
+      case SYS_MKDIR :
+        f->eax = mkdir ((char *) arg1);
+        break;
+      case SYS_READDIR :
+        f->eax = readdir (arg1, (char *) arg2);
+        break;
+      case SYS_ISDIR :
+        f->eax = isdir (arg1);
+        break;
+      case SYS_INUMBER :
+        f->eax = inumber (arg1);
         break;
       default :
         exit (-1);
@@ -508,4 +531,147 @@ close_fd (struct thread *t)
       close (fd);
       e = next;
     }
+}
+
+/* Changes the current working directory of the process to dir, which may be
+   relative or absolute. Returns true if successful, false on failure. */
+static bool
+chdir (const char *dir)
+{
+  if (filename_ends_in_slash (dir))
+    return false;
+  
+  char *abs_path = get_cleaned_absolute_path ((char *) dir);
+  
+  free (abs_path);
+  return true;
+}
+
+/* Creates the directory named dir, which may be relative or absolute.
+   Returns true if successful, false on failure. Fails if dir already
+   exists or if any directory name in dir, besides the last, does not
+   already exist. */
+static bool
+mkdir (const char *dir UNUSED)
+{
+  return true;
+}
+
+/* Reads a directory entry from file descriptor fd, which must represent a
+   directory. If successful, stores the null-terminated file name in name and
+   returns true. If no entries are left in the directory, returns false. */
+static bool
+readdir (int fd, char *name UNUSED)
+{
+  if (!isdir (fd))
+    return false;
+  return true;
+}
+
+/* Returns true if fd represents a directory, false if it represents an
+   ordinary file. */
+static bool
+isdir (int fd UNUSED)
+{
+  return true;
+}
+
+/* Returns the inode number of the inode associated with fd, which may
+   represent an ordinary file or a directory. */
+static int
+inumber (int fd UNUSED)
+{
+  return 0;
+}
+
+/* Return whether the filename ends in a '/', excluding the root directory */
+static bool
+filename_ends_in_slash (const char *filename)
+{
+  if (strlen (filename) == 1)
+    return false;
+  return filename[strlen (filename) - 1] == '/';
+}
+
+/* Returns dir if it is already an absolute path. Otherwise, creates a string
+   of the absolute path and returns it. */
+static char *
+get_cleaned_absolute_path (char *dir)
+{
+  if (*dir == '/')
+    return dir;
+  
+  char *cur_dir = thread_current ()->current_directory;
+  /* Allocate enough space for both strings and their null terminators */
+  char *path = malloc (strlen (cur_dir) + strlen (dir) + 2);
+  if (!path)
+    exit (-1);
+  
+  /* Create the absolute path string (cur_dir + "/" + dir) */
+  memcpy (path, cur_dir, strlen (cur_dir));
+  path[strlen (cur_dir)] = '/';
+  memcpy (path + strlen (cur_dir) + 1, dir, strlen (dir) + 1);
+  
+  char *cleaned_path = malloc (strlen (path) + 1);
+  if (!cleaned_path)
+    {
+      free (path);
+      exit (-1);
+    }
+  clean_filename (path, cleaned_path);
+  return cleaned_path;
+}
+
+/* Removes consecutive '/' and removes extraneous "/./" from the filename.
+   Also removes extra "/../" from the start of filename */
+/* TODO: maybe remove trailing '.' or "/." */
+/* This function might be completely unnecessary */
+static void
+clean_filename (char *filename, char *cleaned)
+{
+  char *tmp1 = malloc (strlen (filename) + 1);
+  if (!tmp1)
+    exit (-1);
+  char *tmp2 = malloc (strlen (filename) + 1);
+  if (!tmp2)
+    {
+      free (tmp1);
+      exit (-1);
+    }
+  /* Remove consecutive '/' from filename */
+  char *cur_in = filename;
+  char *cur_out = tmp1;
+  do
+    {
+      *cur_out = *cur_in;
+      if (*cur_in == '/')
+        {
+          while (*(cur_in + 1) == '/')
+            cur_in++;
+        }
+      cur_in++;
+      cur_out++;
+    } while (*cur_in != '\0');
+    
+  /* Replace any instance of "/./" with "/" */
+  cur_in = tmp1;
+  cur_out = tmp2;
+  do
+    {
+      *cur_out = *cur_in;
+      if ((*cur_in == '/') && (*(cur_in + 1) == '.') &&
+          (*(cur_in + 2) == '/'))
+        cur_in += 2;
+      cur_in++;
+      cur_out++;
+    } while (*cur_in != '\0');
+      
+   /* If a string starts with "/../", replace it with "/" */
+   cur_in = tmp2;
+   while ((*cur_in == '/') && (*(cur_in + 1) == '.') &&
+          (*(cur_in + 2) == '.') && (*(cur_in + 3) == '/'))
+    cur_in += 3;
+   memcpy (cleaned, cur_in, strlen (cur_in) + 1);
+   free (tmp1);
+   free (tmp2);
 }

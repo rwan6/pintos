@@ -94,6 +94,7 @@ struct thread
     tid_t tid;                          /* Thread identifier. */
     enum thread_status status;          /* Thread state. */
     char name[16];                      /* Name (for debugging purposes). */
+    char *current_directory;            /* Absolute working directory path */
     unsigned magic;                     /* Detects stack overflow. */
 
     /* Member variables for Advanced scheduler.
