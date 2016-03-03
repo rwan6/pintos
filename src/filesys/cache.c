@@ -34,9 +34,14 @@ cache_init (void)
       lock_init (&cache_table[i].entry_lock);
     }
 
-  list_init (&readahead_list);
   lock_init (&readahead_lock);
   cond_init (&readahead_cond);
+  
+  i = 0;
+  for (; i < READAHEAD_SIZE; i++)
+    readahead_list[i] = -1;
+  
+  next_readahead_entry = 0;
 
   /* Spawn threads that will write back to cache periodically and will
      manage readahead in the background. */
@@ -55,7 +60,6 @@ periodic_write_behind (void *aux UNUSED)
     {
       timer_msleep (WRITE_BEHIND_WAIT);
       cache_flush();
-      // printf ("Woke up, just wrote back\n");
     }
 }
 
@@ -66,26 +70,21 @@ periodic_write_behind (void *aux UNUSED)
 void
 read_ahead (void *aux UNUSED)
 {
-  struct list_elem *next_elem;
-  struct readahead_entry *next_readahead = NULL;
+  int ra_index = 0;
 
   /* Thread CANNOT terminate, so it is wrapped in an infinite while loop. */
   while (1)
     {
       lock_acquire (&readahead_lock);
-      if (list_empty (&readahead_list))
-        {
-          // printf ("Waiting...\n");
-          cond_wait (&readahead_cond, &readahead_lock);
-        }
-      // printf ("Awake, doing work\n");
-      next_elem = list_pop_front (&readahead_list);
-      next_readahead = list_entry (next_elem,
-        struct readahead_entry, readahead_elem);
-      if (cache_lookup (next_readahead->next_sector) == -1)
-        cache_fetch (next_readahead->next_sector);
+      ra_index = ra_index % READAHEAD_SIZE;
+      if (readahead_list[ra_index] == -1)
+        cond_wait (&readahead_cond, &readahead_lock);
+
+      if (cache_lookup (readahead_list[ra_index]) == -1)
+        cache_fetch (readahead_list[ra_index]);
+      readahead_list[ra_index] = -1;
       lock_release (&readahead_lock);
-      free (next_readahead);
+      ra_index++;
     }
 }
 

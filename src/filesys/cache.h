@@ -10,6 +10,7 @@
 #define WRITE_BEHIND_WAIT 200 /* Period of time (in ms) write behind
                                    thread sleeps before flushing cache
                                    to disk. */
+#define READAHEAD_SIZE CACHE_SIZE/4 /* Size of the readahead queue. */
 
 /* Entry into the cache.  Holds metadata about the entry in addition to
    the data block. */
@@ -23,15 +24,9 @@ struct cache_entry
     struct lock entry_lock;       /* Per-entry lock. */
   };
 
-/* Entry into the readahead list for the next block to be fetched. */
-struct readahead_entry
-  {
-    int next_sector;                  /* Next sector to fetch. */
-    struct list_elem readahead_elem;  /* readahead_list entry. */
-  };
-
 struct cache_entry cache_table[CACHE_SIZE]; /* Buffer cache. */
-struct list readahead_list;          /* Readahead queue. */
+int readahead_list[READAHEAD_SIZE];         /* Readahead queue. */
+int next_readahead_entry; /* Points to next readahead queue entry. */
 
 struct lock readahead_lock;       /* Lock associated with readahead_cond. */
 struct condition readahead_cond;  /* Readahead thread wakeup condition. */
