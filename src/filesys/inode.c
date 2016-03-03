@@ -229,6 +229,23 @@ inode_read_at (struct inode *inode, void *buffer_, off_t size, off_t offset)
       offset += chunk_size;
       bytes_read += chunk_size;
     }
+    
+    /* If we are not yet at the end of the file, have the readahead
+       thread fetch the next block. */
+    if ((BLOCK_SECTOR_SIZE + offset) < inode_length (inode))
+      {
+        lock_acquire (&readahead_lock);
+        struct readahead_entry *ra_entry =
+          malloc (sizeof (struct readahead_entry));
+        if (!ra_entry)
+          PANIC ("Unable to allocate readahead entry!");
+        ra_entry->next_sector = (int) byte_to_sector (inode,
+                                 offset + BLOCK_SECTOR_SIZE);
+        list_push_back (&readahead_list, &ra_entry->readahead_elem);
+        cond_signal (&readahead_cond, &readahead_lock);
+        // printf ("Just signaled!\n");
+        lock_release (&readahead_lock);
+      }
 
   return bytes_read;
 }
