@@ -35,6 +35,7 @@ static block_sector_t indirect_lookup (struct inode_disk *, unsigned);
 static block_sector_t doub_indir_lookup (struct inode_disk *, unsigned);
 static bool file_block_growth (struct inode_disk *);
 static block_sector_t allocate_new_block (void);
+static void file_grow (struct inode_disk *, unsigned);
 
 /* In-memory inode. */
 struct inode
@@ -381,13 +382,31 @@ inode_read_at (struct inode *inode, void *buffer_, off_t size, off_t offset)
 
 /* Writes SIZE bytes from BUFFER into INODE, starting at OFFSET.
    Returns the number of bytes actually written, which may be
-   less than SIZE if end of file is reached or an error occurs.
-   (Normally a write at end of file would extend the inode, but
-   growth is not yet implemented.) */
+   less than SIZE if end of file is reached or an error occurs. */
 off_t
 inode_write_at (struct inode *inode, const void *buffer_, off_t size,
                 off_t offset)
 {
+  /* Determine whether file growth is necessary. */
+  struct inode_disk new_idisk;
+  cache_read (inode->sector, &new_idisk, BLOCK_SECTOR_SIZE, 0); 
+  // printf ("Here, offset: %d, size: %d, idiskL: %d\n", offset, size, new_idisk.length);
+  if ((uint32_t) (offset + size) > new_idisk.length)
+    {
+      uint32_t curr_blocks = new_idisk.num_blocks;
+      int num_blocks_needed = (((int) (offset + size) -
+                              curr_blocks * BLOCK_SECTOR_SIZE)
+                              / BLOCK_SECTOR_SIZE) + 1;
+      int blocks_needed_offset = ((int) (offset + size) -
+                                 curr_blocks * BLOCK_SECTOR_SIZE)
+                                 % BLOCK_SECTOR_SIZE;
+      if (num_blocks_needed > 0 && blocks_needed_offset > 0)
+        { //printf ("About to grow the file, NBN: %d\n", num_blocks_needed);
+          file_grow (&new_idisk, (unsigned) num_blocks_needed);
+          new_idisk.length = offset + size;
+          // printf ("After growing file, length: %d\n", new_idisk.length);
+        }
+    }
   const uint8_t *buffer = buffer_;
   off_t bytes_written = 0;
 
@@ -412,7 +431,7 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
 
       cache_write (sector_idx, (void *) buffer + bytes_written,
         chunk_size, sector_ofs);
-
+        // printf ("BW: %d, size: %d\n", bytes_written, size);
       /* Advance. */
       size -= chunk_size;
       offset += chunk_size;
@@ -449,6 +468,18 @@ inode_length (const struct inode *inode)
   struct inode_disk length_idisk; 
   cache_read (inode->sector, &length_idisk, BLOCK_SECTOR_SIZE, 0);
   return (off_t) length_idisk.length;
+}
+
+static void
+file_grow (struct inode_disk *disk_inode, unsigned num_grow_blocks)
+{
+  unsigned i = 0;
+  for (; i < num_grow_blocks; i++)
+    {
+      bool success = file_block_growth (disk_inode);
+      if (!success)
+        printf ("Couldn't grow the file!\n");
+    }
 }
 
 /* Grow a file by one block.  Determines what level the new block should
