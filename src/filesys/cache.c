@@ -80,6 +80,7 @@ read_ahead (void *aux UNUSED)
       if (readahead_list[ra_index] == -1)
         cond_wait (&readahead_cond, &readahead_lock);
 
+      /* If the block is not already in the cache, fetch it. */
       if (cache_lookup (readahead_list[ra_index]) == -1)
         cache_fetch (readahead_list[ra_index]);
       readahead_list[ra_index] = -1;
