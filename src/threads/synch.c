@@ -119,15 +119,14 @@ sema_up (struct semaphore *sema)
 
   ASSERT (sema != NULL);
 
-  struct list_elem *thread_max_elem = list_max (&sema->waiters,
-    priority_less, NULL);
-  struct thread *thread_max = list_entry (thread_max_elem,
-    struct thread, elem);
-
   /* Added minimal number of lines between disabled interrupts */
   old_level = intr_disable ();
   if (!list_empty (&sema->waiters))
     {
+      struct list_elem *thread_max_elem = list_max (&sema->waiters,
+        priority_less, NULL);
+      struct thread *thread_max = list_entry (thread_max_elem,
+        struct thread, elem);
       list_remove (thread_max_elem);
       thread_unblock (thread_max);
 

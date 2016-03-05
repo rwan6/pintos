@@ -28,6 +28,7 @@ struct cache_entry cache_table[CACHE_SIZE]; /* Buffer cache. */
 int readahead_list[READAHEAD_SIZE];         /* Readahead queue. */
 int next_readahead_entry; /* Points to next readahead queue entry. */
 
+struct lock clock_handle_lock;    /* Lock for the eviction clock handle. */
 struct lock readahead_lock;       /* Lock associated with readahead_cond. */
 struct condition readahead_cond;  /* Readahead thread wakeup condition. */
 

@@ -34,6 +34,7 @@ cache_init (void)
       lock_init (&cache_table[i].entry_lock);
     }
 
+  lock_init (&clock_handle_lock);
   lock_init (&readahead_lock);
   cond_init (&readahead_cond);
   
@@ -188,21 +189,24 @@ cache_evict (void)
   int evicted_idx = -1;
   while (!found)
     {
-      lock_acquire (&cache_table[cache_clock_handle].entry_lock);
-      if (cache_table[cache_clock_handle].accessed)
-        cache_table[cache_clock_handle].accessed = false;
+      volatile int cur_clock_handle = cache_clock_handle;
+      lock_acquire (&cache_table[cur_clock_handle].entry_lock);
+      if (cache_table[cur_clock_handle].accessed)
+        cache_table[cur_clock_handle].accessed = false;
       else
         {
           found = true;
-          cache_writeback_if_dirty (cache_clock_handle);
-          evicted_idx = cache_clock_handle;
+          cache_writeback_if_dirty (cur_clock_handle);
+          evicted_idx = cur_clock_handle;
         }
 
-      lock_release (&cache_table[cache_clock_handle].entry_lock);
+      lock_release (&cache_table[cur_clock_handle].entry_lock);
+      lock_acquire (&clock_handle_lock);
       if (cache_clock_handle == CACHE_SIZE - 1)
         cache_clock_handle = 0;
       else
         cache_clock_handle++;
+      lock_release (&clock_handle_lock);
     }
 
   ASSERT (evicted_idx >= 0);
