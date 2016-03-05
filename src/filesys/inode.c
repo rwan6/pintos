@@ -46,16 +46,7 @@ struct inode
     bool removed;                       /* True if deleted, false otherwise. */
     int deny_write_cnt;                 /* 0: writes ok, >0: deny writes. */
     struct lock inode_lock;             /* Inode synchronization lock. */
-    // struct inode_disk data;             /* Inode content. */
   };
-
-// struct inode_disk
-//   {
-//     block_sector_t start;               /* First data sector. */
-//     off_t length;                       /* File size in bytes. */
-//     unsigned magic;                     /* Magic number. */
-//     uint32_t unused[125];               /* Not used. */
-//   };
 
 /* On-disk inode.  Since it must be BLOCK_SECTOR_SIZE bytes long,
    the first level indexing is based on the metadata size.  In
@@ -191,13 +182,10 @@ inode_create (block_sector_t sector, off_t length, unsigned status)
       disk_inode->magic = INODE_MAGIC;
       disk_inode->status = status;
       disk_inode->num_blocks = 0;
-      // if (free_map_allocate (sectors, &disk_inode->start))
-      //   {
-      //     block_write (fs_device, sector, disk_inode);
+
       success = true;
       if (sectors > 0)
-        { /* TODO: Implement file growth and grow file from here. */
-          // static char zeros[BLOCK_SECTOR_SIZE];
+        {
           size_t i;
           for (i = 0; i < sectors; i++)
             {
@@ -205,9 +193,7 @@ inode_create (block_sector_t sector, off_t length, unsigned status)
               if (!success)
                 break;
             }
-            // block_write (fs_device, disk_inode->start + i, zeros);
         }
-        // }
 
       /* Write the disk_inode into the cache. */
       cache_write (sector, disk_inode, BLOCK_SECTOR_SIZE, 0);
@@ -249,7 +235,6 @@ inode_open (block_sector_t sector)
   inode->deny_write_cnt = 0;
   inode->removed = false;
   lock_init (&inode->inode_lock);
-  // cache_read (sector, &inode->data, BLOCK_SECTOR_SIZE, 0);
   return inode;
 }
 
@@ -407,8 +392,7 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
   if (inode->deny_write_cnt)
     return 0;
 
-  /* Update file size at the end so file length changes are not
-     visible to other processes trying to access the file. */
+  /* Update file size at the end. */
   if (file_grown)
     {
       new_idisk.length = offset + size;
