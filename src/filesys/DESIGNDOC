@@ -32,6 +32,9 @@ FirstName LastName <email@domain.example>
 
 >> A2: What is the maximum size of a file supported by your inode
 >> structure?  Show your work.
+The block size is 512 bytes, meaning each indirect or double indirect block
+has 128 pointers. There are 12 direct block pointers.
+12*512 + 128*512 + 128*128*512 = 8460288 bytes, or 8.07 MB.
 
 ---- SYNCHRONIZATION ----
 

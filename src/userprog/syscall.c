@@ -451,7 +451,7 @@ close (int fd)
       lock_release (&file_lock);
       exit (-1);
     }
-    printf ("In here\n");
+    //printf ("In here\n");
   /* Close the file and remove it from all lists if fd_instance
      is valid. */
 

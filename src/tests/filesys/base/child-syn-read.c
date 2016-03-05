@@ -37,6 +37,9 @@ main (int argc, const char *argv[])
       CHECK (read (fd, &c, 1) > 0, "read \"%s\"", file_name);
       compare_bytes (&c, buf + i, 1, i, file_name);
     }
+    quiet = false;
+    msg("in close\n");
+    quiet = true;
   close (fd);
 
   return child_idx;
