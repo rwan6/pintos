@@ -25,7 +25,7 @@
 
 /* Calculate the maximum location the doubly-indirect level can point to
    and ensure the block_loc does not exceed this. */
-unsigned max_block = FIRSTLEVEL_SIZE + INDIR_DOUB_SIZE + 
+unsigned max_block = FIRSTLEVEL_SIZE + INDIR_DOUB_SIZE +
                      INDIR_DOUB_SIZE * INDIR_DOUB_SIZE;
 
 /* Function prototypes. */
@@ -58,7 +58,7 @@ struct inode
 //   };
 
 /* On-disk inode.  Since it must be BLOCK_SECTOR_SIZE bytes long,
-   the first level indexing is based on the metadata size.  In 
+   the first level indexing is based on the metadata size.  In
    declaration order: 4 + 4 + 4 + 4 + 4*FIRSTLEVEL_SIZE + 4 + 4 = 512. */
 struct inode_disk
   {
@@ -87,19 +87,6 @@ bytes_to_sectors (off_t size)
   return DIV_ROUND_UP (size, BLOCK_SECTOR_SIZE);
 }
 
-// static block_sector_t
-// byte_to_sector (const struct inode *inode, off_t pos)
-// {
-//   ASSERT (inode != NULL);
-//   if (pos < inode->data.length)
-//     {
-//       printf ("Pos/BSS: %d\n", pos / BLOCK_SECTOR_SIZE);
-//       return inode->data.start + pos / BLOCK_SECTOR_SIZE;
-//     }
-//   else
-//     return -1;
-// }
-  
 /* Returns the block device sector that contains byte offset POS
    within INODE by searching the inode hierarchy for the block. */
 static block_sector_t
@@ -107,11 +94,11 @@ byte_to_sector (const struct inode *inode, off_t pos)
 {
   ASSERT (inode != NULL);
   ASSERT ((unsigned) pos < max_block * BLOCK_SECTOR_SIZE);
-  
+
   /* Retrieve the inode_disk object associated with the inode. */
   struct inode_disk new_idisk;
   cache_read (inode->sector, &new_idisk, BLOCK_SECTOR_SIZE, 0);
-  block_sector_t new_sector = block_lookup (&new_idisk, 
+  block_sector_t new_sector = block_lookup (&new_idisk,
                               pos / BLOCK_SECTOR_SIZE);
   return new_sector;
 }
@@ -124,14 +111,14 @@ block_lookup (struct inode_disk *idisk, unsigned block_loc)
 {
   /* Ensure block_loc does not exceed system constraints. */
   ASSERT (block_loc < max_block);
-  
+
   if (block_loc < FIRSTLEVEL_SIZE) /* First level. */
     return idisk->first_level[block_loc];
   else if (block_loc < FIRSTLEVEL_SIZE + INDIR_DOUB_SIZE)
     return indirect_lookup (idisk, block_loc);
   else
     return doub_indir_lookup (idisk, block_loc);
-  
+
   /* Unreachable code. */
   return (max_block + 1);
 }
@@ -163,7 +150,7 @@ doub_indir_lookup (struct inode_disk *idisk, unsigned block_loc)
   cache_read (indir_entry, &new_indir_sect, BLOCK_SECTOR_SIZE, 0);
   int indir_block = (block_loc - (FIRSTLEVEL_SIZE + INDIR_DOUB_SIZE))
                     % INDIR_DOUB_SIZE;
-  
+
   return new_indir_sect.indir_blocks[indir_block];
 }
 
@@ -221,7 +208,7 @@ inode_create (block_sector_t sector, off_t length, unsigned status)
             // block_write (fs_device, disk_inode->start + i, zeros);
         }
         // }
-      
+
       /* Write the disk_inode into the cache. */
       cache_write (sector, disk_inode, BLOCK_SECTOR_SIZE, 0);
     }
@@ -312,7 +299,7 @@ inode_close (struct inode *inode)
           for (b = 0; b < close_idisk.num_blocks; b++)
             {
               close_block = block_lookup (&close_idisk, b);
-              free_map_release (close_block, 1); 
+              free_map_release (close_block, 1);
             }
 
           free_map_release (inode->sector, 1);
@@ -363,7 +350,7 @@ inode_read_at (struct inode *inode, void *buffer_, off_t size, off_t offset)
       offset += chunk_size;
       bytes_read += chunk_size;
     }
-    
+
     /* If we are not yet at the end of the file, have the readahead
        thread fetch the next block. */
     if ((BLOCK_SECTOR_SIZE + offset) < inode_length (inode))
@@ -391,7 +378,6 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
   struct inode_disk new_idisk;
   cache_read (inode->sector, &new_idisk, BLOCK_SECTOR_SIZE, 0);
   bool file_grown = false;
-  // printf ("Here, offset: %d, size: %d, idiskL: %d\n", offset, size, new_idisk.length);
   if ((uint32_t) (offset + size) > new_idisk.length)
     {
       uint32_t curr_blocks = new_idisk.num_blocks;
@@ -402,16 +388,15 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
                                  (int) curr_blocks * BLOCK_SECTOR_SIZE)
                                  % BLOCK_SECTOR_SIZE;
       if (num_blocks_needed > 0 && blocks_needed_offset > 0)
-        { //printf ("About to grow the file, NBN: %d\n", num_blocks_needed);
+        {
           bool success = file_grow (&new_idisk,
                                    (unsigned) num_blocks_needed);
           /* If the necessary number of blocks could not be allocated,
              return that 0 bytes were written. */
           if (!success)
             return 0;
-          
+
           file_grown = true;
-          // printf ("After growing file, length: %d\n", new_idisk.length);
         }
       else if (num_blocks_needed > 0)
         file_grown = true;
@@ -422,31 +407,6 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
   if (inode->deny_write_cnt)
     return 0;
 
-  while (size > 0)
-    {
-      /* Sector to write, starting byte offset within sector. */
-      block_sector_t sector_idx = byte_to_sector (inode, offset);
-      int sector_ofs = offset % BLOCK_SECTOR_SIZE;
-
-      /* Bytes left in inode, bytes left in sector, lesser of the two. */
-      //off_t inode_left = inode_length (inode) - offset;
-      int sector_left = BLOCK_SECTOR_SIZE - sector_ofs;
-      //int min_left = inode_left < sector_left ? inode_left : sector_left;
-
-      /* Number of bytes to actually write into this sector. */
-      int chunk_size = size < sector_left ? size : sector_left;
-      if (chunk_size <= 0)
-        break;
-
-      cache_write (sector_idx, (void *) buffer + bytes_written,
-        chunk_size, sector_ofs);
-        // printf ("BW: %d, size: %d\n", bytes_written, size);
-      /* Advance. */
-      size -= chunk_size;
-      offset += chunk_size;
-      bytes_written += chunk_size;
-    }
-
   /* Update file size at the end so file length changes are not
      visible to other processes trying to access the file. */
   if (file_grown)
@@ -455,7 +415,29 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
       cache_write (inode->sector, &new_idisk,
         BLOCK_SECTOR_SIZE, 0);
     }
-    
+
+  while (size > 0)
+    {
+      /* Sector to write, starting byte offset within sector. */
+      block_sector_t sector_idx = byte_to_sector (inode, offset);
+      int sector_ofs = offset % BLOCK_SECTOR_SIZE;
+
+      /* Bytes left in inode, bytes left in sector, lesser of the two. */
+      int sector_left = BLOCK_SECTOR_SIZE - sector_ofs;
+
+      /* Number of bytes to actually write into this sector. */
+      int chunk_size = size < sector_left ? size : sector_left;
+      if (chunk_size <= 0)
+        break;
+
+      cache_write (sector_idx, (void *) buffer + bytes_written,
+        chunk_size, sector_ofs);
+      /* Advance. */
+      size -= chunk_size;
+      offset += chunk_size;
+      bytes_written += chunk_size;
+    }
+
   return bytes_written;
 }
 
@@ -483,7 +465,7 @@ inode_allow_write (struct inode *inode)
 off_t
 inode_length (const struct inode *inode)
 {
-  struct inode_disk length_idisk; 
+  struct inode_disk length_idisk;
   cache_read (inode->sector, &length_idisk, BLOCK_SECTOR_SIZE, 0);
   return (off_t) length_idisk.length;
 }
@@ -511,10 +493,10 @@ file_block_growth (struct inode_disk *disk_inode)
   uint32_t inode_blocks = disk_inode->num_blocks;
   ASSERT ((unsigned) inode_blocks <= max_block);
   block_sector_t new_sector = (max_block + 1);
-  
+
   /* First check if we need to set up the indirect or doubly-indirect
      levels before proceeding to check where the next block should live. */
-  
+
    /* Indirect setup. */
   if (inode_blocks == FIRSTLEVEL_SIZE)
     {
@@ -558,14 +540,14 @@ file_block_growth (struct inode_disk *disk_inode)
       struct indir_doub_indir_sectors new_doubindir;
       cache_read (disk_inode->doub_indir_level,
         &new_doubindir, BLOCK_SECTOR_SIZE, 0);
-                  
+
       /* Calculate entry locations for both the doubly-indirect and the
          indirect level. */
       int doubly_indir_entry = (inode_blocks - (FIRSTLEVEL_SIZE +
                                INDIR_DOUB_SIZE)) / INDIR_DOUB_SIZE;
       int indir_entry = (inode_blocks - (FIRSTLEVEL_SIZE + INDIR_DOUB_SIZE))
                         % INDIR_DOUB_SIZE;
-      
+
       /* If zero, we need to set up the doubly-indirect level's indirect
          level first. */
       if (indir_entry == 0)
@@ -577,13 +559,13 @@ file_block_growth (struct inode_disk *disk_inode)
           cache_write (disk_inode->doub_indir_level,
             &new_doubindir, BLOCK_SECTOR_SIZE, 0);
         }
-      
+
       block_sector_t indir_block = new_doubindir.indir_blocks[indir_entry];
       cache_read (indir_block, &new_doubindir, BLOCK_SECTOR_SIZE, 0);
       new_doubindir.indir_blocks[indir_entry] = new_sector;
       cache_write (indir_block, &new_doubindir, BLOCK_SECTOR_SIZE, 0);
     }
-    
+
     /* Allocation was successful. */
     disk_inode->num_blocks++;
     return true;
@@ -604,7 +586,7 @@ allocate_new_block (void)
       memset (&dummy_buffer, 0, BLOCK_SECTOR_SIZE);
       cache_write (new_block, &dummy_buffer, BLOCK_SECTOR_SIZE, 0);
     }
-    
+
   return new_block;
 }
 

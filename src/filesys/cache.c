@@ -37,11 +37,11 @@ cache_init (void)
   lock_init (&clock_handle_lock);
   lock_init (&readahead_lock);
   cond_init (&readahead_cond);
-  
+
   i = 0;
   for (; i < READAHEAD_SIZE; i++)
     readahead_list[i] = -1;
-  
+
   next_readahead_entry = 0;
 
   /* Spawn threads that will write back to cache periodically and will
