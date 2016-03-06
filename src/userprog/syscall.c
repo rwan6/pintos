@@ -7,12 +7,13 @@
 #include "threads/interrupt.h"
 #include "threads/thread.h"
 #include "threads/malloc.h"
-#include "threads/synch.h"    /* For synching in exec and with files */
-#include "threads/vaddr.h"    /* For validating the user address. */
-#include "devices/shutdown.h" /* For shutdown_power_off. */
-#include "devices/input.h"    /* For input_putc(). */
-#include "filesys/file.h"     /* For file operations. */
-#include "filesys/filesys.h"  /* For filesys operations. */
+#include "threads/synch.h"     /* For synching in exec and with files */
+#include "threads/vaddr.h"     /* For validating the user address. */
+#include "devices/shutdown.h"  /* For shutdown_power_off. */
+#include "devices/input.h"     /* For input_putc(). */
+#include "filesys/file.h"      /* For file operations. */
+#include "filesys/filesys.h"   /* For filesys operations. */
+#include "filesys/directory.h"
 
 /* Prototypes for system call functions and helper functions. */
 static void syscall_handler (struct intr_frame *);
@@ -35,7 +36,6 @@ static bool readdir (int, char *);
 static bool isdir (int);
 static int inumber (int);
 static bool filename_ends_in_slash (const char *);
-static char *get_cleaned_absolute_path (char *);
 static void clean_filename (char *, char *);
 static bool check_pointer (const void *, unsigned);
 static struct sys_fd* get_fd_item (int);
@@ -207,7 +207,8 @@ static bool
 create (const char *file, unsigned initial_size)
 {
   bool success;
-  success = filesys_create (file, initial_size);
+  struct dir *dir = thread_current ()->current_directory;
+  success = filesys_create (dir, file, initial_size);
   return success;
 }
 
@@ -245,7 +246,8 @@ open (const char *file)
         }
     }
 
-  struct file *f = filesys_open (file);
+  struct dir *dir = thread_current ()->current_directory;
+  struct file *f = filesys_open (dir, file);
 
   if (!f)
     return -1;
@@ -497,10 +499,6 @@ chdir (const char *dir)
 {
   if (filename_ends_in_slash (dir))
     return false;
-
-  char *abs_path = get_cleaned_absolute_path ((char *) dir);
-
-  free (abs_path);
   return true;
 }
 
@@ -548,35 +546,6 @@ filename_ends_in_slash (const char *filename)
   if (strlen (filename) == 1)
     return false;
   return filename[strlen (filename) - 1] == '/';
-}
-
-/* Returns dir if it is already an absolute path. Otherwise, creates a string
-   of the absolute path and returns it. */
-static char *
-get_cleaned_absolute_path (char *dir)
-{
-  if (*dir == '/')
-    return dir;
-
-  char *cur_dir = thread_current ()->current_directory;
-  /* Allocate enough space for both strings and their null terminators */
-  char *path = malloc (strlen (cur_dir) + strlen (dir) + 2);
-  if (!path)
-    exit (-1);
-
-  /* Create the absolute path string (cur_dir + "/" + dir) */
-  memcpy (path, cur_dir, strlen (cur_dir));
-  path[strlen (cur_dir)] = '/';
-  memcpy (path + strlen (cur_dir) + 1, dir, strlen (dir) + 1);
-
-  char *cleaned_path = malloc (strlen (path) + 1);
-  if (!cleaned_path)
-    {
-      free (path);
-      exit (-1);
-    }
-  clean_filename (path, cleaned_path);
-  return cleaned_path;
 }
 
 /* Removes consecutive '/' and removes extraneous "/./" from the filename.

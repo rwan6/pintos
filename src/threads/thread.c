@@ -15,6 +15,7 @@
 #include "userprog/process.h"
 #endif
 #include "filesys/cache.h"
+#include "filesys/directory.h"
 
 /* Random value for struct thread's `magic' member.
    Used to detect stack overflow.  See the big comment at the top
@@ -588,6 +589,7 @@ init_thread (struct thread *t, const char *name, int priority)
   memset (t, 0, sizeof *t);
   t->status = THREAD_BLOCKED;
   strlcpy (t->name, name, sizeof t->name);
+  t->current_directory = dir_open_root ();
 
   t->thread_timer_ticks = 0;
   t->starting_timer_ticks = 0;

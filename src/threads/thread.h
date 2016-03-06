@@ -7,6 +7,7 @@
 #include "threads/synch.h"
 #include "threads/fixed-point.h"
 #include "devices/timer.h"
+#include "filesys/directory.h"
 
 /* States in a thread's life cycle. */
 enum thread_status
@@ -94,7 +95,7 @@ struct thread
     tid_t tid;                          /* Thread identifier. */
     enum thread_status status;          /* Thread state. */
     char name[16];                      /* Name (for debugging purposes). */
-    char *current_directory;            /* Absolute working directory path */
+    struct dir *current_directory;      /* Thread current working directory */
     unsigned magic;                     /* Detects stack overflow. */
 
     /* Member variables for Advanced scheduler.
