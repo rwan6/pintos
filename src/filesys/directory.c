@@ -246,3 +246,44 @@ dir_readdir (struct dir *dir, char name[NAME_MAX + 1])
     }
   return false;
 }
+
+struct dir *
+dir_from_path (struct dir *cur_dir, const char *path)
+{
+  if (*path == '/')
+    {
+      /* path is an absolute path */
+      cur_dir = dir_open_root ();
+    }
+    
+  char *s = malloc (strlen (path) + 1);
+  if (!s)
+    return NULL;
+  strlcpy (s, path, strlen(path));
+  char *token, *save_ptr;
+  
+  struct dir_entry e;
+  for (token = strtok_r (s, "/", &save_ptr); token != NULL;
+        token = strtok_r (NULL, "/", &save_ptr))
+    {
+      if (!strcmp (token, "."))
+        continue;
+      else if (!strcmp (token, ".."))
+        cur_dir = cur_dir->parent;
+      else if (lookup (cur_dir, token, &e, NULL))
+        if (e.child_dir)
+          cur_dir = e.child_dir;
+        else
+          {
+            free (s);
+            return NULL;
+          }
+      else
+        {
+          free (s);
+          return NULL;
+        }
+    }
+    free (s);
+    return cur_dir;
+}

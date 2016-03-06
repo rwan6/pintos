@@ -208,7 +208,7 @@ create (const char *file, unsigned initial_size)
 {
   bool success;
   struct dir *dir = thread_current ()->current_directory;
-  success = filesys_create (dir, file, initial_size);
+  success = filesys_create (dir, file, initial_size, true);
   return success;
 }
 
@@ -500,7 +500,20 @@ chdir (const char *dir)
 {
   if (filename_ends_in_slash (dir))
     return false;
-  return true;
+  
+  struct dir *cur_dir = thread_current ()->current_directory;
+  struct dir *new_dir = dir_from_path (cur_dir, dir);
+  
+  if (new_dir)
+    thread_current ()->current_directory = new_dir;
+  
+  return (new_dir != NULL);
+}
+
+void
+last_dir (const char *dir, char *last_dir)
+{
+  char *c = strrchr (dir, '/');
 }
 
 /* Creates the directory named dir, which may be relative or absolute.
@@ -508,9 +521,32 @@ chdir (const char *dir)
    exists or if any directory name in dir, besides the last, does not
    already exist. */
 static bool
-mkdir (const char *dir UNUSED)
+mkdir (const char *dir)
 {
-  return true;
+  if (filename_ends_in_slash (dir))
+    return false;
+  
+  char *dir_copy = malloc (strlen (dir) + 1);
+  if (!dir_copy)
+    exit (-1);
+  
+  strlcpy (dir_copy, dir, strlen (dir));
+  char *c = strrchr (dir_copy, '/');
+  struct dir *cur_dir = thread_current ()->current_directory;
+  struct dir *parent_dir = cur_dir;
+  if (c)
+    {
+      *c = '\0';
+      parent_dir = dir_from_path (cur_dir, dir_copy);
+      if (!parent_dir)
+        {
+          free (dir_copy);
+          return false;
+        }
+    }
+  free (dir_copy);
+  
+  return filesys_create (parent_dir, dir, 16, false);
 }
 
 /* Reads a directory entry from file descriptor fd, which must represent a
@@ -598,7 +634,7 @@ clean_filename (char *filename, char *cleaned)
    while ((*cur_in == '/') && (*(cur_in + 1) == '.') &&
           (*(cur_in + 2) == '.') && (*(cur_in + 3) == '/'))
     cur_in += 3;
-   memcpy (cleaned, cur_in, strlen (cur_in) + 1);
+   strlcpy (cleaned, cur_in, strlen (cur_in));
    free (tmp1);
    free (tmp2);
 }

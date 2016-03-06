@@ -12,10 +12,10 @@
 /* Block device that contains the file system. */
 struct block *fs_device;
 
-void filesys_init (bool format);
+void filesys_init (bool);
 void filesys_done (void);
-bool filesys_create (struct dir *dir, const char *name, off_t initial_size);
-struct file *filesys_open (struct dir *dir, const char *name);
-bool filesys_remove (struct dir *dir, const char *name);
+bool filesys_create (struct dir *, const char *, off_t, bool);
+struct file *filesys_open (struct dir *, const char *);
+bool filesys_remove (struct dir *, const char *);
 
 #endif /* filesys/filesys.h */
