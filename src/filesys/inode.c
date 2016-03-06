@@ -69,6 +69,11 @@ struct indir_doub_indir_sectors
     block_sector_t indir_blocks[INDIR_DOUB_SIZE]; /* Indirect and doubly
                                                      indirect blocks. */
   };
+  
+/* List of open inodes, so that opening a single inode twice
+   returns the same 'struct inode'. */
+static struct list open_inodes;
+struct lock open_inodes_lock; /* Lock for open_inodes list. */
 
 /* Returns the number of sectors to allocate for an inode SIZE
    bytes long. */
@@ -145,16 +150,13 @@ doub_indir_lookup (struct inode_disk *idisk, unsigned block_loc)
   return new_indir_sect.indir_blocks[indir_block];
 }
 
-/* List of open inodes, so that opening a single inode twice
-   returns the same `struct inode'. */
-static struct list open_inodes;
-
 /* Initializes the inode module. */
 void
 inode_init (void)
 {
   cache_init ();
   list_init (&open_inodes);
+  lock_init (&open_inodes_lock);
 }
 
 /* Initializes an inode with LENGTH bytes of data and
@@ -212,6 +214,7 @@ inode_open (block_sector_t sector)
   struct inode *inode;
 
   /* Check whether this inode is already open. */
+  lock_acquire (&open_inodes_lock);
   for (e = list_begin (&open_inodes); e != list_end (&open_inodes);
        e = list_next (e))
     {
@@ -219,6 +222,7 @@ inode_open (block_sector_t sector)
       if (inode->sector == sector)
         {
           inode_reopen (inode);
+          lock_release (&open_inodes_lock);
           return inode;
         }
     }
@@ -230,6 +234,8 @@ inode_open (block_sector_t sector)
 
   /* Initialize. */
   list_push_front (&open_inodes, &inode->elem);
+  lock_release (&open_inodes_lock);
+    
   inode->sector = sector;
   inode->open_cnt = 1;
   inode->deny_write_cnt = 0;
@@ -265,12 +271,15 @@ inode_close (struct inode *inode)
   if (inode == NULL)
     return;
 
+  lock_acquire (&open_inodes_lock);
   /* Release resources if this was the last opener. */
   if (--inode->open_cnt == 0)
     {
       /* Remove from inode list and release lock. */
       list_remove (&inode->elem);
-
+      
+      lock_release (&open_inodes_lock);
+      
       /* Deallocate blocks if removed. */
       if (inode->removed)
         {
@@ -290,9 +299,10 @@ inode_close (struct inode *inode)
 
           free_map_release (inode->sector, 1);
         }
-
       free (inode);
     }
+  else
+    lock_release (&open_inodes_lock);
 }
 
 /* Marks INODE to be deleted when it is closed by the last caller who
@@ -319,7 +329,7 @@ inode_read_at (struct inode *inode, void *buffer_, off_t size, off_t offset)
   struct inode_disk new_idisk;
   cache_read (inode->sector, &new_idisk, BLOCK_SECTOR_SIZE, 0);
 
-  if (size + offset > new_idisk.length)
+  if ((unsigned) (size + offset) > new_idisk.length)
     lock_acquire (&inode->inode_lock);
 
   while (size > 0)
@@ -346,7 +356,7 @@ inode_read_at (struct inode *inode, void *buffer_, off_t size, off_t offset)
       bytes_read += chunk_size;
     }
 
-  if (size + offset > new_idisk.length)
+  if ((unsigned) (size + offset) > new_idisk.length)
     lock_release (&inode->inode_lock);
   
   /* If we are not yet at the end of the file, have the readahead
