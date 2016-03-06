@@ -6,8 +6,8 @@
 #include "devices/block.h"
 #include "threads/synch.h"
 
-#define CACHE_SIZE 64 /* Size limit for the buffer cache. */
-#define WRITE_BEHIND_WAIT 200 /* Period of time (in ms) write behind
+#define CACHE_SIZE 64           /* Size limit for the buffer cache. */
+#define WRITE_BEHIND_WAIT 200   /* Period of time (in ms) write behind
                                    thread sleeps before flushing cache
                                    to disk. */
 #define READAHEAD_SIZE CACHE_SIZE / 4 /* Size of the readahead queue. */
