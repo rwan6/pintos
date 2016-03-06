@@ -497,10 +497,6 @@ chdir (const char *dir)
 {
   if (filename_ends_in_slash (dir))
     return false;
-
-  char *abs_path = get_cleaned_absolute_path ((char *) dir);
-
-  free (abs_path);
   return true;
 }
 
@@ -550,34 +546,6 @@ filename_ends_in_slash (const char *filename)
   return filename[strlen (filename) - 1] == '/';
 }
 
-/* Returns dir if it is already an absolute path. Otherwise, creates a string
-   of the absolute path and returns it. */
-static char *
-get_cleaned_absolute_path (char *dir)
-{
-  if (*dir == '/')
-    return dir;
-
-  char *cur_dir = thread_current ()->current_directory;
-  /* Allocate enough space for both strings and their null terminators */
-  char *path = malloc (strlen (cur_dir) + strlen (dir) + 2);
-  if (!path)
-    exit (-1);
-
-  /* Create the absolute path string (cur_dir + "/" + dir) */
-  memcpy (path, cur_dir, strlen (cur_dir));
-  path[strlen (cur_dir)] = '/';
-  memcpy (path + strlen (cur_dir) + 1, dir, strlen (dir) + 1);
-
-  char *cleaned_path = malloc (strlen (path) + 1);
-  if (!cleaned_path)
-    {
-      free (path);
-      exit (-1);
-    }
-  clean_filename (path, cleaned_path);
-  return cleaned_path;
-}
 
 /* Removes consecutive '/' and removes extraneous "/./" from the filename.
    Also removes extra "/../" from the start of filename */

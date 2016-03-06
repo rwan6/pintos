@@ -94,7 +94,6 @@ process_execute (const char *file_name)
 
       /* Child inherits the working directory from its parent */
       /* TODO: change this because it should be its own pointer */
-      child_thread->current_directory = thread_current ()->current_directory;
 
       cp = malloc (sizeof (struct child_process));
       if (cp == NULL)
