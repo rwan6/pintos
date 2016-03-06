@@ -503,7 +503,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
   process_activate ();
 
   /* Open executable file. */
-  file = filesys_open (dir_open_root (), file_name);
+  file = filesys_open (t->current_directory, file_name);
   if (file == NULL)
     {
       printf ("load: %s: open failed\n", file_name);
