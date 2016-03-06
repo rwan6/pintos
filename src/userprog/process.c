@@ -91,7 +91,7 @@ process_execute (const char *file_name)
           palloc_free_page (fn_copy2);
           return -1;
         }
-        
+
       /* Child inherits the working directory from its parent */
       /* TODO: change this because it should be its own pointer */
       child_thread->current_directory = thread_current ()->current_directory;
@@ -106,9 +106,7 @@ process_execute (const char *file_name)
       cp->child = child_thread;
       cp->child->my_process = cp;
       cp->child_tid = tid;
-      lock_acquire (&file_lock);
       cp->child->executable = filesys_open (file_name);
-      lock_release (&file_lock);
 
       /* Deny writes to executable. */
       if (cp->child->executable != NULL)
@@ -505,9 +503,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
   process_activate ();
 
   /* Open executable file. */
-  lock_acquire (&file_lock);
   file = filesys_open (file_name);
-  lock_release (&file_lock);
   if (file == NULL)
     {
       printf ("load: %s: open failed\n", file_name);

@@ -207,9 +207,7 @@ static bool
 create (const char *file, unsigned initial_size)
 {
   bool success;
-  lock_acquire (&file_lock);
   success = filesys_create (file, initial_size);
-  lock_release (&file_lock);
   return success;
 }
 
@@ -220,9 +218,7 @@ static bool
 remove (const char *file)
 {
   bool success;
-  lock_acquire (&file_lock);
   success = filesys_remove (file);
-  lock_release (&file_lock);
   return success;
 }
 
@@ -237,7 +233,6 @@ open (const char *file)
   struct sys_file* sf = NULL;
 
   /* Figure out if we have opened this file before. */
-  lock_acquire (&file_lock);
   for (e = list_begin (&opened_files);
        e != list_end (&opened_files);
        e = list_next(e))
@@ -253,17 +248,11 @@ open (const char *file)
   struct file *f = filesys_open (file);
 
   if (!f)
-    {
-      lock_release (&file_lock);
-      return -1;
-    }
+    return -1;
 
   struct sys_fd *fd = malloc (sizeof (struct sys_fd));
   if (!fd)
-    {
-      lock_release (&file_lock);
-      exit (-1);
-    }
+    exit (-1);
   fd->value = next_avail_fd++;
   fd->file = f;
   fd->owner_tid = thread_current ()->tid;
@@ -275,7 +264,6 @@ open (const char *file)
       if (!sf)
         {
           free (fd);
-          lock_release (&file_lock);
           exit (-1);
         }
       list_init (&sf->fd_list);
@@ -295,8 +283,6 @@ open (const char *file)
   struct thread *t = thread_current ();
   list_push_back (&t->opened_fds, &fd->thread_opened_elem);
 
-  lock_release (&file_lock);
-
   return fd->value;
 }
 
@@ -306,19 +292,14 @@ static int
 filesize (int fd)
 {
   int file_size;
-  lock_acquire (&file_lock);
   struct sys_fd *fd_instance = get_fd_item (fd);
 
   /* If the pointer returned to fd_instance is NULL, the fd was not
      found in the file list.  Thus, we should exit immediately. */
   if (fd_instance == NULL)
-    {
-      lock_release (&file_lock);
-      exit (-1);
-    }
+    exit (-1);
 
   file_size = file_length (fd_instance->file);
-  lock_release (&file_lock);
   return file_size;
 }
 
@@ -338,19 +319,14 @@ read (int fd, void *buffer, unsigned size)
     }
   else
     {
-      lock_acquire (&file_lock);
       struct sys_fd *fd_instance = get_fd_item (fd);
 
       /* If the pointer returned to fd_instance is NULL, the fd was not
          found in the file list.  Thus, we should exit immediately. */
       if (fd_instance == NULL)
-        {
-          lock_release (&file_lock);
-          exit (-1);
-        }
+        exit (-1);
 
       num_read = file_read (fd_instance->file, buffer, size);
-      lock_release (&file_lock);
       return num_read;
     }
 }
@@ -372,19 +348,14 @@ write (int fd, const void *buffer, unsigned size)
     }
   else
     {
-      lock_acquire (&file_lock);
       struct sys_fd *fd_instance = get_fd_item (fd);
 
       /* If the pointer returned to fd_instance is NULL, the fd was not
          found in the file list.  Thus, we should exit immediately. */
       if (fd_instance == NULL)
-        {
-          lock_release (&file_lock);
-          exit (-1);
-        }
+        exit (-1);
 
       num_written = file_write (fd_instance->file, buffer, size);
-      lock_release (&file_lock);
       return num_written;
     }
 }
@@ -395,19 +366,14 @@ write (int fd, const void *buffer, unsigned size)
 static void
 seek (int fd, unsigned position)
 {
-  lock_acquire (&file_lock);
   struct sys_fd *fd_instance = get_fd_item (fd);
 
   /* If the pointer returned to fd_instance is NULL, the fd was not
      found in the file list.  Thus, we should exit immediately. */
   if (fd_instance == NULL)
-    {
-      lock_release (&file_lock);
-      exit (-1);
-    }
+    exit (-1);
 
   file_seek (fd_instance->file, position);
-  lock_release (&file_lock);
 
 }
 
@@ -416,20 +382,15 @@ seek (int fd, unsigned position)
 static unsigned
 tell (int fd)
 {
-  lock_acquire (&file_lock);
   unsigned position;
   struct sys_fd *fd_instance = get_fd_item (fd);
 
   /* If the pointer returned to fd_instance is NULL, the fd was not
      found in the file list.  Thus, we should exit immediately. */
   if (fd_instance == NULL)
-    {
-      lock_release (&file_lock);
-      exit (-1);
-    }
+    exit (-1);
 
   position = (unsigned) file_tell (fd_instance->file);
-  lock_release (&file_lock);
   return position;
 }
 
@@ -439,7 +400,6 @@ tell (int fd)
 static void
 close (int fd)
 {
-  lock_acquire (&file_lock);
   struct sys_fd *fd_instance = get_fd_item (fd);
 
   /* If the pointer returned to fd_instance is NULL, the fd was not
@@ -447,11 +407,8 @@ close (int fd)
      Note that this also takes care of the case when stdin or stdout
      are passed as fd (0 and 1, respectively). */
   if (fd_instance == NULL)
-    {
-      lock_release (&file_lock);
-      exit (-1);
-    }
-    //printf ("In here\n");
+    exit (-1);
+
   /* Close the file and remove it from all lists if fd_instance
      is valid. */
 
@@ -467,7 +424,6 @@ close (int fd)
       free (fd_instance->sys_file);
     }
   free (fd_instance);
-  lock_release (&file_lock);
 }
 
 /* Function to check all pointers that are passed to system calls.
@@ -541,9 +497,9 @@ chdir (const char *dir)
 {
   if (filename_ends_in_slash (dir))
     return false;
-  
+
   char *abs_path = get_cleaned_absolute_path ((char *) dir);
-  
+
   free (abs_path);
   return true;
 }
@@ -601,18 +557,18 @@ get_cleaned_absolute_path (char *dir)
 {
   if (*dir == '/')
     return dir;
-  
+
   char *cur_dir = thread_current ()->current_directory;
   /* Allocate enough space for both strings and their null terminators */
   char *path = malloc (strlen (cur_dir) + strlen (dir) + 2);
   if (!path)
     exit (-1);
-  
+
   /* Create the absolute path string (cur_dir + "/" + dir) */
   memcpy (path, cur_dir, strlen (cur_dir));
   path[strlen (cur_dir)] = '/';
   memcpy (path + strlen (cur_dir) + 1, dir, strlen (dir) + 1);
-  
+
   char *cleaned_path = malloc (strlen (path) + 1);
   if (!cleaned_path)
     {
@@ -653,7 +609,7 @@ clean_filename (char *filename, char *cleaned)
       cur_in++;
       cur_out++;
     } while (*cur_in != '\0');
-    
+
   /* Replace any instance of "/./" with "/" */
   cur_in = tmp1;
   cur_out = tmp2;
@@ -666,7 +622,7 @@ clean_filename (char *filename, char *cleaned)
       cur_in++;
       cur_out++;
     } while (*cur_in != '\0');
-      
+
    /* If a string starts with "/../", replace it with "/" */
    cur_in = tmp2;
    while ((*cur_in == '/') && (*(cur_in + 1) == '.') &&

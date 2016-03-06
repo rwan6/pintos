@@ -101,8 +101,7 @@ thread_init (void)
   lock_init (&tid_lock);
   list_init (&ready_list);
   list_init (&all_list);
-  
-  lock_init (&file_lock);
+
   lock_init (&exit_lock);
 
   if (thread_mlfqs)
@@ -235,7 +234,7 @@ thread_create (const char *name, int priority,
   sf = alloc_frame (t, sizeof *sf);
   sf->eip = switch_entry;
   sf->ebp = 0;
-  
+
   t->return_status = -1;
 
   /* Add to run queue. */

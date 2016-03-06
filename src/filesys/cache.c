@@ -14,7 +14,6 @@ int cache_lookup (block_sector_t sector_idx);
 int cache_fetch (block_sector_t);
 void cache_writeback_if_dirty (int);
 int cache_evict (void);
-void cache_flush (void);
 void cache_readahead (void);
 void periodic_write_behind (void *);
 void read_ahead (void *);

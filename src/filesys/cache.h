@@ -36,5 +36,6 @@ struct condition readahead_cond;  /* Readahead thread wakeup condition. */
 void cache_init (void);
 void cache_read (block_sector_t, void *, int, int);
 void cache_write (block_sector_t, void *, int, int);
+void cache_flush (void);
 
 #endif /* filesys/cache.h */
