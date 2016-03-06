@@ -15,7 +15,7 @@
 /* Number of inode_disk objects that are not part of the inode's first level
    hierarchy.  Used to determine how many sectors the first level should
    have. */
-#define NUM_METADATA_INDIR_DOUB 6
+#define NUM_METADATA_INDIR_DOUB 5
 
 /* Size of the inode hierarchy first level. */
 #define FIRSTLEVEL_SIZE ((BLOCK_SECTOR_SIZE / 4) - NUM_METADATA_INDIR_DOUB)
@@ -56,7 +56,6 @@ struct inode_disk
     uint32_t length;         /* File size in bytes. */
     uint32_t num_blocks;     /* Number of blocks allocated to this file. */
     unsigned magic;          /* Magic number. */
-    unsigned status;         /* Inode status. */
     block_sector_t first_level[FIRSTLEVEL_SIZE]; /* First level blocks. */
     block_sector_t indir_level;       /* Indirect sector. */
     block_sector_t doub_indir_level;  /* Doubly-indirect sector. */

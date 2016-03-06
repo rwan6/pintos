@@ -142,7 +142,8 @@ dir_lookup (const struct dir *dir, const char *name,
    Fails if NAME is invalid (i.e. too long) or a disk or memory
    error occurs. */
 bool
-dir_add (struct dir *dir, const char *name, block_sector_t inode_sector)
+dir_add (struct dir *dir, const char *name, block_sector_t inode_sector,
+         bool is_file)
 {
   struct dir_entry e;
   off_t ofs;
@@ -175,6 +176,14 @@ dir_add (struct dir *dir, const char *name, block_sector_t inode_sector)
   e.in_use = true;
   strlcpy (e.name, name, sizeof e.name);
   e.inode_sector = inode_sector;
+  e.cur_dir = dir;
+  if (is_file)
+    e.child_dir = NULL;
+  else
+    {
+      e.child_dir = dir_open (inode_open (inode_sector));
+      e.child_dir->parent = dir;
+    }
   success = inode_write_at (dir->inode, &e, sizeof e, ofs) == sizeof e;
 
  done:
