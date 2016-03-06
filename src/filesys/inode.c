@@ -15,7 +15,7 @@
 /* Number of inode_disk objects that are not part of the inode's first level
    hierarchy.  Used to determine how many sectors the first level should
    have. */
-#define NUM_METADATA_INDIR_DOUB 5
+#define NUM_METADATA_INDIR_DOUB 6
 
 /* Size of the inode hierarchy first level. */
 #define FIRSTLEVEL_SIZE ((BLOCK_SECTOR_SIZE / 4) - NUM_METADATA_INDIR_DOUB)
@@ -50,12 +50,13 @@ struct inode
 
 /* On-disk inode.  Since it must be BLOCK_SECTOR_SIZE bytes long,
    the first level indexing is based on the metadata size.  In
-   declaration order: 4 + 4 + 4 + 4*FIRSTLEVEL_SIZE + 4 + 4 = 512. */
+   declaration order: 4 + 4 + 4 + 4 + 4*FIRSTLEVEL_SIZE + 4 + 4 = 512. */
 struct inode_disk
   {
     uint32_t length;         /* File size in bytes. */
     uint32_t num_blocks;     /* Number of blocks allocated to this file. */
     unsigned magic;          /* Magic number. */
+    unsigned is_file;        /* Is this inode a file? */
     block_sector_t first_level[FIRSTLEVEL_SIZE]; /* First level blocks. */
     block_sector_t indir_level;       /* Indirect sector. */
     block_sector_t doub_indir_level;  /* Doubly-indirect sector. */
@@ -164,7 +165,7 @@ inode_init (void)
    Returns true if successful.
    Returns false if memory or disk allocation fails. */
 bool
-inode_create (block_sector_t sector, off_t length)
+inode_create (block_sector_t sector, off_t length, unsigned is_file)
 {
   struct inode_disk *disk_inode = NULL; //printf("creating sector %u\n", sector);
   bool success = false;
@@ -181,6 +182,7 @@ inode_create (block_sector_t sector, off_t length)
       size_t sectors = bytes_to_sectors (length);
       disk_inode->length = length;
       disk_inode->magic = INODE_MAGIC;
+      disk_inode->is_file = is_file;
       disk_inode->num_blocks = 0;
 
       success = true;
