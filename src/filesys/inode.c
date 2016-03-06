@@ -24,7 +24,7 @@
 #define INDIR_DOUB_SIZE BLOCK_SECTOR_SIZE / 4
 
 /* Calculate the maximum location the doubly-indirect level can point to
-   and ensure the block_loc does not exceed this. */
+   and ensure that a process does not try to access past this. */
 unsigned max_block = FIRSTLEVEL_SIZE + INDIR_DOUB_SIZE +
                      INDIR_DOUB_SIZE * INDIR_DOUB_SIZE;
 
@@ -40,17 +40,17 @@ static bool file_grow (struct inode_disk *, unsigned);
 /* In-memory inode. */
 struct inode
   {
-    struct list_elem elem;              /* Element in inode list. */
-    block_sector_t sector;              /* Sector number of disk location. */
-    int open_cnt;                       /* Number of openers. */
-    bool removed;                       /* True if deleted, false otherwise. */
-    int deny_write_cnt;                 /* 0: writes ok, >0: deny writes. */
-    struct lock inode_lock;             /* Inode synchronization lock. */
+    struct list_elem elem;       /* Element in inode list. */
+    block_sector_t sector;       /* Sector number of disk location. */
+    int open_cnt;                /* Number of openers. */
+    bool removed;                /* True if deleted, false otherwise. */
+    int deny_write_cnt;          /* 0: writes ok, >0: deny writes. */
+    struct lock inode_lock;      /* Inode synchronization lock. */
   };
 
 /* On-disk inode.  Since it must be BLOCK_SECTOR_SIZE bytes long,
    the first level indexing is based on the metadata size.  In
-   declaration order: 4 + 4 + 4 + 4 + 4*FIRSTLEVEL_SIZE + 4 + 4 = 512. */
+   declaration order: 4 + 4 + 4 + 4*FIRSTLEVEL_SIZE + 4 + 4 = 512. */
 struct inode_disk
   {
     uint32_t length;         /* File size in bytes. */
@@ -69,9 +69,9 @@ struct indir_doub_indir_sectors
                                                      indirect blocks. */
   };
   
-/* List of open inodes, so that opening a single inode twice
-   returns the same 'struct inode'. */
-static struct list open_inodes;
+static struct list open_inodes; /* List of open inodes, so that opening a
+                                   single inode twice returns the same
+                                   'struct inode'. */
 struct lock open_inodes_lock; /* Lock for open_inodes list. */
 
 /* Returns the number of sectors to allocate for an inode SIZE
@@ -114,7 +114,7 @@ block_lookup (struct inode_disk *idisk, unsigned block_loc)
   else
     return doub_indir_lookup (idisk, block_loc);
 
-  /* Unreachable code. */
+  /* Unreachable code.  Prevents compiler warnings. */
   return (max_block + 1);
 }
 
@@ -375,7 +375,9 @@ inode_read_at (struct inode *inode, void *buffer_, off_t size, off_t offset)
 
 /* Writes SIZE bytes from BUFFER into INODE, starting at OFFSET.
    Returns the number of bytes actually written, which may be
-   less than SIZE if end of file is reached or an error occurs. */
+   less than SIZE if end of file is reached or an error occurs.
+   If the intended writing destination exceeds the current file
+   size, grow the file before writing to it. */
 off_t
 inode_write_at (struct inode *inode, const void *buffer_, off_t size,
                 off_t offset)
@@ -484,6 +486,10 @@ inode_length (const struct inode *inode)
   return (off_t) length_idisk.length;
 }
 
+/* Grows a file by calling file_block_grow until the number of necessary
+   blocks have been allocated for inode_write_at to successfully write
+   to the file.  Returns false if a block was unable to be allocated
+   (most likely due to exceeding the disk size). */
 static bool
 file_grow (struct inode_disk *disk_inode, unsigned num_grow_blocks)
 {
@@ -585,7 +591,9 @@ file_block_growth (struct inode_disk *disk_inode)
     return true;
 }
 
-/* Allocate a new block in the free map and add it to the cache. */
+/* Allocate a new block in the free map and add it to the cache.
+   Returns the new block sector if successful and (max_block + 1)
+   if a new block could not be allocated. */
 static block_sector_t
 allocate_new_block (void)
 {
@@ -595,7 +603,8 @@ allocate_new_block (void)
     return (block_sector_t) (max_block + 1);
   else
     {
-      /* Create a new buffer and zero it out. */
+      /* Create a new buffer and zero it out before writing it to
+         the cache. */
       struct indir_doub_indir_sectors dummy_buffer;
       memset (&dummy_buffer, 0, BLOCK_SECTOR_SIZE);
       cache_write (new_block, &dummy_buffer, BLOCK_SECTOR_SIZE, 0);

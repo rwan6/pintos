@@ -18,6 +18,10 @@ void cache_readahead (void);
 void periodic_write_behind (void *);
 void read_ahead (void *);
 
+/* Initialize the buffer cache and all buffer cache entries.
+   Also initializes the readahead list and creates the subprocesses
+   that take care of periodic cache flushing (write-behind) and
+   fetching future blocks (readahead). */
 void
 cache_init (void)
 {
@@ -89,6 +93,9 @@ read_ahead (void *aux UNUSED)
     }
 }
 
+/* Look up an entry corresponding to the inputted sector index.
+   Returns the cache index of the desired block or -1 if the
+   block was not found in the cache. */
 int
 cache_lookup (block_sector_t sector_idx)
 {
@@ -109,6 +116,9 @@ cache_lookup (block_sector_t sector_idx)
   return index;
 }
 
+/* Read 'chunk_size' bytes of a block entry that starts at sector
+  'sector_idx' with offset 'sector_ofs' into 'buffer'. If the
+   entry was not found in the cache, it is fetched from disk. */
 void
 cache_read (block_sector_t sector_idx, void *buffer, int chunk_size,
             int sector_ofs)
@@ -120,6 +130,9 @@ cache_read (block_sector_t sector_idx, void *buffer, int chunk_size,
   cache_table[index].accessed = true;
 }
 
+/* Writes 'chunk_size' bytes of a block entry that starts at sector
+  'sector_idx' with offset 'sector_ofs' into 'buffer'. If the
+   entry was not found in the cache, it is fetched from disk. */
 void
 cache_write (block_sector_t sector_idx, void *buffer, int chunk_size,
              int sector_ofs)
@@ -132,6 +145,8 @@ cache_write (block_sector_t sector_idx, void *buffer, int chunk_size,
   cache_table[index].dirty = true;
 }
 
+/* Fetch an entry from the disk into the cache.  If no cache entries
+   are free, evict an entry before reading from disk. */
 int
 cache_fetch (block_sector_t sector_idx)
 {
@@ -188,6 +203,8 @@ cache_evict (void)
   int evicted_idx = -1;
   while (!found)
     {
+      /* Clock handle can change sporadically, so it is declared as
+         a volatile int. */
       volatile int cur_clock_handle = cache_clock_handle;
       lock_acquire (&cache_table[cur_clock_handle].entry_lock);
       if (cache_table[cur_clock_handle].accessed)
@@ -212,6 +229,8 @@ cache_evict (void)
   return evicted_idx;
 }
 
+/* Iterate over all cache entries call cache_writeback_if_dirty if the
+   entry is not unoccupied. */
 void
 cache_flush (void)
 {
