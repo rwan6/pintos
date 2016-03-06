@@ -7,13 +7,15 @@
 #include "threads/interrupt.h"
 #include "threads/thread.h"
 #include "threads/malloc.h"
-#include "threads/synch.h"     /* For synching in exec and with files */
-#include "threads/vaddr.h"     /* For validating the user address. */
-#include "devices/shutdown.h"  /* For shutdown_power_off. */
-#include "devices/input.h"     /* For input_putc(). */
-#include "filesys/file.h"      /* For file operations. */
-#include "filesys/filesys.h"   /* For filesys operations. */
+#include "threads/synch.h"    
+#include "threads/vaddr.h"    
+#include "devices/shutdown.h" 
+#include "devices/input.h"    
+#include "filesys/file.h"     
+#include "filesys/filesys.h"
+#include "filesys/file.h"  
 #include "filesys/directory.h"
+#include "filesys/inode.h"
 
 /* Prototypes for system call functions and helper functions. */
 static void syscall_handler (struct intr_frame *);
@@ -202,8 +204,7 @@ wait (pid_t pid)
   return process_wait ((tid_t) pid);
 }
 
-/* Creates a new file.  Returns true if successful, false otherwise.
-   File system gets locked down with a coarse-grain lock. */
+/* Creates a new file.  Returns true if successful, false otherwise. */
 static bool
 create (const char *file, unsigned initial_size)
 {
@@ -217,8 +218,7 @@ create (const char *file, unsigned initial_size)
 }
 
 /* Deletes the file.  Returns true if successful, false otherwise.
-   File can be removed while it is open or closed.  File system
-   gets locked down with a coarse-grain lock. */
+   File can be removed while it is open or closed. */
 static bool
 remove (const char *file)
 {
@@ -232,8 +232,7 @@ remove (const char *file)
 }
 
 /* Opens the file and returns a file descriptor.  If open fails,
-   -1 is returned.  File system gets locked down with a coarse-
-   grain lock. */
+   -1 is returned. */
 static int
 open (const char *file)
 {
@@ -301,8 +300,7 @@ open (const char *file)
   return fd->value;
 }
 
-/* Returns the file size (in bytes) of the file open.  File
-   system gets locked down with a coarse-grain lock. */
+/* Returns the file size (in bytes) of the file open. */
 static int
 filesize (int fd)
 {
@@ -319,8 +317,7 @@ filesize (int fd)
 }
 
 /* Returns the number of bytes actually read, or -1 if the file could
-   not be read.  If fd = 0, function reads from the keyboard.
-   File system gets locked down with a coarse-grain lock. */
+   not be read.  If fd = 0, function reads from the keyboard. */
 static int
 read (int fd, void *buffer, unsigned size)
 {
@@ -348,8 +345,7 @@ read (int fd, void *buffer, unsigned size)
 
 /* Writes 'size' bytes from 'buffer' to file 'fd'.  Returns number
    of bytes actually written, or -1 if there was an error in writing
-   to the file. If fd = 1, function write to the console.  File
-   system gets locked down with a coarse-grain lock. */
+   to the file. If fd = 1, function write to the console. */
 static int
 write (int fd, const void *buffer, unsigned size)
 {
@@ -376,8 +372,7 @@ write (int fd, const void *buffer, unsigned size)
 }
 
 /* Changes the next byte to be read or written in an open file to
-   'position'.  Seeking past the end of a file is not an error.
-   File system gets locked down with coarse-grain lock. */
+   'position'.  Seeking past the end of a file is not an error. */
 static void
 seek (int fd, unsigned position)
 {
@@ -392,8 +387,7 @@ seek (int fd, unsigned position)
 
 }
 
-/* Returns the position of the next byte to be read or written.
-   File system gets locked down with coarse-grain lock. */
+/* Returns the position of the next byte to be read or written. */
 static unsigned
 tell (int fd)
 {
@@ -410,8 +404,7 @@ tell (int fd)
 }
 
 /* Closes file descriptor 'fd'.  Exiting or terminating a process
-   will close all open file descriptors.  File system gets locked
-   down with a coarse-grain lock. */
+   will close all open file descriptors. */
 static void
 close (int fd)
 {
@@ -581,8 +574,9 @@ mkdir (const char *dir)
 }
 
 /* Reads a directory entry from file descriptor fd, which must represent a
-   directory. If successful, stores the null-terminated file name in name and
-   returns true. If no entries are left in the directory, returns false. */
+   directory.  If successful, stores the null-terminated file name in name
+   and returns true.  If no entries are left in the directory, returns
+   false. */
 static bool
 readdir (int fd, char *name UNUSED)
 {
@@ -602,9 +596,18 @@ isdir (int fd UNUSED)
 /* Returns the inode number of the inode associated with fd, which may
    represent an ordinary file or a directory. */
 static int
-inumber (int fd UNUSED)
+inumber (int fd)
 {
-  return 0;
+  struct sys_fd *fd_instance = get_fd_item (fd);
+  
+  /* If the pointer returned to fd_instance is NULL, the fd was not
+     found in the file list.  Thus, we should exit immediately. */
+  if (fd_instance == NULL)
+    exit (-1);
+  
+  const struct inode *inode = fd_instance->file->inode;
+  
+  return inode_get_inumber (inode);
 }
 
 /* Return whether the filename ends in a '/', excluding the root directory */
