@@ -40,8 +40,9 @@ dir_open (struct inode *inode)
   struct dir *dir = calloc (1, sizeof *dir);
   if (inode != NULL && dir != NULL)
     {
-      dir->inode = inode;
+      dir->inode = inode; //printf("set inode to %u\n", inode);
       dir->pos = 0;
+      dir->parent = NULL;
       return dir;
     }
   else
@@ -99,7 +100,7 @@ lookup (const struct dir *dir, const char *name,
   size_t ofs;
   
   ASSERT (dir != NULL);
-  ASSERT (name != NULL);
+  ASSERT (name != NULL); //printf("dir->inode: %u\n", dir->inode);
 
   for (ofs = 0; inode_read_at (dir->inode, &e, sizeof e, ofs) == sizeof e;
        ofs += sizeof e) 
@@ -145,21 +146,21 @@ bool
 dir_add (struct dir *dir, const char *name, block_sector_t inode_sector,
          bool is_file)
 {
-  struct dir_entry e;
+  struct dir_entry e; //printf("in dir_add\n");
   off_t ofs;
   bool success = false;
 
   ASSERT (dir != NULL);
   ASSERT (name != NULL);
-
+//printf("name: %s %u %d %x %u\n", name, inode_sector, is_file, dir, dir->inode);
   /* Check NAME for validity. */
   if (*name == '\0' || strlen (name) > NAME_MAX)
     return false;
-
+ //printf("here1\n");
   /* Check that NAME is not in use. */
   if (lookup (dir, name, NULL, NULL))
     goto done;
-
+ //printf("here2\n");
   /* Set OFS to offset of free slot.
      If there are no free slots, then it will be set to the
      current end-of-file.
@@ -171,7 +172,7 @@ dir_add (struct dir *dir, const char *name, block_sector_t inode_sector,
        ofs += sizeof e) 
     if (!e.in_use)
       break;
-
+ //printf("here3\n");
   /* Write slot. */
   e.in_use = true;
   strlcpy (e.name, name, sizeof e.name);
@@ -247,13 +248,35 @@ dir_readdir (struct dir *dir, char name[NAME_MAX + 1])
   return false;
 }
 
+/* Returns the directory struct given a starting directory and an absolute
+   or relative path. */
 struct dir *
-dir_from_path (struct dir *cur_dir, const char *path)
-{
+get_dir_from_path (struct dir *cur_dir, const char *path)
+{//printf("looking for %s, %x, %u\n", path, cur_dir, cur_dir->inode);
   if (*path == '/')
     {
       /* path is an absolute path */
       cur_dir = dir_open_root ();
+    }
+    
+  struct dir_entry e;
+    
+  /* If we don't need to traverse subdirectories */
+  char *c = strrchr (path, '/');
+  if (c == NULL || c == path)
+    {
+      bool b;
+      //printf("going to lookup\n");
+      if (b = lookup (cur_dir, path, &e, NULL) && e.child_dir)
+        {
+          //printf("returning e.child_dir: %x\n", e.child_dir);
+          return e.child_dir;
+        }
+      else
+        {
+          //printf("lookup: %d cd: %x\n", b, e.child_dir);
+          return NULL;
+        }
     }
     
   char *s = malloc (strlen (path) + 1);
@@ -262,22 +285,25 @@ dir_from_path (struct dir *cur_dir, const char *path)
   strlcpy (s, path, strlen(path));
   char *token, *save_ptr;
   
-  struct dir_entry e;
   for (token = strtok_r (s, "/", &save_ptr); token != NULL;
         token = strtok_r (NULL, "/", &save_ptr))
     {
+      //printf("token: %s\n", token);
       if (!strcmp (token, "."))
         continue;
       else if (!strcmp (token, ".."))
         cur_dir = cur_dir->parent;
-      else if (lookup (cur_dir, token, &e, NULL))
-        if (e.child_dir)
-          cur_dir = e.child_dir;
-        else
-          {
-            free (s);
-            return NULL;
-          }
+      else if (lookup (cur_dir, token, &e, NULL)) 
+        {
+          //printf("looked for %s in %x, curdir is gonna be %x\n", token, cur_dir, e.child_dir);
+          if (e.child_dir)
+            cur_dir = e.child_dir;
+          else
+            {
+              free (s);
+              return NULL;
+            }
+        }
       else
         {
           free (s);

@@ -38,6 +38,7 @@ static int inumber (int);
 static bool filename_ends_in_slash (const char *);
 static void clean_filename (char *, char *);
 static bool check_pointer (const void *, unsigned);
+static struct dir *get_last_dir (const char *, const char **);
 static struct sys_fd* get_fd_item (int);
 
 static int next_avail_fd;       /* Tracks the next available fd. */
@@ -207,8 +208,11 @@ static bool
 create (const char *file, unsigned initial_size)
 {
   bool success;
-  struct dir *dir = thread_current ()->current_directory;
-  success = filesys_create (dir, file, initial_size, true);
+  const char *new_file;
+  struct dir *last_dir = get_last_dir (file, &new_file);
+  if (!last_dir)
+    return false;
+  success = filesys_create (last_dir, new_file, initial_size, true);
   return success;
 }
 
@@ -219,8 +223,11 @@ static bool
 remove (const char *file)
 {
   bool success;
-  struct dir *dir = thread_current ()->current_directory;
-  success = filesys_remove (dir, file);
+  const char *new_file;
+  struct dir *last_dir = get_last_dir (file, &new_file);
+  if (!last_dir)
+    return false;
+  success = filesys_remove (last_dir, file);
   return success;
 }
 
@@ -246,9 +253,14 @@ open (const char *file)
           break;
         }
     }
-
-  struct dir *dir = thread_current ()->current_directory;
-  struct file *f = filesys_open (dir, file);
+    
+  const char *new_file;
+  struct dir *last_dir = get_last_dir (file, &new_file);
+  //printf ("last_dir: %x\n", last_dir);
+  if (!last_dir)
+    return -1;
+  
+  struct file *f = filesys_open (last_dir, file); //printf("f: %x\n", f);
 
   if (!f)
     return -1;
@@ -493,6 +505,46 @@ close_fd (struct thread *t)
     }
 }
 
+/* Removes the last file (or folder) from pathname in dir returns the dir
+   corresponding to that path. Sets last_token to be the final file/folder
+   name. Returns NULL if path is invalid. */
+static struct dir *
+get_last_dir (const char *dir, const char **last_token)
+{
+  struct dir *last_dir;
+  struct dir *cur_dir = thread_current ()->current_directory;
+  /* dir_copy holds the path not including the last file/folder */
+  char *dir_copy = malloc (strlen (dir) + 1);
+  if (!dir_copy)
+    exit (-1);
+  
+  strlcpy (dir_copy, dir, strlen (dir));
+  char *c = strrchr (dir_copy, '/');
+  if (c)
+    {
+      /* If the '/' was at the beginning, the last_dir is the root directory.
+         Otherwise, dir_copy should be the whole path name up to the '/'. */
+      if (c == dir_copy)
+        {
+          last_dir = dir_open_root ();
+        }
+      else
+        {
+          *c = '\0';
+          last_dir = get_dir_from_path (cur_dir, dir_copy);
+        }
+      *last_token = dir + (c - dir_copy) + 1;
+    }
+  else
+    {
+      last_dir = cur_dir;
+      *last_token = dir;
+    }
+  
+  free (dir_copy);
+  return last_dir;  
+}
+
 /* Changes the current working directory of the process to dir, which may be
    relative or absolute. Returns true if successful, false on failure. */
 static bool
@@ -502,18 +554,12 @@ chdir (const char *dir)
     return false;
   
   struct dir *cur_dir = thread_current ()->current_directory;
-  struct dir *new_dir = dir_from_path (cur_dir, dir);
+  struct dir *new_dir = get_dir_from_path (cur_dir, dir);
   
   if (new_dir)
     thread_current ()->current_directory = new_dir;
   
   return (new_dir != NULL);
-}
-
-void
-last_dir (const char *dir, char *last_dir)
-{
-  char *c = strrchr (dir, '/');
 }
 
 /* Creates the directory named dir, which may be relative or absolute.
@@ -526,27 +572,12 @@ mkdir (const char *dir)
   if (filename_ends_in_slash (dir))
     return false;
   
-  char *dir_copy = malloc (strlen (dir) + 1);
-  if (!dir_copy)
-    exit (-1);
+  const char *new_dir;
+  struct dir *last_dir = get_last_dir (dir, &new_dir);
+  if (!last_dir)
+    return false;
   
-  strlcpy (dir_copy, dir, strlen (dir));
-  char *c = strrchr (dir_copy, '/');
-  struct dir *cur_dir = thread_current ()->current_directory;
-  struct dir *parent_dir = cur_dir;
-  if (c)
-    {
-      *c = '\0';
-      parent_dir = dir_from_path (cur_dir, dir_copy);
-      if (!parent_dir)
-        {
-          free (dir_copy);
-          return false;
-        }
-    }
-  free (dir_copy);
-  
-  return filesys_create (parent_dir, dir, 16, false);
+  return filesys_create (last_dir, new_dir, 16, false);
 }
 
 /* Reads a directory entry from file descriptor fd, which must represent a
