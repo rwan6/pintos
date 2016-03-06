@@ -93,7 +93,6 @@ process_execute (const char *file_name)
         }
 
       /* Child inherits the working directory from its parent */
-      /* TODO: change this because it should be its own pointer */
       child_thread->current_directory = thread_current ()->current_directory;
 
       cp = malloc (sizeof (struct child_process));
@@ -106,7 +105,8 @@ process_execute (const char *file_name)
       cp->child = child_thread;
       cp->child->my_process = cp;
       cp->child_tid = tid;
-      cp->child->executable = filesys_open (file_name);
+      struct dir *dir = cp->child->current_directory;
+      cp->child->executable = filesys_open (dir, file_name);
 
       /* Deny writes to executable. */
       if (cp->child->executable != NULL)
@@ -503,7 +503,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
   process_activate ();
 
   /* Open executable file. */
-  file = filesys_open (file_name);
+  file = filesys_open (dir_open_root (), file_name);
   if (file == NULL)
     {
       printf ("load: %s: open failed\n", file_name);
