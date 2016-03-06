@@ -7,12 +7,13 @@
 #include "threads/interrupt.h"
 #include "threads/thread.h"
 #include "threads/malloc.h"
-#include "threads/synch.h"    /* For synching in exec and with files */
-#include "threads/vaddr.h"    /* For validating the user address. */
-#include "devices/shutdown.h" /* For shutdown_power_off. */
-#include "devices/input.h"    /* For input_putc(). */
-#include "filesys/file.h"     /* For file operations. */
-#include "filesys/filesys.h"  /* For filesys operations. */
+#include "threads/synch.h"     /* For synching in exec and with files */
+#include "threads/vaddr.h"     /* For validating the user address. */
+#include "devices/shutdown.h"  /* For shutdown_power_off. */
+#include "devices/input.h"     /* For input_putc(). */
+#include "filesys/file.h"      /* For file operations. */
+#include "filesys/filesys.h"   /* For filesys operations. */
+#include "filesys/directory.h"
 
 /* Prototypes for system call functions and helper functions. */
 static void syscall_handler (struct intr_frame *);
@@ -35,7 +36,6 @@ static bool readdir (int, char *);
 static bool isdir (int);
 static int inumber (int);
 static bool filename_ends_in_slash (const char *);
-static char *get_cleaned_absolute_path (char *);
 static void clean_filename (char *, char *);
 static bool check_pointer (const void *, unsigned);
 static struct sys_fd* get_fd_item (int);
@@ -207,7 +207,8 @@ static bool
 create (const char *file, unsigned initial_size)
 {
   bool success;
-  success = filesys_create (file, initial_size);
+  struct dir *dir = thread_current ()->current_directory;
+  success = filesys_create (dir, file, initial_size);
   return success;
 }
 
@@ -245,7 +246,8 @@ open (const char *file)
         }
     }
 
-  struct file *f = filesys_open (file);
+  struct dir *dir = thread_current ()->current_directory;
+  struct file *f = filesys_open (dir, file);
 
   if (!f)
     return -1;
@@ -546,7 +548,10 @@ filename_ends_in_slash (const char *filename)
   return filename[strlen (filename) - 1] == '/';
 }
 
+<<<<<<< HEAD
 
+=======
+>>>>>>> 252197d37def29efc8f6e45eb01978de6ccef1a3
 /* Removes consecutive '/' and removes extraneous "/./" from the filename.
    Also removes extra "/../" from the start of filename */
 /* TODO: maybe remove trailing '.' or "/." */
