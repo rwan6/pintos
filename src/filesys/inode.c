@@ -167,7 +167,7 @@ inode_init (void)
 bool
 inode_create (block_sector_t sector, off_t length, unsigned is_file)
 {
-  struct inode_disk *disk_inode = NULL; //printf("creating sector %u\n", sector);
+  struct inode_disk *disk_inode = NULL;
   bool success = false;
 
   ASSERT (length >= 0);

@@ -50,8 +50,6 @@ bool
 filesys_create (struct dir *dir, const char *name, off_t initial_size,
                 bool is_file)
 {
-  dir = dir_open_root ();
-  //printf("dir: %x name: %s\n", dir, name);
   block_sector_t inode_sector = 0;
   bool success = (dir != NULL
                   && free_map_allocate (1, &inode_sector)
@@ -59,7 +57,8 @@ filesys_create (struct dir *dir, const char *name, off_t initial_size,
                   && dir_add (dir, name, inode_sector, is_file));
   if (!success && inode_sector != 0)
     free_map_release (inode_sector, 1);
-  dir_close (dir); //printf("success: %d\n", success);
+  if (dir != thread_current ()->current_directory)
+    dir_close (dir);
 
   return success;
 }
@@ -72,12 +71,12 @@ filesys_create (struct dir *dir, const char *name, off_t initial_size,
 struct file *
 filesys_open (struct dir *dir, const char *name)
 {
-  dir = dir_open_root ();
   struct inode *inode = NULL;
 
   if (dir != NULL)
     dir_lookup (dir, name, &inode);
-  dir_close (dir);
+  if (dir != thread_current ()->current_directory)
+    dir_close (dir);
 
   return file_open (inode);
 }
@@ -89,9 +88,9 @@ filesys_open (struct dir *dir, const char *name)
 bool
 filesys_remove (struct dir *dir, const char *name)
 {
-  dir = dir_open_root ();
   bool success = dir != NULL && dir_remove (dir, name);
-  dir_close (dir);
+  if (dir != thread_current ()->current_directory)
+    dir_close (dir);
 
   return success;
 }

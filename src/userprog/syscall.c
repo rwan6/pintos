@@ -208,6 +208,8 @@ wait (pid_t pid)
 static bool
 create (const char *file, unsigned initial_size)
 {
+  if (strlen (file) == 0)
+    exit (-1);
   bool success;
   const char *new_file;
   struct dir *last_dir = get_last_dir (file, &new_file);
@@ -255,11 +257,10 @@ open (const char *file)
     
   const char *new_file;
   struct dir *last_dir = get_last_dir (file, &new_file);
-  //printf ("last_dir: %x\n", last_dir);
   if (!last_dir)
     return -1;
   
-  struct file *f = filesys_open (last_dir, file); //printf("f: %x\n", f);
+  struct file *f = filesys_open (last_dir, file);
 
   if (!f)
     return -1;
@@ -543,7 +544,7 @@ get_last_dir (const char *dir, const char **last_token)
 static bool
 chdir (const char *dir)
 {
-  if (filename_ends_in_slash (dir))
+  if (strlen (dir) == 0 || filename_ends_in_slash (dir))
     return false;
   
   struct dir *cur_dir = thread_current ()->current_directory;
@@ -562,7 +563,7 @@ chdir (const char *dir)
 static bool
 mkdir (const char *dir)
 {
-  if (filename_ends_in_slash (dir))
+  if (strlen (dir) == 0 || filename_ends_in_slash (dir))
     return false;
   
   const char *new_dir;
