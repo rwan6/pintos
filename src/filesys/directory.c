@@ -287,7 +287,7 @@ get_dir_from_path (struct dir *cur_dir, const char *path)
   char *s = malloc (strlen (path) + 1);
   if (!s)
     return NULL;
-  strlcpy (s, path, strlen(path));
+  strlcpy (s, path, strlen(path) + 1);
   char *token, *save_ptr;
   
   for (token = strtok_r (s, "/", &save_ptr); token != NULL;

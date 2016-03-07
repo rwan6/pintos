@@ -523,7 +523,7 @@ get_last_dir (const char *dir, const char **last_token)
   if (!dir_copy)
     exit (-1);
 
-  strlcpy (dir_copy, dir, strlen (dir));
+  strlcpy (dir_copy, dir, strlen (dir) + 1);
   char *c = strrchr (dir_copy, '/');
   if (c)
     {
@@ -705,7 +705,7 @@ clean_filename (char *filename, char *cleaned)
    while ((*cur_in == '/') && (*(cur_in + 1) == '.') &&
           (*(cur_in + 2) == '.') && (*(cur_in + 3) == '/'))
     cur_in += 3;
-   strlcpy (cleaned, cur_in, strlen (cur_in));
+   strlcpy (cleaned, cur_in, strlen (cur_in) + 1);
    free (tmp1);
    free (tmp2);
 }
