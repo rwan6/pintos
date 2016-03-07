@@ -225,11 +225,17 @@ create (const char *file, unsigned initial_size)
 static bool
 remove (const char *file)
 {
+  // if (!strcmp(file, "a"))
+    // return false;
   if (!strcmp(file, "/"))
     return false;
   bool success;
   const char *new_file;
   struct dir *last_dir = get_last_dir (file, &new_file);
+  // if (!dir_is_empty (get_dir_from_path (last_dir, new_file)))
+    // return false;
+  // printf("ld=%x, cd=%x\n", last_dir, thread_current ()->current_directory);
+// printf("ld=%x, cd=%x, %s\n", last_dir, thread_current ()->current_directory, new_file);
   if (!last_dir)
     return false;
   success = filesys_remove (last_dir, file);

@@ -25,8 +25,6 @@ struct dir_entry
     struct dir *cur_dir;                /* Pointer to directory it lives in. */
   };
 
-static bool dir_is_empty (struct dir *);
-
 /* Creates a directory with space for ENTRY_CNT entries in the
    given SECTOR.  Returns true if successful, false on failure. */
 bool
@@ -221,6 +219,16 @@ dir_remove (struct dir *dir, const char *name)
   if (!lookup (dir, name, &e, &ofs))
     goto done;
 
+    // if (is_dir_open (e.cur_dir))
+      // goto done;
+  // int oc = inode_get_opencnt (e.cur_dir->inode);
+  // printf("opcnt=%d\n", oc);
+  // bool isfile = inode_is_file (e.cur_dir->inode);
+  // printf("isfile=%d\n", isfile);
+  if (inode_get_opencnt (e.cur_dir->inode) > 0
+      && (!inode_is_file (e.cur_dir->inode)))
+    goto done;
+
   /* Open inode. */
   inode = inode_open (e.inode_sector);
   if (inode == NULL)
@@ -284,7 +292,7 @@ get_dir_from_path (struct dir *cur_dir, const char *path)
   if (c == NULL || c == path)
     {
       // printf("here2 %s\n", path);
-      char *lookup_path = path;
+      const char *lookup_path = path;
       if (c != NULL && path[0] == '/' && path[1] != '\0') lookup_path++;
       if (lookup (cur_dir, lookup_path, &e, NULL) && e.child_dir)
         {
@@ -332,7 +340,7 @@ get_dir_from_path (struct dir *cur_dir, const char *path)
     return cur_dir;
 }
 
-static bool
+bool
 dir_is_empty (struct dir *dir)
 {
   off_t ofs;

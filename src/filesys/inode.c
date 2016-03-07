@@ -159,12 +159,20 @@ inode_is_file (const struct inode *inode)
 
   /* Retrieve the inode_disk object associated with the inode. */
   struct inode_disk status_idisk;
+  // printf("%d\n", inode->sector);
   cache_read (inode->sector, &status_idisk, BLOCK_SECTOR_SIZE, 0);
 
   if (status_idisk.is_file == 0)
     return false;
   else
     return true;
+}
+
+int
+inode_get_opencnt (struct inode *inode)
+{
+  ASSERT (inode != NULL);
+  return inode->open_cnt;
 }
 
 /* Initializes the inode module. */
@@ -245,7 +253,7 @@ inode_open (block_sector_t sector)
     }
 
   /* Allocate memory. */
-  inode = malloc (sizeof *inode);  
+  inode = malloc (sizeof *inode);
   if (inode == NULL)
     return NULL;
 
@@ -268,7 +276,7 @@ inode_reopen (struct inode *inode)
 {
   if (inode != NULL)
     inode->open_cnt++;
-  
+
   return inode;
 }
 
