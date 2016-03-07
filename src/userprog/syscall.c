@@ -7,13 +7,13 @@
 #include "threads/interrupt.h"
 #include "threads/thread.h"
 #include "threads/malloc.h"
-#include "threads/synch.h"    
-#include "threads/vaddr.h"    
-#include "devices/shutdown.h" 
-#include "devices/input.h"    
-#include "filesys/file.h"     
+#include "threads/synch.h"
+#include "threads/vaddr.h"
+#include "devices/shutdown.h"
+#include "devices/input.h"
+#include "filesys/file.h"
 #include "filesys/filesys.h"
-#include "filesys/file.h"  
+#include "filesys/file.h"
 #include "filesys/directory.h"
 #include "filesys/inode.h"
 
@@ -254,12 +254,12 @@ open (const char *file)
           break;
         }
     }
-    
+
   const char *new_file;
   struct dir *last_dir = get_last_dir (file, &new_file);
   if (!last_dir)
     return -1;
-  
+
   struct file *f = filesys_open (last_dir, file);
 
   if (!f)
@@ -297,7 +297,7 @@ open (const char *file)
   /* Add the fd to the thread's opened_fds list. */
   struct thread *t = thread_current ();
   list_push_back (&t->opened_fds, &fd->thread_opened_elem);
-  
+
   /* If it is a directory, dir will be set to non-NULL. */
   if (isdir (fd->value))
     fd->dir = dir_open (fd->file->inode);
@@ -370,7 +370,7 @@ write (int fd, const void *buffer, unsigned size)
 
       /* If the pointer returned to fd_instance is NULL, the fd was not
          found in the file list.  Thus, we should exit immediately. */
-      if (fd_instance == NULL)
+      if (fd_instance == NULL || isdir (fd_instance->value))
         exit (-1);
 
       num_written = file_write (fd_instance->file, buffer, size);
@@ -517,7 +517,7 @@ get_last_dir (const char *dir, const char **last_token)
   char *dir_copy = malloc (strlen (dir) + 1);
   if (!dir_copy)
     exit (-1);
-  
+
   strlcpy (dir_copy, dir, strlen (dir));
   char *c = strrchr (dir_copy, '/');
   if (c)
@@ -540,9 +540,9 @@ get_last_dir (const char *dir, const char **last_token)
       last_dir = cur_dir;
       *last_token = dir;
     }
-  
+
   free (dir_copy);
-  return last_dir;  
+  return last_dir;
 }
 
 /* Changes the current working directory of the process to dir, which may be
@@ -552,13 +552,13 @@ chdir (const char *dir)
 {
   if (strlen (dir) == 0 || filename_ends_in_slash (dir))
     return false;
-  
+
   struct dir *cur_dir = thread_current ()->current_directory;
   struct dir *new_dir = get_dir_from_path (cur_dir, dir);
-  
+
   if (new_dir)
     thread_current ()->current_directory = new_dir;
-  
+
   return (new_dir != NULL);
 }
 
@@ -571,12 +571,12 @@ mkdir (const char *dir)
 {
   if (strlen (dir) == 0 || filename_ends_in_slash (dir))
     return false;
-  
+
   const char *new_dir;
   struct dir *last_dir = get_last_dir (dir, &new_dir);
   if (!last_dir)
     return false;
-  
+
   return filesys_create (last_dir, new_dir, 16, false);
 }
 
@@ -593,15 +593,15 @@ readdir (int fd, char *name)
   else
     {
       struct sys_fd *fd_instance = get_fd_item (fd);
-  
+
       /* If the pointer returned to fd_instance is NULL, the fd was not
          found in the file list.  Thus, we should exit immediately. */
       if (fd_instance == NULL)
         exit (-1);
-      
+
       struct inode **inode = &fd_instance->file->inode;
       const struct dir *dir = fd_instance->dir;
-      
+
       return dir_lookup (dir, name, inode);
     }
 }
@@ -612,14 +612,14 @@ static bool
 isdir (int fd)
 {
   struct sys_fd *fd_instance = get_fd_item (fd);
-  
+
   /* If the pointer returned to fd_instance is NULL, the fd was not
      found in the file list.  Thus, we should exit immediately. */
   if (fd_instance == NULL)
     exit (-1);
-  
+
   const struct inode *inode = fd_instance->file->inode;
-  
+
   return !inode_is_file (inode);
 }
 
@@ -629,14 +629,14 @@ static int
 inumber (int fd)
 {
   struct sys_fd *fd_instance = get_fd_item (fd);
-  
+
   /* If the pointer returned to fd_instance is NULL, the fd was not
      found in the file list.  Thus, we should exit immediately. */
   if (fd_instance == NULL)
     exit (-1);
-  
+
   const struct inode *inode = fd_instance->file->inode;
-  
+
   return inode_get_inumber (inode);
 }
 
