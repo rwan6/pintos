@@ -242,6 +242,10 @@ remove (const char *file)
 static int
 open (const char *file)
 {
+  /* If the file or directory is empty, return -1 immediately. */
+  if (strlen (file) == 0)
+    return -1;
+  
   bool found = false;
   struct list_elem *e;
   struct sys_file* sf = NULL;
@@ -267,8 +271,9 @@ open (const char *file)
   struct file *f = filesys_open (last_dir, new_file);
   if (!f)
     return -1;
+  
   dir_close (last_dir);
-
+  
   struct sys_fd *fd = malloc (sizeof (struct sys_fd));
   if (!fd)
     exit (-1);
@@ -524,6 +529,7 @@ get_last_dir (const char *dir, const char **last_token)
     exit (-1);
 
   strlcpy (dir_copy, dir, strlen (dir) + 1);
+
   char *c = strrchr (dir_copy, '/');
   if (c)
     {
@@ -603,13 +609,10 @@ readdir (int fd, char *name)
 
       /* If the pointer returned to fd_instance is NULL, the fd was not
          found in the file list.  Thus, we should exit immediately. */
-      if (fd_instance == NULL)
+      if (fd_instance == NULL || inode_is_file (fd_instance->file->inode))
         exit (-1);
-
-      struct inode **inode = &fd_instance->file->inode;
-      const struct dir *dir = fd_instance->dir;
-
-      return dir_lookup (dir, name, inode);
+      
+      return dir_readdir (fd_instance->dir, name);
     }
 }
 
@@ -643,7 +646,6 @@ inumber (int fd)
     exit (-1);
 
   const struct inode *inode = fd_instance->file->inode;
-
   return inode_get_inumber (inode);
 }
 
