@@ -216,6 +216,7 @@ create (const char *file, unsigned initial_size)
   if (!last_dir)
     return false;
   success = filesys_create (last_dir, new_file, initial_size, true);
+  dir_close (last_dir);
   return success;
 }
 
@@ -224,12 +225,15 @@ create (const char *file, unsigned initial_size)
 static bool
 remove (const char *file)
 {
+  if (!strcmp(file, "/"))
+    return false;
   bool success;
   const char *new_file;
   struct dir *last_dir = get_last_dir (file, &new_file);
   if (!last_dir)
     return false;
   success = filesys_remove (last_dir, file);
+  dir_close (last_dir);
   return success;
 }
 
@@ -260,10 +264,10 @@ open (const char *file)
   if (!last_dir)
     return -1;
 
-  struct file *f = filesys_open (last_dir, file);
-
+  struct file *f = filesys_open (last_dir, new_file);
   if (!f)
     return -1;
+  dir_close (last_dir);
 
   struct sys_fd *fd = malloc (sizeof (struct sys_fd));
   if (!fd)
@@ -438,6 +442,7 @@ close (int fd)
       list_remove (&fd_instance->sys_file->sys_file_elem);
       free (fd_instance->sys_file);
     }
+  dir_close (fd_instance->dir);
   free (fd_instance);
 }
 
@@ -537,7 +542,7 @@ get_last_dir (const char *dir, const char **last_token)
     }
   else
     {
-      last_dir = cur_dir;
+      last_dir = dir_reopen (cur_dir);
       *last_token = dir;
     }
 
@@ -577,7 +582,9 @@ mkdir (const char *dir)
   if (!last_dir)
     return false;
 
-  return filesys_create (last_dir, new_dir, 16, false);
+  bool success = filesys_create (last_dir, new_dir, 16, false);
+  dir_close (last_dir);
+  return success;
 }
 
 /* Reads a directory entry from file descriptor fd, which must represent a

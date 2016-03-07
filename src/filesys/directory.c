@@ -23,6 +23,8 @@ struct dir_entry
     struct dir *child_dir;              /* Pointer to child subdirectory. */
     struct dir *cur_dir;                /* Pointer to directory it lives in. */
   };
+  
+static bool dir_is_empty (struct dir *);
 
 /* Creates a directory with space for ENTRY_CNT entries in the
    given SECTOR.  Returns true if successful, false on failure. */
@@ -156,9 +158,12 @@ dir_add (struct dir *dir, const char *name, block_sector_t inode_sector,
   /* Check NAME for validity. */
   if (*name == '\0' || strlen (name) > NAME_MAX)
     return false;
+  if (!strcmp (name, ".") || !strcmp (name, ".."))
+    goto done;
   /* Check that NAME is not in use. */
   if (lookup (dir, name, NULL, NULL))
     goto done;
+  
   /* Set OFS to offset of free slot.
      If there are no free slots, then it will be set to the
      current end-of-file.
@@ -201,6 +206,9 @@ dir_remove (struct dir *dir, const char *name)
 
   ASSERT (dir != NULL);
   ASSERT (name != NULL);
+  
+  if (!strcmp (name, ".") || !strcmp (name, ".."))
+    goto done;
 
   /* Find directory entry. */
   if (!lookup (dir, name, &e, &ofs))
@@ -210,6 +218,10 @@ dir_remove (struct dir *dir, const char *name)
   inode = inode_open (e.inode_sector);
   if (inode == NULL)
     goto done;
+  
+  if (e.child_dir)
+    if (!dir_is_empty (e.child_dir))
+      goto done;
 
   /* Erase directory entry. */
   e.in_use = false;
@@ -262,10 +274,9 @@ get_dir_from_path (struct dir *cur_dir, const char *path)
   char *c = strrchr (path, '/');
   if (c == NULL || c == path)
     {
-      bool b;
-      if (b = lookup (cur_dir, path, &e, NULL) && e.child_dir)
+      if (lookup (cur_dir, path, &e, NULL) && e.child_dir)
         {
-          return e.child_dir;
+          return dir_reopen (e.child_dir);
         }
       else
         {
@@ -303,5 +314,20 @@ get_dir_from_path (struct dir *cur_dir, const char *path)
         }
     }
     free (s);
+    if (cur_dir)
+      cur_dir = dir_reopen (cur_dir);
     return cur_dir;
+}
+
+static bool
+dir_is_empty (struct dir *dir)
+{
+  off_t ofs;
+  struct dir_entry e;
+  
+  for (ofs = 0; inode_read_at (dir->inode, &e, sizeof e, ofs) == sizeof e;
+       ofs += sizeof e) 
+    if (e.in_use)
+      return false;
+  return true;
 }

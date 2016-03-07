@@ -57,8 +57,6 @@ filesys_create (struct dir *dir, const char *name, off_t initial_size,
                   && dir_add (dir, name, inode_sector, is_file));
   if (!success && inode_sector != 0)
     free_map_release (inode_sector, 1);
-  if (dir != thread_current ()->current_directory)
-    dir_close (dir);
 
   return success;
 }
@@ -75,8 +73,6 @@ filesys_open (struct dir *dir, const char *name)
 
   if (dir != NULL)
     dir_lookup (dir, name, &inode);
-  if (dir != thread_current ()->current_directory)
-    dir_close (dir);
 
   return file_open (inode);
 }
@@ -89,8 +85,6 @@ bool
 filesys_remove (struct dir *dir, const char *name)
 {
   bool success = dir != NULL && dir_remove (dir, name);
-  if (dir != thread_current ()->current_directory)
-    dir_close (dir);
 
   return success;
 }
