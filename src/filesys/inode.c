@@ -150,6 +150,21 @@ doub_indir_lookup (struct inode_disk *idisk, unsigned block_loc)
   return new_indir_sect.indir_blocks[indir_block];
 }
 
+/* Returns the status of the inode (false if it is a directory,
+   true if it is a file). */
+bool
+inode_is_file (const struct inode *inode)
+{
+  /* Retrieve the inode_disk object associated with the inode. */
+  struct inode_disk status_idisk;
+  cache_read (inode->sector, &status_idisk, BLOCK_SECTOR_SIZE, 0);
+  
+  if (status_idisk.is_file == 0)
+    return false;
+  else
+    return true;
+}
+
 /* Initializes the inode module. */
 void
 inode_init (void)
@@ -614,5 +629,4 @@ allocate_new_block (void)
 
   return new_block;
 }
-
 

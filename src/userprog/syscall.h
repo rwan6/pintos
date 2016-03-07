@@ -28,8 +28,11 @@ struct sys_fd
     tid_t owner_tid;                      /* The tid of the owner. */
     struct sys_file *sys_file;            /* Pointer to the system file
                                              struct. */
-    struct file *file;                    /* Pointer to the file's 'file'
-                                             struct. */
+    struct file *file;                    /* If the fd corresponds to a file,
+                                             points to the file's 'file'. */
+    struct dir *dir;                      /* If the fd corresponds to a
+                                             directory, points to the
+                                             directory's 'dir'. */
     struct list_elem sys_fd_elem;         /* List element for sys_file's
                                              fd_list. */
     struct list_elem used_fds_elem;       /* List element for used fds. */

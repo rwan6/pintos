@@ -297,6 +297,12 @@ open (const char *file)
   /* Add the fd to the thread's opened_fds list. */
   struct thread *t = thread_current ();
   list_push_back (&t->opened_fds, &fd->thread_opened_elem);
+  
+  /* If it is a directory, dir will be set to non-NULL. */
+  if (isdir (fd->value))
+    fd->dir = dir_open (fd->file->inode);
+  else
+    fd->dir = NULL;
 
   return fd->value;
 }
@@ -575,23 +581,46 @@ mkdir (const char *dir)
 }
 
 /* Reads a directory entry from file descriptor fd, which must represent a
-   directory.  If successful, stores the null-terminated file name in name
+   directory.  If successful, stores the null-terminated filename in name
    and returns true.  If no entries are left in the directory, returns
    false. */
 static bool
-readdir (int fd, char *name UNUSED)
+readdir (int fd, char *name)
 {
+  /* If it is not a directory, return false. */
   if (!isdir (fd))
     return false;
-  return true;
+  else
+    {
+      struct sys_fd *fd_instance = get_fd_item (fd);
+  
+      /* If the pointer returned to fd_instance is NULL, the fd was not
+         found in the file list.  Thus, we should exit immediately. */
+      if (fd_instance == NULL)
+        exit (-1);
+      
+      struct inode **inode = &fd_instance->file->inode;
+      const struct dir *dir = fd_instance->dir;
+      
+      return dir_lookup (dir, name, inode);
+    }
 }
 
 /* Returns true if fd represents a directory, false if it represents an
    ordinary file. */
 static bool
-isdir (int fd UNUSED)
+isdir (int fd)
 {
-  return true;
+  struct sys_fd *fd_instance = get_fd_item (fd);
+  
+  /* If the pointer returned to fd_instance is NULL, the fd was not
+     found in the file list.  Thus, we should exit immediately. */
+  if (fd_instance == NULL)
+    exit (-1);
+  
+  const struct inode *inode = fd_instance->file->inode;
+  
+  return !inode_is_file (inode);
 }
 
 /* Returns the inode number of the inode associated with fd, which may
