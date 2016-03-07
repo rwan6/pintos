@@ -245,7 +245,7 @@ open (const char *file)
   /* If the file or directory is empty, return -1 immediately. */
   if (strlen (file) == 0)
     return -1;
-  
+
   bool found = false;
   struct list_elem *e;
   struct sys_file* sf = NULL;
@@ -262,24 +262,27 @@ open (const char *file)
           break;
         }
     }
+// printf("1\n");
 
   const char *new_file;
   struct dir *last_dir = get_last_dir (file, &new_file);
   if (!last_dir)
     return -1;
+// printf("2 %x %s\n", last_dir, new_file);
 
   struct file *f = filesys_open (last_dir, new_file);
   if (!f)
     return -1;
-  
+
   dir_close (last_dir);
-  
+
   struct sys_fd *fd = malloc (sizeof (struct sys_fd));
   if (!fd)
     exit (-1);
   fd->value = next_avail_fd++;
   fd->file = f;
   fd->owner_tid = thread_current ()->tid;
+// printf("4\n");
 
   /* If we have not opened it before, create a new entry. */
   if (!found)
@@ -546,6 +549,11 @@ get_last_dir (const char *dir, const char **last_token)
         }
       *last_token = dir + (c - dir_copy) + 1;
     }
+  else if (!strcmp (dir_copy, "."))
+    {
+      last_dir = cur_dir;
+      *last_token = "";
+    }
   else
     {
       last_dir = dir_reopen (cur_dir);
@@ -611,7 +619,7 @@ readdir (int fd, char *name)
          found in the file list.  Thus, we should exit immediately. */
       if (fd_instance == NULL || inode_is_file (fd_instance->file->inode))
         exit (-1);
-      
+
       return dir_readdir (fd_instance->dir, name);
     }
 }
@@ -646,6 +654,7 @@ inumber (int fd)
     exit (-1);
 
   const struct inode *inode = fd_instance->file->inode;
+
   return inode_get_inumber (inode);
 }
 
