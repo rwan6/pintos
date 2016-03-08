@@ -225,8 +225,6 @@ create (const char *file, unsigned initial_size)
 static bool
 remove (const char *file)
 {
-  // if (!strcmp(file, "a"))
-    // return false;
   if (!strcmp(file, "/"))
     return false;
   bool success;
@@ -238,7 +236,7 @@ remove (const char *file)
 // printf("ld=%x, cd=%x, %s\n", last_dir, thread_current ()->current_directory, new_file);
   if (!last_dir)
     return false;
-  success = filesys_remove (last_dir, file);
+  success = filesys_remove (last_dir, new_file);
   dir_close (last_dir);
   return success;
 }
@@ -552,6 +550,7 @@ get_last_dir (const char *dir, const char **last_token)
         {
           *c = '\0';
           last_dir = get_dir_from_path (cur_dir, dir_copy);
+          // inode_close (last_dir->inode);
         }
       *last_token = dir + (c - dir_copy) + 1;
     }
@@ -564,6 +563,7 @@ get_last_dir (const char *dir, const char **last_token)
     {
       last_dir = dir_reopen (cur_dir);
       *last_token = dir;
+      // inode_close (last_dir->inode);
     }
 
   free (dir_copy);

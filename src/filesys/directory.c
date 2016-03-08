@@ -113,7 +113,6 @@ lookup (const struct dir *dir, const char *name,
           *ofsp = ofs;
         return true;
       }
-      // printf("returning false\n");
   return false;
 }
 
@@ -191,7 +190,6 @@ dir_add (struct dir *dir, const char *name, block_sector_t inode_sector,
       e.child_dir = dir_open (inode_open (inode_sector));
       e.child_dir->parent = dir;
     }
-    // printf("dir inode=%x\n", dir->inode);
   success = inode_write_at (dir->inode, &e, sizeof e, ofs) == sizeof e;
 
  done:
@@ -215,20 +213,17 @@ dir_remove (struct dir *dir, const char *name)
   if (!strcmp (name, ".") || !strcmp (name, ".."))
     goto done;
 
+  // printf("dir=%x, name=%s\n", dir, name);
   /* Find directory entry. */
   if (!lookup (dir, name, &e, &ofs))
     goto done;
 
-    // if (is_dir_open (e.cur_dir))
-      // goto done;
-  // int oc = inode_get_opencnt (e.cur_dir->inode);
-  // printf("opcnt=%d\n", oc);
-  // bool isfile = inode_is_file (e.cur_dir->inode);
-  // printf("isfile=%d\n", isfile);
+  // printf("cdi=%x, tcdi=%x oc=%d\n", e.cur_dir, thread_current ()->current_directory,
+    // inode_get_opencnt (e.cur_dir->inode));
   if (inode_get_opencnt (e.cur_dir->inode) > 0
       && (!inode_is_file (e.cur_dir->inode)))
     goto done;
-
+  // printf("hereeeee\n");
   /* Open inode. */
   inode = inode_open (e.inode_sector);
   if (inode == NULL)
@@ -291,12 +286,10 @@ get_dir_from_path (struct dir *cur_dir, const char *path)
   char *c = strrchr (path, '/');
   if (c == NULL || c == path)
     {
-      // printf("here2 %s\n", path);
       const char *lookup_path = path;
       if (c != NULL && path[0] == '/' && path[1] != '\0') lookup_path++;
       if (lookup (cur_dir, lookup_path, &e, NULL) && e.child_dir)
         {
-          // printf("here1\n");
           return dir_reopen (e.child_dir);
         }
       else

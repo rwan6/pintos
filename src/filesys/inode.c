@@ -175,6 +175,13 @@ inode_get_opencnt (struct inode *inode)
   return inode->open_cnt;
 }
 
+bool
+inode_is_removed (struct inode *inode)
+{
+  ASSERT (inode != NULL);
+  return inode->removed;
+}
+
 /* Initializes the inode module. */
 void
 inode_init (void)
