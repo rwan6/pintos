@@ -157,9 +157,7 @@ inode_is_file (const struct inode *inode)
 {
   ASSERT (inode != NULL);
 
-  /* Retrieve the inode_disk object associated with the inode. */
   struct inode_disk status_idisk;
-  // printf("%d\n", inode->sector);
   cache_read (inode->sector, &status_idisk, BLOCK_SECTOR_SIZE, 0);
 
   if (status_idisk.is_file == 0)
@@ -283,7 +281,6 @@ inode_reopen (struct inode *inode)
 {
   if (inode != NULL)
     inode->open_cnt++;
-// printf("incrementing oc, oc=%d, inode=%x\n", inode->open_cnt, inode);
   return inode;
 }
 

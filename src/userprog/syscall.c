@@ -232,11 +232,11 @@ remove (const char *file)
   struct dir *last_dir = get_last_dir (file, &new_file);
   // if (!dir_is_empty (get_dir_from_path (last_dir, new_file)))
     // return false;
-  // printf("ld=%x, cd=%x\n", last_dir, thread_current ()->current_directory);
-// printf("ld=%x, cd=%x, %s\n", last_dir, thread_current ()->current_directory, new_file);
+
   if (!last_dir)
     return false;
   success = filesys_remove (last_dir, new_file);
+
   dir_close (last_dir);
   return success;
 }
@@ -266,13 +266,11 @@ open (const char *file)
           break;
         }
     }
-// printf("1\n");
 
   const char *new_file;
   struct dir *last_dir = get_last_dir (file, &new_file);
   if (!last_dir)
     return -1;
-// printf("2 %x %s\n", last_dir, new_file);
 
   struct file *f = filesys_open (last_dir, new_file);
   if (!f)
@@ -286,7 +284,6 @@ open (const char *file)
   fd->value = next_avail_fd++;
   fd->file = f;
   fd->owner_tid = thread_current ()->tid;
-// printf("4\n");
 
   /* If we have not opened it before, create a new entry. */
   if (!found)
@@ -578,19 +575,14 @@ chdir (const char *dir)
   if (strlen (dir) == 0 || filename_ends_in_slash (dir))
     return false;
 
-// printf("h1\n");
   struct dir *cur_dir = thread_current ()->current_directory;
-// printf("h2, cur d=%d, dir name=%s\n", inode_get_inumber (dir_get_inode (cur_dir)), dir);
   struct dir *new_dir = get_dir_from_path (cur_dir, dir);
-// printf("h3, new d=%d\n", inode_get_inumber (dir_get_inode (new_dir)));
 
   if (new_dir)
   {
+    // printf("newdir-inode=%x curd-inode=%x\n", dir_get_inode (new_dir), dir_get_inode (cur_dir));
     thread_current ()->current_directory = new_dir;
-    // printf("set thread current cd\n");
   }
-
-  // dir_close (cur_dir);
 
   return (new_dir != NULL);
 }
