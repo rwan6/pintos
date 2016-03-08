@@ -527,6 +527,7 @@ get_last_dir (const char *dir, const char **last_token)
 {
   struct dir *last_dir;
   struct dir *cur_dir = thread_current ()->current_directory;
+  // printf("cur dir i = %x", dir_get_inode (cur_dir));
   /* dir_copy holds the path not including the last file/folder */
   char *dir_copy = malloc (strlen (dir) + 1);
   if (!dir_copy)
@@ -535,6 +536,7 @@ get_last_dir (const char *dir, const char **last_token)
   strlcpy (dir_copy, dir, strlen (dir) + 1);
 
   char *c = strrchr (dir_copy, '/');
+  // printf("what is c? %s, dir_copy=%s\n", c, dir_copy);
   if (c)
     {
       /* If the '/' was at the beginning, the last_dir is the root directory.
@@ -580,9 +582,15 @@ chdir (const char *dir)
 
   if (new_dir)
   {
-    // printf("newdir-inode=%x curd-inode=%x\n", dir_get_inode (new_dir), dir_get_inode (cur_dir));
+    // printf("dir=%s, newdir-inode=%x curd-inode=%x, newdir->parent=%x\n",
+    //   dir, dir_get_inode (new_dir), dir_get_inode (cur_dir),
+    //   dir_get_inode (dir_get_parent (new_dir)));
+    if (new_dir != cur_dir && strcmp(dir, ".") && strcmp(dir, "..") && strrchr (dir, '/') == NULL)
+      dir_set_parent (new_dir, cur_dir);
     thread_current ()->current_directory = new_dir;
   }
+
+  // dir_close (cur_dir);
 
   return (new_dir != NULL);
 }

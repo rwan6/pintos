@@ -59,7 +59,9 @@ dir_open (struct inode *inode)
 struct dir *
 dir_open_root (void)
 {
-  return dir_open (inode_open (ROOT_DIR_SECTOR));
+  struct dir *root_dir = dir_open (inode_open (ROOT_DIR_SECTOR));
+  root_dir->parent = root_dir;
+  return root_dir;
 }
 
 /* Opens and returns a new directory for the same inode as DIR.
@@ -90,6 +92,21 @@ dir_get_inode (struct dir *dir)
 {
   return dir->inode;
 }
+
+/* Returns the parent dir. */
+struct dir *
+dir_get_parent (struct dir *dir)
+{
+  return dir->parent;
+}
+
+/* Sets the parent dir. */
+void
+dir_set_parent (struct dir *dir, struct dir *parent)
+{
+  dir->parent = parent;
+}
+
 
 /* Searches DIR for a file with the given NAME.
    If successful, returns true, sets *EP to the directory entry
@@ -191,6 +208,7 @@ dir_add (struct dir *dir, const char *name, block_sector_t inode_sector,
     {
       e.child_dir = dir_open (inode_open (inode_sector));
       e.child_dir->parent = dir;
+      // printf("child dir inode = %x, dir inode = %x\n", e.child_dir->inode, dir->inode);
     }
   success = inode_write_at (dir->inode, &e, sizeof e, ofs) == sizeof e;
 
@@ -295,6 +313,8 @@ get_dir_from_path (struct dir *cur_dir, const char *path)
         return cur_dir;
       else if (!strcmp (path, ".."))
       {
+        // printf("c=%s, path=%s\n", c, path);
+        // printf("got here? cdi = %x, pi=%x\n", cur_dir->inode, cur_dir->parent->inode);
         return cur_dir->parent;
       }
       else

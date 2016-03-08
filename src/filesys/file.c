@@ -9,7 +9,6 @@
 struct file *
 file_open (struct inode *inode)
 {
-  // printf("file open inode=%x\n", inode);
   struct file *file = calloc (1, sizeof *file);
   if (inode != NULL && file != NULL && !inode_is_removed (inode))
     {
