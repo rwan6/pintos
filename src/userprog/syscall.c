@@ -578,11 +578,19 @@ chdir (const char *dir)
   if (strlen (dir) == 0 || filename_ends_in_slash (dir))
     return false;
 
+// printf("h1\n");
   struct dir *cur_dir = thread_current ()->current_directory;
+// printf("h2, cur d=%d, dir name=%s\n", inode_get_inumber (dir_get_inode (cur_dir)), dir);
   struct dir *new_dir = get_dir_from_path (cur_dir, dir);
+// printf("h3, new d=%d\n", inode_get_inumber (dir_get_inode (new_dir)));
 
   if (new_dir)
+  {
     thread_current ()->current_directory = new_dir;
+    // printf("set thread current cd\n");
+  }
+
+  // dir_close (cur_dir);
 
   return (new_dir != NULL);
 }

@@ -94,7 +94,8 @@ process_execute (const char *file_name)
 
       /* Child inherits the working directory from its parent */
       child_thread->current_directory = thread_current ()->current_directory;
-
+// printf("setting child's cd, sector=%d\n", inode_get_inumber (dir_get_inode (child_thread->current_directory)));
+// printf("setting child's cd, sector=%d\n", child_thread->current_directory);
       cp = malloc (sizeof (struct child_process));
       if (cp == NULL)
         {
