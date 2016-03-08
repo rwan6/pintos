@@ -283,7 +283,7 @@ inode_reopen (struct inode *inode)
 {
   if (inode != NULL)
     inode->open_cnt++;
-
+// printf("incrementing oc, oc=%d, inode=%x\n", inode->open_cnt, inode);
   return inode;
 }
 

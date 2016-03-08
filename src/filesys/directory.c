@@ -102,7 +102,7 @@ lookup (const struct dir *dir, const char *name,
 
   ASSERT (dir != NULL);
   ASSERT (name != NULL);
-
+// printf("dir inode=%x\n", dir->inode);
   for (ofs = 0; inode_read_at (dir->inode, &e, sizeof e, ofs) == sizeof e;
        ofs += sizeof e)
     if (e.in_use && !strcmp (name, e.name))
@@ -210,22 +210,23 @@ dir_remove (struct dir *dir, const char *name)
   ASSERT (dir != NULL);
   ASSERT (name != NULL);
 
-  if (!strcmp (name, ".") || !strcmp (name, ".."))
-    goto done;
+  // if (!strcmp (name, ".") || !strcmp (name, ".."))
+    // goto done;
 
-  // printf("dir=%x, name=%s\n", dir, name);
+  // printf("dirI=%x, name=%s\n", dir->inode, name);
   /* Find directory entry. */
   if (!lookup (dir, name, &e, &ofs))
     goto done;
 
-  // printf("cdi=%x, tcdi=%x oc=%d\n", e.cur_dir, thread_current ()->current_directory,
+  // printf("cdi=%x, tcdi=%x oc=%d\n", e.cur_dir->inode, thread_current ()->current_directory->inode,
     // inode_get_opencnt (e.cur_dir->inode));
-  if (inode_get_opencnt (e.cur_dir->inode) > 0
-      && (!inode_is_file (e.cur_dir->inode)))
-    goto done;
+  // if (inode_get_opencnt (e.cur_dir->inode) > 0
+      // && (!inode_is_file (e.cur_dir->inode)))
+    // goto done;
   // printf("hereeeee\n");
   /* Open inode. */
   inode = inode_open (e.inode_sector);
+  // printf("inode = %x\n", );
   if (inode == NULL)
     goto done;
 
@@ -237,9 +238,10 @@ dir_remove (struct dir *dir, const char *name)
   e.in_use = false;
   if (inode_write_at (dir->inode, &e, sizeof e, ofs) != sizeof e)
     goto done;
-
+// printf("inode address=%x\n", inode);
   /* Remove inode. */
   inode_remove (inode);
+// printf("inode removed=%d\n", inode_is_removed (inode));
   success = true;
 
  done:
@@ -276,6 +278,7 @@ get_dir_from_path (struct dir *cur_dir, const char *path)
     {
       /* path is an absolute path */
       cur_dir = dir_open_root ();
+      // printf("root d inode=%x\n", cur_dir->inode);
       if (strlen (path) == 1)
         return cur_dir;
     }
