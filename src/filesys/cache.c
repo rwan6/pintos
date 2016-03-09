@@ -118,7 +118,8 @@ cache_lookup (block_sector_t sector_idx)
 
 /* Read 'chunk_size' bytes of a block entry that starts at sector
   'sector_idx' with offset 'sector_ofs' into 'buffer'. If the
-   entry was not found in the cache, it is fetched from disk. */
+   entry was not found in the cache, it is fetched from disk.
+   Lock down during memory copy and changing accessed bit. */
 void
 cache_read (block_sector_t sector_idx, void *buffer, int chunk_size,
             int sector_ofs)
@@ -126,13 +127,17 @@ cache_read (block_sector_t sector_idx, void *buffer, int chunk_size,
   int index = cache_lookup (sector_idx);
   if (index == -1)
     index = cache_fetch (sector_idx);
+  
+  lock_acquire (&cache_table[index].entry_lock);
   memcpy (buffer, cache_table[index].data + sector_ofs, chunk_size);
   cache_table[index].accessed = true;
+  lock_release (&cache_table[index].entry_lock);
 }
 
 /* Writes 'chunk_size' bytes of a block entry that starts at sector
   'sector_idx' with offset 'sector_ofs' into 'buffer'. If the
-   entry was not found in the cache, it is fetched from disk. */
+   entry was not found in the cache, it is fetched from disk.
+   Lock down during memory copy and changing accessed and dirty bits. */
 void
 cache_write (block_sector_t sector_idx, void *buffer, int chunk_size,
              int sector_ofs)
@@ -140,9 +145,11 @@ cache_write (block_sector_t sector_idx, void *buffer, int chunk_size,
   int index = cache_lookup (sector_idx);
   if (index == -1)
     index = cache_fetch (sector_idx);
+  lock_acquire (&cache_table[index].entry_lock);
   memcpy (cache_table[index].data + sector_ofs, buffer, chunk_size);
   cache_table[index].accessed = true;
   cache_table[index].dirty = true;
+  lock_release (&cache_table[index].entry_lock);
 }
 
 /* Fetch an entry from the disk into the cache.  If no cache entries
@@ -173,10 +180,13 @@ cache_fetch (block_sector_t sector_idx)
 
   block_read (fs_device, sector_idx, cache_table[index].data);
 
+  lock_acquire (&cache_table[index].entry_lock);
   cache_table[index].free = false;
   cache_table[index].accessed = false;
   cache_table[index].dirty = false;
   cache_table[index].sector_idx = (int) sector_idx;
+  lock_release (&cache_table[index].entry_lock);
+  
   return index;
 }
 
@@ -237,11 +247,9 @@ cache_flush (void)
   int i = 0;
   for (; i < CACHE_SIZE; i++)
     {
+      lock_acquire (&cache_table[i].entry_lock);
       if (!cache_table[i].free)
-        {
-          lock_acquire (&cache_table[i].entry_lock);
-          cache_writeback_if_dirty (i);
-          lock_release (&cache_table[i].entry_lock);
-        }
+        cache_writeback_if_dirty (i);
+      lock_release (&cache_table[i].entry_lock);
     }
 }
