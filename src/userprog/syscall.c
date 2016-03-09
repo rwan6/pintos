@@ -580,7 +580,6 @@ chdir (const char *dir)
     dir_close (cur_dir);
     thread_current ()->current_directory = new_dir;
   }
-
   return (new_dir != NULL);
 }
 

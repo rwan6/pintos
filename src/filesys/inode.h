@@ -22,5 +22,7 @@ off_t inode_length (const struct inode *);
 bool inode_is_file (const struct inode *);
 // int inode_get_opencnt (struct inode *);
 bool inode_is_removed (struct inode *);
+bool inode_grab_lock (struct inode *);
+void inode_release_lock (struct inode *);
 
 #endif /* filesys/inode.h */

@@ -182,6 +182,7 @@ dir_add (struct dir *dir, const char *name, block_sector_t inode_sector,
   /* Check NAME for validity. */
   if (*name == '\0' || strlen (name) > NAME_MAX)
     return false;
+  
   /* Check that NAME is not in use. */
   if (lookup (dir, name, NULL, NULL))
     goto done;
@@ -336,6 +337,8 @@ dir_is_empty (struct dir *dir)
   off_t ofs;
   struct dir_entry e;
 
+  /* If an entry is in use and it is not "." or "..", the directory
+     is not free. */
   for (ofs = 0; inode_read_at (dir->inode, &e, sizeof e, ofs) == sizeof e;
        ofs += sizeof e)
     if (e.in_use && strcmp (e.name, ".") && strcmp (e.name, ".."))

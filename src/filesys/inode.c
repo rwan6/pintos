@@ -285,9 +285,9 @@ inode_reopen (struct inode *inode)
 {
   if (inode != NULL)
     {
-      lock_acquire (&inode->inode_lock);
+      inode_grab_lock (inode);
       inode->open_cnt++;
-      lock_release (&inode->inode_lock);
+      inode_release_lock (inode);
     }
   return inode;
 }
@@ -350,9 +350,9 @@ void
 inode_remove (struct inode *inode)
 {
   ASSERT (inode != NULL);
-  lock_acquire (&inode->inode_lock);
+  inode_grab_lock (inode);
   inode->removed = true;
-  lock_release (&inode->inode_lock);
+  inode_release_lock (inode);
 }
 
 /* Reads SIZE bytes from INODE into BUFFER, starting at position OFFSET.
@@ -364,6 +364,7 @@ inode_read_at (struct inode *inode, void *buffer_, off_t size, off_t offset)
   ASSERT (inode != NULL);
   uint8_t *buffer = buffer_;
   off_t bytes_read = 0;
+  bool lock_success = false;
 
   /* Determine whether the process is about to read past the end of the
      file.  If so, it should proceed atomically. */
@@ -373,7 +374,7 @@ inode_read_at (struct inode *inode, void *buffer_, off_t size, off_t offset)
   /* Acquire the lock if the process is trying to read past the end of
      the file. */
   if ((unsigned) (size + offset) > new_idisk.length)
-    lock_acquire (&inode->inode_lock);
+    lock_success = inode_grab_lock (inode);
 
   while (size > 0)
     {
@@ -400,7 +401,10 @@ inode_read_at (struct inode *inode, void *buffer_, off_t size, off_t offset)
     }
 
   if ((unsigned) (size + offset) > new_idisk.length)
-    lock_release (&inode->inode_lock);
+    {
+      if (lock_success)
+        inode_release_lock (inode);
+    }
 
   /* If we are not yet at the end of the file, have the readahead
      thread fetch the next block. */
@@ -430,6 +434,10 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
   ASSERT (inode != NULL);
   const uint8_t *buffer = buffer_;
   off_t bytes_written = 0;
+  bool lock_success = false;
+  
+  if (inode->deny_write_cnt)
+    return 0;
 
   /* Determine whether file growth is necessary. */
   struct inode_disk new_idisk;
@@ -438,7 +446,8 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
 
   if ((uint32_t) (offset + size) > new_idisk.length)
     {
-      lock_acquire (&inode->inode_lock);
+      lock_success = inode_grab_lock (inode);
+      
       uint32_t curr_blocks = new_idisk.num_blocks;
       int file_extended = (((int) (offset + size) -
                           (int) curr_blocks * BLOCK_SECTOR_SIZE)
@@ -447,13 +456,17 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
                              (int) curr_blocks * BLOCK_SECTOR_SIZE);
       if (file_extended > 0 && file_block_grown > 0)
         {
-          bool success = file_grow (&new_idisk,
-                                   (unsigned) file_extended);
+          bool grown_success = file_grow (&new_idisk,
+                                         (unsigned) file_extended);
 
           /* If the necessary number of blocks could not be allocated,
              return that 0 bytes were written. */
-          if (!success)
-            return 0;
+          if (!grown_success)
+            {
+              if (lock_success)
+                inode_release_lock (inode);
+              return 0;
+            }
         }
 
       /* Update file size at the end. */
@@ -462,16 +475,11 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
       file_grown = true;
     }
 
-  if (inode->deny_write_cnt)
-    return 0;
-
   while (size > 0)
     {
       /* Sector to write, starting byte offset within sector. */
       block_sector_t sector_idx = byte_to_sector (inode, offset);
       int sector_ofs = offset % BLOCK_SECTOR_SIZE;
-
-      /* Bytes left in inode, bytes left in sector, lesser of the two. */
       int sector_left = BLOCK_SECTOR_SIZE - sector_ofs;
 
       /* Number of bytes to actually write into this sector. */
@@ -487,7 +495,10 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
     }
 
   if (file_grown)
-    lock_release (&inode->inode_lock);
+    {
+      if (lock_success)
+        inode_release_lock (inode);
+    }
 
   return bytes_written;
 }
@@ -498,10 +509,10 @@ void
 inode_deny_write (struct inode *inode)
 {
   ASSERT (inode != NULL);
-  lock_acquire (&inode->inode_lock);
+  inode_grab_lock (inode);
   inode->deny_write_cnt++;
   ASSERT (inode->deny_write_cnt <= inode->open_cnt);
-  lock_release (&inode->inode_lock);
+  inode_release_lock (inode);
 }
 
 /* Re-enables writes to INODE.
@@ -512,11 +523,11 @@ inode_allow_write (struct inode *inode)
 {
   ASSERT (inode != NULL);
   
-  lock_acquire (&inode->inode_lock);
+  inode_grab_lock (inode);
   ASSERT (inode->deny_write_cnt > 0);
   ASSERT (inode->deny_write_cnt <= inode->open_cnt);
   inode->deny_write_cnt--;
-  lock_release (&inode->inode_lock);
+  inode_release_lock (inode);
 }
 
 /* Returns the length, in bytes, of INODE's data. */
@@ -524,8 +535,11 @@ off_t
 inode_length (const struct inode *inode)
 {
   ASSERT (inode != NULL);
+  bool lock_success = inode_grab_lock (inode);
   struct inode_disk length_idisk;
   cache_read (inode->sector, &length_idisk, BLOCK_SECTOR_SIZE, 0);
+  if (lock_success)
+    inode_release_lock (inode);
   return (off_t) length_idisk.length;
 }
 
@@ -661,3 +675,27 @@ allocate_new_block (void)
   return new_block;
 }
 
+/* Grab the inode's lock if it does not already hold it.  Returns
+   false if the inode's lock was already held (which means it was
+   acquired in a different function and is needed later on). */
+bool
+inode_grab_lock (struct inode *inode)
+{
+  if (lock_held_by_current_thread (&inode->inode_lock))
+    return false;
+  else
+    {
+      lock_acquire (&inode->inode_lock);
+      return true;
+    }
+}
+
+/* Release the inode's lock.  Note that this function does not require
+   any return value since it will only be called by the last function in
+   the event of a nested function call sequence that may require grabbing
+   the same lock. */
+void
+inode_release_lock (struct inode *inode)
+{
+  lock_release (&inode->inode_lock);
+}
