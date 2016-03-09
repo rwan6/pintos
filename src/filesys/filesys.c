@@ -98,6 +98,9 @@ do_format (void)
   free_map_create ();
   if (!dir_create (ROOT_DIR_SECTOR, 16))
     PANIC ("root directory creation failed");
+  struct dir *root_dir = dir_open_root ();
+  setup_dir (root_dir, ROOT_DIR_SECTOR);
+  dir_close (root_dir);
   free_map_close ();
   printf ("done.\n");
 }

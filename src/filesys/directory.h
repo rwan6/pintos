@@ -20,14 +20,13 @@ struct dir *dir_open_root (void);
 struct dir *dir_reopen (struct dir *);
 void dir_close (struct dir *);
 struct inode *dir_get_inode (struct dir *);
-struct dir *dir_get_parent (struct dir *);
-void dir_set_parent (struct dir *, struct dir *);
 
 /* Reading and writing. */
 bool dir_lookup (const struct dir *, const char *name, struct inode **);
 bool dir_add (struct dir *, const char *name, block_sector_t, bool);
 bool dir_remove (struct dir *, const char *name);
 bool dir_readdir (struct dir *, char name[NAME_MAX + 1]);
+bool setup_dir (struct dir *, block_sector_t);
 
 struct dir *get_dir_from_path (struct dir *, const char *);
 bool dir_is_empty (struct dir *);

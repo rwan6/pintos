@@ -12,7 +12,6 @@ struct dir
   {
     struct inode *inode;                /* Backing store. */
     off_t pos;                          /* Current position. */
-    struct dir *parent;                 /* Pointer to parent directory */
   };
 
 /* A single directory entry. */
@@ -21,16 +20,38 @@ struct dir_entry
     block_sector_t inode_sector;        /* Sector number of header. */
     char name[NAME_MAX + 1];            /* Null terminated file name. */
     bool in_use;                        /* In use or free? */
-    struct dir *child_dir;              /* Pointer to child subdirectory. */
-    struct dir *cur_dir;                /* Pointer to directory it lives in. */
   };
+  
+bool dir_entry_is_file (struct dir_entry *);
 
 /* Creates a directory with space for ENTRY_CNT entries in the
    given SECTOR.  Returns true if successful, false on failure. */
 bool
 dir_create (block_sector_t sector, size_t entry_cnt)
 {
-  return inode_create (sector, entry_cnt * sizeof (struct dir_entry), 0);
+  bool success = inode_create (sector, (entry_cnt) *
+                               sizeof (struct dir_entry), 0);
+  
+}
+
+/* Creates entries "." and ".." for a directory that is located in SECTOR. */
+bool
+setup_dir (struct dir *parent, block_sector_t sector)
+{
+  struct dir *dir = dir_open (inode_open (sector));
+  block_sector_t parent_sector = inode_get_inumber (parent->inode);
+  return dir_add (dir, ".", sector, false) &&
+         dir_add (dir, "..", parent_sector, false);
+}
+
+/* Checks if the dir_entry is a file. */
+bool
+dir_entry_is_file (struct dir_entry *e)
+{
+   struct inode *inode = inode_open (e->inode_sector);
+   bool is_file = inode_is_file (inode);
+   inode_close (inode);
+   return is_file;
 }
 
 /* Opens and returns the directory for the given INODE, of which
@@ -43,7 +64,6 @@ dir_open (struct inode *inode)
     {
       dir->inode = inode;
       dir->pos = 0;
-      dir->parent = NULL;
       return dir;
     }
   else
@@ -60,7 +80,6 @@ struct dir *
 dir_open_root (void)
 {
   struct dir *root_dir = dir_open (inode_open (ROOT_DIR_SECTOR));
-  root_dir->parent = root_dir;
   return root_dir;
 }
 
@@ -70,8 +89,6 @@ struct dir *
 dir_reopen (struct dir *dir)
 {
   struct dir *reopen_dir = dir_open (inode_reopen (dir->inode));
-  reopen_dir->parent = dir->parent;
-  // printf ("Reopen, Par: %x\n", dir);
   return reopen_dir;
 }
 
@@ -79,8 +96,7 @@ dir_reopen (struct dir *dir)
 void
 dir_close (struct dir *dir)
 {
-  if (dir != NULL && !(dir == thread_current ()->current_directory)
-      && !(dir == thread_current ()->current_directory->parent))
+  if (dir != NULL && !(dir == thread_current ()->current_directory))
     {
       inode_close (dir->inode);
       free (dir);
@@ -93,21 +109,6 @@ dir_get_inode (struct dir *dir)
 {
   return dir->inode;
 }
-
-/* Returns the parent dir. */
-struct dir *
-dir_get_parent (struct dir *dir)
-{
-  return dir->parent;
-}
-
-/* Sets the parent dir. */
-void
-dir_set_parent (struct dir *dir, struct dir *parent)
-{
-  dir->parent = parent;
-}
-
 
 /* Searches DIR for a file with the given NAME.
    If successful, returns true, sets *EP to the directory entry
@@ -181,8 +182,6 @@ dir_add (struct dir *dir, const char *name, block_sector_t inode_sector,
   /* Check NAME for validity. */
   if (*name == '\0' || strlen (name) > NAME_MAX)
     return false;
-  if (!strcmp (name, ".") || !strcmp (name, ".."))
-    goto done;
   /* Check that NAME is not in use. */
   if (lookup (dir, name, NULL, NULL))
     goto done;
@@ -202,17 +201,9 @@ dir_add (struct dir *dir, const char *name, block_sector_t inode_sector,
   e.in_use = true;
   strlcpy (e.name, name, sizeof e.name);
   e.inode_sector = inode_sector;
-  e.cur_dir = dir;
-  if (is_file)
-    e.child_dir = NULL;
-  else
-    {
-      e.child_dir = dir_open (inode_open (inode_sector));
-      // printf ("Add, Name: %s, My Name: %s, My Dir: %x, Par: %x\n", name, e.name, e.child_dir, dir);
-      e.child_dir->parent = dir;
-      // printf("child dir inode = %x, dir inode = %x\n", e.child_dir->inode, dir->inode);
-    }
   success = inode_write_at (dir->inode, &e, sizeof e, ofs) == sizeof e;
+  if (success && !is_file && (!strcmp (name, ".") || !strcmp (name, "..")))
+    success = setup_dir (dir, inode_sector);
 
   done:
     return success;
@@ -223,7 +214,7 @@ dir_add (struct dir *dir, const char *name, block_sector_t inode_sector,
    which occurs only if there is no file with the given NAME. */
 bool
 dir_remove (struct dir *dir, const char *name)
-{ // printf ("Remove, Name: %s, Par: %x\n", name, dir->parent);
+{
   struct dir_entry e;
   struct inode *inode = NULL;
   bool success = false;
@@ -232,26 +223,24 @@ dir_remove (struct dir *dir, const char *name)
   ASSERT (dir != NULL);
   ASSERT (name != NULL);
 
-  // if (!strcmp (name, ".") || !strcmp (name, ".."))
-    // goto done;
-
   /* Find directory entry. */
   if (!lookup (dir, name, &e, &ofs))
     goto done;
-
-  // if (inode_get_opencnt (e.cur_dir->inode) > 0
-      // && (!inode_is_file (e.cur_dir->inode)))
-    // goto done;
 
   /* Open inode. */
   inode = inode_open (e.inode_sector);
   if (inode == NULL)
     goto done;
 
-  if (e.child_dir)
-    if (!dir_is_empty (e.child_dir))
-      goto done;
-
+  if (!dir_entry_is_file (&e))
+    {
+      struct dir *child_dir = dir_open (inode);
+      if (!dir_is_empty (child_dir))
+        {
+          dir_close (child_dir);
+          goto done;
+        }
+    }
   /* Erase directory entry. */
   e.in_use = false;
   if (inode_write_at (dir->inode, &e, sizeof e, ofs) != sizeof e)
@@ -277,7 +266,7 @@ dir_readdir (struct dir *dir, char name[NAME_MAX + 1])
   while (inode_read_at (dir->inode, &e, sizeof e, dir->pos) == sizeof e)
     {
       dir->pos += sizeof e;
-      if (e.in_use)
+      if (e.in_use && strcmp (e.name, ".") && strcmp (e.name, ".."))
         {
           strlcpy (name, e.name, NAME_MAX + 1);
           return true;
@@ -307,18 +296,10 @@ get_dir_from_path (struct dir *cur_dir, const char *path)
     {
       const char *lookup_path = path;
       if (c != NULL && path[0] == '/' && path[1] != '\0') lookup_path++;
-      if (lookup (cur_dir, lookup_path, &e, NULL) && e.child_dir)
+      if (lookup (cur_dir, lookup_path, &e, NULL) && !dir_entry_is_file (&e))
         {
-          return dir_reopen (e.child_dir);
+          return dir_open (inode_open (e.inode_sector));
         }
-      else if (!strcmp (path, "."))
-        return cur_dir;
-      else if (!strcmp (path, ".."))
-      {
-        // printf("c=%s, path=%s\n", c, path);
-        // printf("got here? cdi = %x, pi=%x\n", cur_dir->inode, cur_dir->parent->inode);
-        return cur_dir->parent;
-      }
       else
         {
           return NULL;
@@ -334,19 +315,10 @@ get_dir_from_path (struct dir *cur_dir, const char *path)
   for (token = strtok_r (s, "/", &save_ptr); token != NULL;
         token = strtok_r (NULL, "/", &save_ptr))
     {
-      if (!strcmp (token, "."))
-        continue;
-      else if (!strcmp (token, ".."))
-        cur_dir = cur_dir->parent;
-      else if (lookup (cur_dir, token, &e, NULL))
+      if (lookup (cur_dir, token, &e, NULL))
         {
-          if (e.child_dir)
-            cur_dir = e.child_dir;
-          else
-            {
-              free (s);
-              return NULL;
-            }
+          dir_close (cur_dir);
+          cur_dir = dir_open (inode_open (e.inode_sector));
         }
       else
         {
@@ -355,8 +327,6 @@ get_dir_from_path (struct dir *cur_dir, const char *path)
         }
     }
     free (s);
-    if (cur_dir)
-      cur_dir = dir_reopen (cur_dir);
     return cur_dir;
 }
 
@@ -368,7 +338,7 @@ dir_is_empty (struct dir *dir)
 
   for (ofs = 0; inode_read_at (dir->inode, &e, sizeof e, ofs) == sizeof e;
        ofs += sizeof e)
-    if (e.in_use)
+    if (e.in_use && strcmp (e.name, ".") && strcmp (e.name, ".."))
       return false;
   return true;
 }
