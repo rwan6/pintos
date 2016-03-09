@@ -609,7 +609,7 @@ mkdir (const char *dir)
   struct dir *last_dir = get_last_dir (dir, &new_dir);
   if (!last_dir)
     return false;
-
+  
   bool success = filesys_create (last_dir, new_dir, 16, false);
   dir_close (last_dir);
   return success;

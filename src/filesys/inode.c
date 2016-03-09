@@ -21,7 +21,7 @@
 #define FIRSTLEVEL_SIZE ((BLOCK_SECTOR_SIZE / 4) - NUM_METADATA_INDIR_DOUB)
 
 /* Size of the inode hierarchy indirect and doubly-indirect levels. */
-#define INDIR_DOUB_SIZE BLOCK_SECTOR_SIZE / 4
+#define INDIR_DOUB_SIZE (BLOCK_SECTOR_SIZE / 4)
 
 /* Calculate the maximum location the doubly-indirect level can point to
    and ensure that a process does not try to access past this. */
@@ -136,7 +136,7 @@ doub_indir_lookup (struct inode_disk *idisk, unsigned block_loc)
   struct indir_doub_indir_sectors new_doubindir_sect;
   cache_read (idisk->doub_indir_level, &new_doubindir_sect,
               BLOCK_SECTOR_SIZE, 0);
-
+     
   int doubly_indir_entry = (block_loc - (FIRSTLEVEL_SIZE + INDIR_DOUB_SIZE))
                            / INDIR_DOUB_SIZE;
   block_sector_t indir_entry = new_doubindir_sect.
@@ -147,7 +147,8 @@ doub_indir_lookup (struct inode_disk *idisk, unsigned block_loc)
   int indir_block = (block_loc - (FIRSTLEVEL_SIZE + INDIR_DOUB_SIZE))
                     % INDIR_DOUB_SIZE;
 
-  return new_indir_sect.indir_blocks[indir_block];
+  block_sector_t next_block = new_indir_sect.indir_blocks[indir_block];
+  return next_block;
 }
 
 /* Returns the status of the inode (false if it is a directory,
@@ -466,7 +467,6 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
       int chunk_size = size < sector_left ? size : sector_left;
       if (chunk_size <= 0)
         break;
-
       cache_write (sector_idx, (void *) buffer + bytes_written,
         chunk_size, sector_ofs);
       /* Advance. */
@@ -612,9 +612,14 @@ file_block_growth (struct inode_disk *disk_inode)
           cache_write (disk_inode->doub_indir_level,
             &new_doubindir, BLOCK_SECTOR_SIZE, 0);
         }
-
-      block_sector_t indir_block = new_doubindir.indir_blocks[indir_entry];
+      block_sector_t indir_block =
+        new_doubindir.indir_blocks[doubly_indir_entry];
       cache_read (indir_block, &new_doubindir, BLOCK_SECTOR_SIZE, 0);
+      
+      new_sector = allocate_new_block ();
+      if (new_sector == (block_sector_t) (max_block + 1))
+        return false;
+      
       new_doubindir.indir_blocks[indir_entry] = new_sector;
       cache_write (indir_block, &new_doubindir, BLOCK_SECTOR_SIZE, 0);
     }

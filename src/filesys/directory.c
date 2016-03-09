@@ -71,6 +71,7 @@ dir_reopen (struct dir *dir)
 {
   struct dir *reopen_dir = dir_open (inode_reopen (dir->inode));
   reopen_dir->parent = dir->parent;
+  // printf ("Reopen, Par: %x\n", dir);
   return reopen_dir;
 }
 
@@ -207,6 +208,7 @@ dir_add (struct dir *dir, const char *name, block_sector_t inode_sector,
   else
     {
       e.child_dir = dir_open (inode_open (inode_sector));
+      // printf ("Add, Name: %s, My Name: %s, My Dir: %x, Par: %x\n", name, e.name, e.child_dir, dir);
       e.child_dir->parent = dir;
       // printf("child dir inode = %x, dir inode = %x\n", e.child_dir->inode, dir->inode);
     }
@@ -221,7 +223,7 @@ dir_add (struct dir *dir, const char *name, block_sector_t inode_sector,
    which occurs only if there is no file with the given NAME. */
 bool
 dir_remove (struct dir *dir, const char *name)
-{
+{ // printf ("Remove, Name: %s, Par: %x\n", name, dir->parent);
   struct dir_entry e;
   struct inode *inode = NULL;
   bool success = false;
