@@ -29,9 +29,7 @@ bool dir_entry_is_file (struct dir_entry *);
 bool
 dir_create (block_sector_t sector, size_t entry_cnt)
 {
-  bool success = inode_create (sector, (entry_cnt) *
-                               sizeof (struct dir_entry), 0);
-
+  return inode_create (sector, (entry_cnt) * sizeof (struct dir_entry), 0);
 }
 
 /* Creates entries "." and ".." for a directory that is located in SECTOR. */
@@ -40,8 +38,9 @@ setup_dir (struct dir *parent, block_sector_t sector)
 {
   struct dir *dir = dir_open (inode_open (sector));
   block_sector_t parent_sector = inode_get_inumber (parent->inode);
-  return dir_add (dir, ".", sector, false) &&
-         dir_add (dir, "..", parent_sector, false);
+  bool success = dir_add (dir, ".", sector, false) &&
+                 dir_add (dir, "..", parent_sector, false);
+  return success;
 }
 
 /* Checks if the dir_entry is a file. */
@@ -64,7 +63,6 @@ dir_open (struct inode *inode)
     {
       dir->inode = inode;
       dir->pos = 0;
-
       return dir;
     }
   else
@@ -97,7 +95,7 @@ dir_reopen (struct dir *dir)
 void
 dir_close (struct dir *dir)
 {
-  if (dir != NULL && !(dir == thread_current ()->current_directory))
+  if (dir != NULL)
     {
       inode_close (dir->inode);
       free (dir);
@@ -156,7 +154,7 @@ dir_lookup (const struct dir *dir, const char *name,
   if (inode_get_inumber (dir->inode) == ROOT_DIR_SECTOR && strlen (name) == 0)
     *inode = inode_open (ROOT_DIR_SECTOR);
   else if (inode_get_inumber (dir->inode) ==
-            inode_get_inumber (thread_current ()->current_directory->inode)
+           inode_get_inumber (thread_current ()->current_directory->inode)
            && strlen (name) == 0)
     *inode = inode_open (inode_get_inumber (dir->inode));
   else if (lookup (dir, name, &e, NULL))
@@ -217,7 +215,7 @@ dir_add (struct dir *dir, const char *name, block_sector_t inode_sector,
     return success;
 }
 
-/* Deletes entries "." and ".." for a directory that is located in SECTOR. */
+/* Deletes entries "." and ".." for directory DIR. */
 bool
 cleanup_dir (struct dir *dir)
 {
