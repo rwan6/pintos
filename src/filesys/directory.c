@@ -21,7 +21,7 @@ struct dir_entry
     char name[NAME_MAX + 1];            /* Null terminated file name. */
     bool in_use;                        /* In use or free? */
   };
-  
+
 bool dir_entry_is_file (struct dir_entry *);
 
 /* Creates a directory with space for ENTRY_CNT entries in the
@@ -31,7 +31,7 @@ dir_create (block_sector_t sector, size_t entry_cnt)
 {
   bool success = inode_create (sector, (entry_cnt) *
                                sizeof (struct dir_entry), 0);
-  
+
 }
 
 /* Creates entries "." and ".." for a directory that is located in SECTOR. */
@@ -64,6 +64,7 @@ dir_open (struct inode *inode)
     {
       dir->inode = inode;
       dir->pos = 0;
+
       return dir;
     }
   else
@@ -124,6 +125,7 @@ lookup (const struct dir *dir, const char *name,
 
   ASSERT (dir != NULL);
   ASSERT (name != NULL);
+
   for (ofs = 0; inode_read_at (dir->inode, &e, sizeof e, ofs) == sizeof e;
        ofs += sizeof e)
     if (e.in_use && !strcmp (name, e.name))
@@ -134,6 +136,7 @@ lookup (const struct dir *dir, const char *name,
           *ofsp = ofs;
         return true;
       }
+
   return false;
 }
 
@@ -152,7 +155,9 @@ dir_lookup (const struct dir *dir, const char *name,
 
   if (inode_get_inumber (dir->inode) == ROOT_DIR_SECTOR && strlen (name) == 0)
     *inode = inode_open (ROOT_DIR_SECTOR);
-  else if (dir == thread_current ()->current_directory && strlen (name) == 0)
+  else if (inode_get_inumber (dir->inode) ==
+            inode_get_inumber (thread_current ()->current_directory->inode)
+           && strlen (name) == 0)
     *inode = inode_open (inode_get_inumber (dir->inode));
   else if (lookup (dir, name, &e, NULL))
     *inode = inode_open (e.inode_sector);
@@ -183,9 +188,7 @@ dir_add (struct dir *dir, const char *name, block_sector_t inode_sector,
   /* Check NAME for validity. */
   if (*name == '\0' || strlen (name) > NAME_MAX)
     return false;
-  
-  // lock_success = inode_grab_lock (dir->inode);
-    
+
   /* Check that NAME is not in use. */
   if (lookup (dir, name, NULL, NULL))
     goto done;
@@ -207,14 +210,19 @@ dir_add (struct dir *dir, const char *name, block_sector_t inode_sector,
   strlcpy (e.name, name, sizeof e.name);
   e.inode_sector = inode_sector;
   success = inode_write_at (dir->inode, &e, sizeof e, ofs) == sizeof e;
-  if (success && !is_file && (!strcmp (name, ".") || !strcmp (name, "..")))
+  if (success && !is_file && strcmp (name, ".") && strcmp (name, ".."))
     success = setup_dir (dir, inode_sector);
 
   done:
-    /* Release lock if we grabbed it in this function. */
-    // if (lock_success)
-    //   inode_release_lock (dir->inode);
     return success;
+}
+
+/* Deletes entries "." and ".." for a directory that is located in SECTOR. */
+bool
+cleanup_dir (struct dir *dir)
+{
+  return dir_remove (dir, ".") &&
+         dir_remove (dir, "..");
 }
 
 /* Removes any entry for NAME in DIR.
@@ -232,8 +240,6 @@ dir_remove (struct dir *dir, const char *name)
   ASSERT (dir != NULL);
   ASSERT (name != NULL);
 
-  lock_success = inode_grab_lock (dir->inode);
-  
   /* Find directory entry. */
   if (!lookup (dir, name, &e, &ofs))
     goto done;
@@ -243,7 +249,7 @@ dir_remove (struct dir *dir, const char *name)
   if (inode == NULL)
     goto done;
 
-  if (!dir_entry_is_file (&e))
+  if (!dir_entry_is_file (&e) && strcmp (name, ".") && strcmp (name, ".."))
     {
       struct dir *child_dir = dir_open (inode);
       if (!dir_is_empty (child_dir))
@@ -261,10 +267,12 @@ dir_remove (struct dir *dir, const char *name)
   inode_remove (inode);
   success = true;
 
+  if (success && inode_get_inumber (inode) ==
+      inode_get_inumber (thread_current ()->current_directory->inode)
+      && strcmp (name, ".") && strcmp (name, ".."))
+    success = cleanup_dir (dir);
+
  done:
-   /* Release lock if we grabbed it in this function. */
-   if (lock_success)
-     inode_release_lock (dir->inode);
   inode_close (inode);
   return success;
 }
@@ -277,26 +285,21 @@ dir_readdir (struct dir *dir, char name[NAME_MAX + 1])
 {
   struct dir_entry e;
   bool lock_success = false;
-  
-  lock_success = inode_grab_lock (dir->inode);
-  
+
   while (inode_read_at (dir->inode, &e, sizeof e, dir->pos) == sizeof e)
     {
       dir->pos += sizeof e;
       if (e.in_use && strcmp (e.name, ".") && strcmp (e.name, ".."))
         {
           strlcpy (name, e.name, NAME_MAX + 1);
-          /* Release lock if we grabbed it in this function before 
+          /* Release lock if we grabbed it in this function before
              returning. */
           if (lock_success)
             inode_release_lock (dir->inode);
           return true;
         }
     }
-    
-  /* Release lock if we grabbed it in this function. */
-  if (lock_success)
-    inode_release_lock (dir->inode);
+
   return false;
 }
 
@@ -351,8 +354,8 @@ get_dir_from_path (struct dir *cur_dir, const char *path)
           return NULL;
         }
     }
-    free (s);
-    return cur_dir;
+  free (s);
+  return cur_dir;
 }
 
 bool

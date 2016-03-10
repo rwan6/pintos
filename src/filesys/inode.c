@@ -136,7 +136,7 @@ doub_indir_lookup (struct inode_disk *idisk, unsigned block_loc)
   struct indir_doub_indir_sectors new_doubindir_sect;
   cache_read (idisk->doub_indir_level, &new_doubindir_sect,
               BLOCK_SECTOR_SIZE, 0);
-     
+
   int doubly_indir_entry = (block_loc - (FIRSTLEVEL_SIZE + INDIR_DOUB_SIZE))
                            / INDIR_DOUB_SIZE;
   block_sector_t indir_entry = new_doubindir_sect.
@@ -435,7 +435,7 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
   const uint8_t *buffer = buffer_;
   off_t bytes_written = 0;
   bool lock_success = false;
-  
+
   if (inode->deny_write_cnt)
     return 0;
 
@@ -447,7 +447,7 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
   if ((uint32_t) (offset + size) > new_idisk.length)
     {
       lock_success = inode_grab_lock (inode);
-      
+
       uint32_t curr_blocks = new_idisk.num_blocks;
       int file_extended = (((int) (offset + size) -
                           (int) curr_blocks * BLOCK_SECTOR_SIZE)
@@ -522,7 +522,7 @@ void
 inode_allow_write (struct inode *inode)
 {
   ASSERT (inode != NULL);
-  
+
   inode_grab_lock (inode);
   ASSERT (inode->deny_write_cnt > 0);
   ASSERT (inode->deny_write_cnt <= inode->open_cnt);
@@ -639,11 +639,11 @@ file_block_growth (struct inode_disk *disk_inode)
       block_sector_t indir_block =
         new_doubindir.indir_blocks[doubly_indir_entry];
       cache_read (indir_block, &new_doubindir, BLOCK_SECTOR_SIZE, 0);
-      
+
       new_sector = allocate_new_block ();
       if (new_sector == (block_sector_t) (max_block + 1))
         return false;
-      
+
       new_doubindir.indir_blocks[indir_entry] = new_sector;
       cache_write (indir_block, &new_doubindir, BLOCK_SECTOR_SIZE, 0);
     }

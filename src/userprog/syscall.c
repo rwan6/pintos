@@ -525,7 +525,7 @@ get_last_dir (const char *dir, const char **last_token)
 {
   struct dir *last_dir;
   struct dir *cur_dir = thread_current ()->current_directory;
-  
+
   /* dir_copy holds the path not including the last file/folder */
   char *dir_copy = malloc (strlen (dir) + 1);
   if (!dir_copy)
@@ -548,11 +548,6 @@ get_last_dir (const char *dir, const char **last_token)
           last_dir = get_dir_from_path (cur_dir, dir_copy);
         }
       *last_token = dir + (c - dir_copy) + 1;
-    }
-  else if (!strcmp (dir_copy, "."))
-    {
-      last_dir = cur_dir;
-      *last_token = "";
     }
   else
     {
@@ -597,7 +592,7 @@ mkdir (const char *dir)
   struct dir *last_dir = get_last_dir (dir, &new_dir);
   if (!last_dir)
     return false;
-  
+
   bool success = filesys_create (last_dir, new_dir, 16, false);
   dir_close (last_dir);
   return success;
