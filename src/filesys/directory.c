@@ -23,6 +23,7 @@ struct dir_entry
   };
 
 bool dir_entry_is_file (struct dir_entry *);
+bool cleanup_dir (struct dir *);
 
 /* Creates a directory with space for ENTRY_CNT entries in the
    given SECTOR.  Returns true if successful, false on failure. */

@@ -407,15 +407,9 @@ inode_read_at (struct inode *inode, void *buffer_, off_t size, off_t offset)
       next_readahead_entry = next_readahead_entry % READAHEAD_SIZE;
       int ra_sector = (int) byte_to_sector (inode,
                                             offset + BLOCK_SECTOR_SIZE);
-      /* Ensure the process is not trying to access an invalid block.
-         This check should always pass, since the byte_to_sector has
-         its own set of checks. */
-      if (ra_sector < block_size (fs_device))
-        {
-          readahead_list[next_readahead_entry] = ra_sector;
-          next_readahead_entry++;
-          cond_signal (&readahead_cond, &readahead_lock);
-        }
+      readahead_list[next_readahead_entry] = ra_sector;
+      next_readahead_entry++;
+      cond_signal (&readahead_cond, &readahead_lock);
       lock_release (&readahead_lock);
     }
 
@@ -535,11 +529,11 @@ off_t
 inode_length (const struct inode *inode)
 {
   ASSERT (inode != NULL);
-  bool lock_success = inode_grab_lock (inode);
+  bool lock_success = inode_grab_lock ((struct inode *) inode);
   struct inode_disk length_idisk;
   cache_read (inode->sector, &length_idisk, BLOCK_SECTOR_SIZE, 0);
   if (lock_success)
-    inode_release_lock (inode);
+    inode_release_lock ((struct inode *) inode);
   return (off_t) length_idisk.length;
 }
 
