@@ -178,7 +178,6 @@ dir_add (struct dir *dir, const char *name, block_sector_t inode_sector,
   struct dir_entry e;
   off_t ofs;
   bool success = false;
-  bool lock_success = false;
 
   ASSERT (dir != NULL);
   ASSERT (name != NULL);
@@ -207,6 +206,7 @@ dir_add (struct dir *dir, const char *name, block_sector_t inode_sector,
   e.in_use = true;
   strlcpy (e.name, name, sizeof e.name);
   e.inode_sector = inode_sector;
+  
   success = inode_write_at (dir->inode, &e, sizeof e, ofs) == sizeof e;
   if (success && !is_file && strcmp (name, ".") && strcmp (name, ".."))
     success = setup_dir (dir, inode_sector);
@@ -232,7 +232,6 @@ dir_remove (struct dir *dir, const char *name)
   struct dir_entry e;
   struct inode *inode = NULL;
   bool success = false;
-  bool lock_success = false;
   off_t ofs;
 
   ASSERT (dir != NULL);
@@ -282,7 +281,6 @@ bool
 dir_readdir (struct dir *dir, char name[NAME_MAX + 1])
 {
   struct dir_entry e;
-  bool lock_success = false;
 
   while (inode_read_at (dir->inode, &e, sizeof e, dir->pos) == sizeof e)
     {
@@ -290,10 +288,6 @@ dir_readdir (struct dir *dir, char name[NAME_MAX + 1])
       if (e.in_use && strcmp (e.name, ".") && strcmp (e.name, ".."))
         {
           strlcpy (name, e.name, NAME_MAX + 1);
-          /* Release lock if we grabbed it in this function before
-             returning. */
-          if (lock_success)
-            inode_release_lock (dir->inode);
           return true;
         }
     }

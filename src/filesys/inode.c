@@ -167,13 +167,6 @@ inode_is_file (const struct inode *inode)
     return true;
 }
 
-// int
-// inode_get_opencnt (struct inode *inode)
-// {
-//   ASSERT (inode != NULL);
-//   return inode->open_cnt;
-// }
-
 bool
 inode_is_removed (struct inode *inode)
 {
@@ -414,9 +407,9 @@ inode_read_at (struct inode *inode, void *buffer_, off_t size, off_t offset)
       next_readahead_entry = next_readahead_entry % READAHEAD_SIZE;
       readahead_list[next_readahead_entry] = (int) byte_to_sector (inode,
                                              offset + BLOCK_SECTOR_SIZE);
+      next_readahead_entry++;
       cond_signal (&readahead_cond, &readahead_lock);
       lock_release (&readahead_lock);
-      next_readahead_entry++;
     }
 
   return bytes_read;

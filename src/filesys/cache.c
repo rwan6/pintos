@@ -39,6 +39,7 @@ cache_init (void)
 
   lock_init (&clock_handle_lock);
   lock_init (&readahead_lock);
+  lock_init (&io_lock);
   cond_init (&readahead_cond);
 
   i = 0;
@@ -75,20 +76,29 @@ void
 read_ahead (void *aux UNUSED)
 {
   int ra_index = 0;
+  int next_ra;
+  int next_sector;
 
   /* Thread CANNOT terminate, so it is wrapped in an infinite while loop. */
   while (1)
     {
       lock_acquire (&readahead_lock);
-      ra_index = ra_index % READAHEAD_SIZE;
-      if (readahead_list[ra_index] == -1)
+      while (ra_index == next_readahead_entry)
         cond_wait (&readahead_cond, &readahead_lock);
 
-      /* If the block is not already in the cache, fetch it. */
-      if (cache_lookup (readahead_list[ra_index]) == -1)
-        cache_fetch (readahead_list[ra_index]);
-      readahead_list[ra_index] = -1;
+      /* If the readahead thread falls behind too far, force it to catch
+         up. */
+      if (ra_index + READAHEAD_SIZE < next_readahead_entry)
+        ra_index = next_readahead_entry - READAHEAD_SIZE;
+
+      next_ra = ra_index % READAHEAD_SIZE;
+      next_sector = readahead_list[next_ra];
+      
       lock_release (&readahead_lock);
+      
+      /* If the block is not already in the cache, fetch it. */
+      if (cache_lookup (next_sector) == -1)
+        cache_fetch (next_sector);
       ra_index++;
     }
 }
@@ -157,6 +167,7 @@ cache_write (block_sector_t sector_idx, void *buffer, int chunk_size,
 int
 cache_fetch (block_sector_t sector_idx)
 {
+  lock_acquire (&clock_handle_lock);
   int index = -1;
 
   /* If cache is already full, immediately call evict. */
@@ -176,9 +187,13 @@ cache_fetch (block_sector_t sector_idx)
       num_taken_slots++;
     }
 
+  lock_release (&clock_handle_lock);
+
   ASSERT (index != -1);
 
+  lock_acquire (&io_lock);
   block_read (fs_device, sector_idx, cache_table[index].data);
+  lock_release (&io_lock);
 
   lock_acquire (&cache_table[index].entry_lock);
   cache_table[index].free = false;
@@ -197,8 +212,10 @@ cache_writeback_if_dirty (int index)
 {
   if (cache_table[index].dirty)
     {
+      lock_acquire (&io_lock);
       block_write (fs_device, cache_table[index].sector_idx,
           cache_table[index].data);
+      lock_release (&io_lock);
       cache_table[index].dirty = false;
     }
 }
@@ -211,6 +228,8 @@ cache_evict (void)
   static int cache_clock_handle = 0;
   bool found = false;
   int evicted_idx = -1;
+  
+  // lock_acquire (&clock_handle_lock);
   while (!found)
     {
       /* Clock handle can change sporadically, so it is declared as
@@ -222,18 +241,21 @@ cache_evict (void)
       else
         {
           found = true;
-          cache_writeback_if_dirty (cur_clock_handle);
           evicted_idx = cur_clock_handle;
+          /* Release during I/O to allow other processes to evict in the
+             meantime. */
+          lock_release (&clock_handle_lock);          
+          cache_writeback_if_dirty (cur_clock_handle);
+          lock_acquire (&clock_handle_lock);
         }
 
       lock_release (&cache_table[cur_clock_handle].entry_lock);
-      lock_acquire (&clock_handle_lock);
       if (cache_clock_handle == CACHE_SIZE - 1)
         cache_clock_handle = 0;
       else
         cache_clock_handle++;
-      lock_release (&clock_handle_lock);
     }
+  // lock_release (&clock_handle_lock);
 
   ASSERT (evicted_idx >= 0);
   return evicted_idx;

@@ -7,10 +7,10 @@
 #include "threads/synch.h"
 
 #define CACHE_SIZE 64           /* Size limit for the buffer cache. */
-#define WRITE_BEHIND_WAIT 200   /* Period of time (in ms) write behind
+#define WRITE_BEHIND_WAIT 2000  /* Period of time (in ms) write behind
                                    thread sleeps before flushing cache
                                    to disk. */
-#define READAHEAD_SIZE CACHE_SIZE / 4 /* Size of the readahead queue. */
+#define READAHEAD_SIZE (CACHE_SIZE) /* Size of the readahead queue. */
 
 /* Entry into the cache.  Holds metadata about the entry in addition to
    the data block. */
@@ -30,6 +30,7 @@ int next_readahead_entry; /* Points to next readahead queue entry. */
 
 struct lock clock_handle_lock;    /* Lock for the eviction clock handle. */
 struct lock readahead_lock;       /* Lock associated with readahead_cond. */
+struct lock io_lock;              /* Lock for accessing the disk. */
 struct condition readahead_cond;  /* Readahead thread wakeup condition. */
 
 /* Prototypes for cache.c functions. */
