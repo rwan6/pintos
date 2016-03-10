@@ -175,6 +175,7 @@ dir_add (struct dir *dir, const char *name, block_sector_t inode_sector,
   struct dir_entry e;
   off_t ofs;
   bool success = false;
+  bool lock_success = false;
 
   ASSERT (dir != NULL);
   ASSERT (name != NULL);
@@ -183,6 +184,8 @@ dir_add (struct dir *dir, const char *name, block_sector_t inode_sector,
   if (*name == '\0' || strlen (name) > NAME_MAX)
     return false;
   
+  // lock_success = inode_grab_lock (dir->inode);
+    
   /* Check that NAME is not in use. */
   if (lookup (dir, name, NULL, NULL))
     goto done;
@@ -198,6 +201,7 @@ dir_add (struct dir *dir, const char *name, block_sector_t inode_sector,
        ofs += sizeof e)
     if (!e.in_use)
       break;
+
   /* Write slot. */
   e.in_use = true;
   strlcpy (e.name, name, sizeof e.name);
@@ -207,6 +211,9 @@ dir_add (struct dir *dir, const char *name, block_sector_t inode_sector,
     success = setup_dir (dir, inode_sector);
 
   done:
+    /* Release lock if we grabbed it in this function. */
+    // if (lock_success)
+    //   inode_release_lock (dir->inode);
     return success;
 }
 
@@ -219,11 +226,14 @@ dir_remove (struct dir *dir, const char *name)
   struct dir_entry e;
   struct inode *inode = NULL;
   bool success = false;
+  bool lock_success = false;
   off_t ofs;
 
   ASSERT (dir != NULL);
   ASSERT (name != NULL);
 
+  lock_success = inode_grab_lock (dir->inode);
+  
   /* Find directory entry. */
   if (!lookup (dir, name, &e, &ofs))
     goto done;
@@ -252,6 +262,9 @@ dir_remove (struct dir *dir, const char *name)
   success = true;
 
  done:
+   /* Release lock if we grabbed it in this function. */
+   if (lock_success)
+     inode_release_lock (dir->inode);
   inode_close (inode);
   return success;
 }
@@ -263,16 +276,27 @@ bool
 dir_readdir (struct dir *dir, char name[NAME_MAX + 1])
 {
   struct dir_entry e;
-
+  bool lock_success = false;
+  
+  lock_success = inode_grab_lock (dir->inode);
+  
   while (inode_read_at (dir->inode, &e, sizeof e, dir->pos) == sizeof e)
     {
       dir->pos += sizeof e;
       if (e.in_use && strcmp (e.name, ".") && strcmp (e.name, ".."))
         {
           strlcpy (name, e.name, NAME_MAX + 1);
+          /* Release lock if we grabbed it in this function before 
+             returning. */
+          if (lock_success)
+            inode_release_lock (dir->inode);
           return true;
         }
     }
+    
+  /* Release lock if we grabbed it in this function. */
+  if (lock_success)
+    inode_release_lock (dir->inode);
   return false;
 }
 
