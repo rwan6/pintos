@@ -293,7 +293,7 @@ open (const char *file)
           exit (-1);
         }
       list_init (&sf->fd_list);
-      strlcpy (sf->name, file, strlen (file) + 1);
+      strlcpy (sf->name, file, strlen (sf->name));
     }
 
   /* Now that sf points to something useful, add it to the opened_files
