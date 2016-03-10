@@ -85,11 +85,11 @@ read_ahead (void *aux UNUSED)
       lock_acquire (&readahead_lock);
       while (ra_index == next_readahead_entry)
         cond_wait (&readahead_cond, &readahead_lock);
-
+      // printf ("RA: %d, NextRA: %d\n", ra_index, next_readahead_entry);
       /* If the readahead thread falls behind too far, force it to catch
          up. */
       if (ra_index + READAHEAD_SIZE < next_readahead_entry)
-        ra_index = next_readahead_entry - READAHEAD_SIZE;
+        ra_index = next_readahead_entry - 1;
 
       next_ra = ra_index % READAHEAD_SIZE;
       next_sector = readahead_list[next_ra];
@@ -98,7 +98,10 @@ read_ahead (void *aux UNUSED)
       
       /* If the block is not already in the cache, fetch it. */
       if (cache_lookup (next_sector) == -1)
-        cache_fetch (next_sector);
+        {
+          int new_sector = cache_fetch (next_sector);
+          cache_table[new_sector].accessed = true;          
+        }
       ra_index++;
     }
 }
