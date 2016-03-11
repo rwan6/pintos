@@ -219,8 +219,9 @@ create (const char *file, unsigned initial_size)
   return success;
 }
 
-/* Deletes the file.  Returns true if successful, false otherwise.
-   File can be removed while it is open or closed. */
+/* Deletes the file or directory.  Returns true if successful,
+   false otherwise.  File or directory can be removed while it
+   is open or closed. */
 static bool
 remove (const char *file)
 {
@@ -360,9 +361,10 @@ read (int fd, void *buffer, unsigned size)
     }
 }
 
-/* Writes 'size' bytes from 'buffer' to file 'fd'.  Returns number
-   of bytes actually written, or -1 if there was an error in writing
-   to the file. If fd = 1, function write to the console. */
+/* Writes 'size' bytes from 'buffer' to file or directory 'fd'.
+   Returns number of bytes actually written, or -1 if there was
+   an error in writing to the file. If fd = 1, function write
+   to the console. */
 static int
 write (int fd, const void *buffer, unsigned size)
 {
@@ -472,7 +474,7 @@ check_pointer (const void *pointer, unsigned size)
 }
 
 /* Function to retrieve the sys_fd struct corresponding to a particular
-   fd. Returns NULL if the fd could not be located in any list member or
+   fd.  Returns NULL if the fd could not be located in any list member or
    if it was found but the calling process is not the owner. */
 static struct sys_fd *
 get_fd_item (int fd)
@@ -517,7 +519,7 @@ close_fd (struct thread *t)
 }
 
 /* Removes the last file (or folder) from pathname in dir returns the dir
-   corresponding to that path. Sets last_token to be the final file/folder
+   corresponding to that path.  Sets last_token to be the final file/folder
    name. Returns NULL if path is invalid. */
 static struct dir *
 get_last_dir (const char *dir, const char **last_token)
@@ -525,7 +527,7 @@ get_last_dir (const char *dir, const char **last_token)
   struct dir *last_dir;
   struct dir *cur_dir = thread_current ()->current_directory;
 
-  /* dir_copy holds the path not including the last file/folder */
+  /* dir_copy holds the path not including the last file/folder. */
   char *dir_copy = malloc (strlen (dir) + 1);
   if (!dir_copy)
     exit (-1);
@@ -559,7 +561,7 @@ get_last_dir (const char *dir, const char **last_token)
 }
 
 /* Changes the current working directory of the process to dir, which may be
-   relative or absolute. Returns true if successful, false on failure. */
+   relative or absolute.  Returns true if successful, false on failure. */
 static bool
 chdir (const char *dir)
 {
@@ -578,7 +580,7 @@ chdir (const char *dir)
 }
 
 /* Creates the directory named dir, which may be relative or absolute.
-   Returns true if successful, false on failure. Fails if dir already
+   Returns true if successful, false on failure.  Fails if dir already
    exists or if any directory name in dir, besides the last, does not
    already exist. */
 static bool
@@ -654,7 +656,7 @@ inumber (int fd)
   return inode_get_inumber (inode);
 }
 
-/* Return whether the filename ends in a '/', excluding the root directory */
+/* Return whether the filename ends in a '/', excluding the root directory. */
 static bool
 filename_ends_in_slash (const char *filename)
 {
