@@ -11,7 +11,7 @@
 
 /* Period of time (in ms) write behind thread sleeps before flushing cache
    to disk. */        
-#define WRITE_BEHIND_WAIT 5000
+#define WRITE_BEHIND_WAIT 2000
 
 /* Size of the readahead queue. */
 #define READAHEAD_SIZE (CACHE_SIZE / 4)
