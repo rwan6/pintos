@@ -40,7 +40,6 @@ int next_readahead_entry; /* Points to next readahead queue entry. */
 struct lock eviction_lookup_lock; /* Lock for synchronizing eviction 
                                      and lookup. */
 struct lock readahead_lock;    /* Lock associated with readahead_cond. */
-struct lock io_lock;           /* Lock for accessing the disk. */
 struct condition readahead_cond;  /* Readahead thread wakeup condition. */
 
 /* Prototypes for cache.c functions. */

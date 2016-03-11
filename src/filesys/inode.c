@@ -448,32 +448,45 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
   if ((uint32_t) (offset + size) > new_idisk.length)
     {
       lock_success = inode_grab_lock (inode);
-
-      uint32_t curr_blocks = new_idisk.num_blocks;
-      int file_extended = (((int) (offset + size) -
-                          (int) curr_blocks * BLOCK_SECTOR_SIZE)
-                          / BLOCK_SECTOR_SIZE) + 1;
-      int file_block_grown = ((int) (offset + size) -
-                             (int) curr_blocks * BLOCK_SECTOR_SIZE);
-      if (file_extended > 0 && file_block_grown > 0)
+      
+      /* Check if we still need to grow the file.  It is possible that
+         while the process was waiting for the lock, the file was
+         already extended by another process.  Thus, a second file
+         extension is not needed. */
+      if (((uint32_t) (offset + size) > new_idisk.length))
         {
-          bool grown_success = file_grow (&new_idisk,
-                                         (unsigned) file_extended);
-
-          /* If the necessary number of blocks could not be allocated,
-             return that 0 bytes were written. */
-          if (!grown_success)
+          uint32_t curr_blocks = new_idisk.num_blocks;
+          int file_extended = (((int) (offset + size) -
+                              (int) curr_blocks * BLOCK_SECTOR_SIZE)
+                              / BLOCK_SECTOR_SIZE) + 1;
+          int file_block_grown = ((int) (offset + size) -
+                                 (int) curr_blocks * BLOCK_SECTOR_SIZE);
+          if (file_extended > 0 && file_block_grown > 0)
             {
-              if (lock_success)
-                inode_release_lock (inode);
-              return 0;
-            }
-        }
+              bool grown_success = file_grow (&new_idisk,
+                                             (unsigned) file_extended);
 
-      /* Update file size at the end. */
-      new_idisk.length = offset + size;
-      cache_write (inode->sector, &new_idisk, BLOCK_SECTOR_SIZE, 0);
-      file_grown = true;
+              /* If the necessary number of blocks could not be allocated,
+                 return that 0 bytes were written. */
+              if (!grown_success)
+                {
+                  if (lock_success)
+                    inode_release_lock (inode);
+                  return 0;
+                }
+            }
+
+          /* Update file size at the end. */
+          new_idisk.length = offset + size;
+          cache_write (inode->sector, &new_idisk, BLOCK_SECTOR_SIZE, 0);
+          file_grown = true;          
+        }
+      else
+        {
+          if (lock_success)
+            inode_release_lock (inode);
+          lock_success = false;
+        }
     }
 
   while (size > 0)

@@ -33,7 +33,6 @@ cache_init (void)
 
   lock_init (&eviction_lookup_lock);
   lock_init (&readahead_lock);
-  lock_init (&io_lock);
   cond_init (&readahead_cond);
 
   i = 0;
@@ -122,9 +121,7 @@ cache_lookup (block_sector_t sector_idx)
       if (sector == -1)
         {
           sector = cache_evict (sector_idx);
-          lock_acquire (&io_lock);
           block_read (fs_device, sector_idx, cache_table[sector].data);
-          lock_release (&io_lock);
         }
       else /* Found the block, simply acquire its respective lock and
               release the lookup/eviction lock. */
@@ -223,10 +220,8 @@ cache_writeback_if_dirty (int index)
 {
   if (cache_table[index].dirty)
     {
-      lock_acquire (&io_lock);
       block_write (fs_device, cache_table[index].sector_idx,
           cache_table[index].data);
-      lock_release (&io_lock);
       cache_table[index].dirty = false;
     }
 }
