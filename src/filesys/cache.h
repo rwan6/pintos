@@ -14,7 +14,7 @@
 #define WRITE_BEHIND_WAIT 2000
 
 /* Size of the readahead queue. */
-#define READAHEAD_SIZE (CACHE_SIZE / 4)
+#define READAHEAD_SIZE (CACHE_SIZE / 2)
 
 /* How far ahead the readahead thread should jump in its indexing so that
    it does not fall inefficiently far behind. */
