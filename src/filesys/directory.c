@@ -308,6 +308,8 @@ get_dir_from_path (struct dir *cur_dir, const char *path)
       if (strlen (path) == 1)
         return cur_dir;
     }
+  else
+    cur_dir = dir_reopen (cur_dir);
 
   struct dir_entry e;
 
