@@ -106,7 +106,8 @@ struct thread
 
     uint8_t *stack;                     /* Saved stack pointer. */
     int priority;                       /* Priority. */
-    struct list_elem allelem;           /* List element for all threads list. */
+    struct list_elem allelem;           /* List element for all threads
+                                           list. */
     int donated_priority;               /* Donated Priority. */
 
     /* Owned by timer.c */
@@ -116,14 +117,15 @@ struct thread
 
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
-    struct list_elem donatedelem;       /* List element */
+    struct list_elem donatedelem;       /* List element. */
     struct lock *waiting_on_lock;       /* Pointer to lock the thread is
-       waiting on */
+                                           waiting on. */
     struct list donated_list;           /* List of threads that donated to
-       this thread */
+                                           this thread. */
       
     /* Owned by syscall.c, filesys.c, and directory.c. */
-    struct dir *current_directory;      /* Absolute working directory path */
+    struct dir *current_directory;      /* Absolute working directory
+                                           path. */
 
 #ifdef USERPROG
     /* Owned by userprog/process.c and userprog/syscall.c */
