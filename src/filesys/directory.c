@@ -303,10 +303,10 @@ dir_readdir (struct dir *dir, char name[NAME_MAX + 1])
 }
 
 /* Returns the directory struct given a starting directory and an absolute
-   or relative path. This will return a newly opened directory, closing any
-   other directories it open while traversing the path. This function always
+   or relative path.  This will return a newly opened directory, closing any
+   other directories it open while traversing the path.  This function always
    opens exactly one more directory than it closes, unless it fails, in which
-   case the opened vs. closed numbers are equal. */
+   case the opened versus closed numbers are equal. */
 struct dir *
 get_dir_from_path (struct dir *cur_dir, const char *path)
 {
