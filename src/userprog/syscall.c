@@ -38,7 +38,6 @@ static bool readdir (int, char *);
 static bool isdir (int);
 static int inumber (int);
 static bool filename_ends_in_slash (const char *);
-static void clean_filename (char *, char *);
 static bool check_pointer (const void *, unsigned);
 static struct dir *get_last_dir (const char *, const char **);
 static struct sys_fd* get_fd_item (int);
@@ -662,58 +661,4 @@ filename_ends_in_slash (const char *filename)
   if (strlen (filename) == 1)
     return false;
   return filename[strlen (filename) - 1] == '/';
-}
-
-/* Removes consecutive '/' and removes extraneous "/./" from the filename.
-   Also removes extra "/../" from the start of filename */
-/* TODO: maybe remove trailing '.' or "/." */
-/* This function might be completely unnecessary */
-static void
-clean_filename (char *filename, char *cleaned)
-{
-  char *tmp1 = malloc (strlen (filename) + 1);
-  if (!tmp1)
-    exit (-1);
-  char *tmp2 = malloc (strlen (filename) + 1);
-  if (!tmp2)
-    {
-      free (tmp1);
-      exit (-1);
-    }
-  /* Remove consecutive '/' from filename */
-  char *cur_in = filename;
-  char *cur_out = tmp1;
-  do
-    {
-      *cur_out = *cur_in;
-      if (*cur_in == '/')
-        {
-          while (*(cur_in + 1) == '/')
-            cur_in++;
-        }
-      cur_in++;
-      cur_out++;
-    } while (*cur_in != '\0');
-
-  /* Replace any instance of "/./" with "/" */
-  cur_in = tmp1;
-  cur_out = tmp2;
-  do
-    {
-      *cur_out = *cur_in;
-      if ((*cur_in == '/') && (*(cur_in + 1) == '.') &&
-          (*(cur_in + 2) == '/'))
-        cur_in += 2;
-      cur_in++;
-      cur_out++;
-    } while (*cur_in != '\0');
-
-   /* If a string starts with "/../", replace it with "/" */
-   cur_in = tmp2;
-   while ((*cur_in == '/') && (*(cur_in + 1) == '.') &&
-          (*(cur_in + 2) == '.') && (*(cur_in + 3) == '/'))
-    cur_in += 3;
-   strlcpy (cleaned, cur_in, strlen (cur_in) + 1);
-   free (tmp1);
-   free (tmp2);
 }

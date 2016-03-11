@@ -207,7 +207,7 @@ dir_add (struct dir *dir, const char *name, block_sector_t inode_sector,
   e.in_use = true;
   strlcpy (e.name, name, sizeof e.name);
   e.inode_sector = inode_sector;
-  
+
   success = inode_write_at (dir->inode, &e, sizeof e, ofs) == sizeof e;
   if (success && !is_file && strcmp (name, ".") && strcmp (name, ".."))
     success = setup_dir (dir, inode_sector);
@@ -270,9 +270,9 @@ dir_remove (struct dir *dir, const char *name)
       && strcmp (name, ".") && strcmp (name, ".."))
     success = cleanup_dir (dir);
 
- done:
-  inode_close (inode);
-  return success;
+  done:
+    inode_close (inode);
+    return success;
 }
 
 /* Reads the next directory entry in DIR and stores the name in
@@ -336,7 +336,7 @@ get_dir_from_path (struct dir *cur_dir, const char *path)
   char *token, *save_ptr;
 
   for (token = strtok_r (s, "/", &save_ptr); token != NULL;
-        token = strtok_r (NULL, "/", &save_ptr))
+       token = strtok_r (NULL, "/", &save_ptr))
     {
       if (lookup (cur_dir, token, &e, NULL))
         {
