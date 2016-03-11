@@ -25,8 +25,8 @@
 
 /* Calculate the maximum location the doubly-indirect level can point to
    and ensure that a process does not try to access past this. */
-unsigned max_block = FIRSTLEVEL_SIZE + INDIR_DOUB_SIZE +
-                     INDIR_DOUB_SIZE * INDIR_DOUB_SIZE;
+#define MAX_BLOCK (FIRSTLEVEL_SIZE + INDIR_DOUB_SIZE + \
+                   INDIR_DOUB_SIZE * INDIR_DOUB_SIZE)
 
 /* Function prototypes. */
 struct inode_disk;
@@ -36,6 +36,8 @@ static block_sector_t doub_indir_lookup (struct inode_disk *, unsigned);
 static bool file_block_growth (struct inode_disk *);
 static block_sector_t allocate_new_block (void);
 static bool file_grow (struct inode_disk *, unsigned);
+static bool inode_grab_lock (struct inode *);
+static void inode_release_lock (struct inode *);
 
 /* In-memory inode. */
 struct inode
@@ -66,8 +68,8 @@ struct inode_disk
    BLOCK_SECTOR_SIZE bytes long: 4*INDIRECT_SIZE = 512. */
 struct indir_doub_indir_sectors
   {
-    block_sector_t indir_blocks[INDIR_DOUB_SIZE]; /* Indirect and doubly
-                                                     indirect blocks. */
+    /* Indirect and doubly indirect blocks. */
+    block_sector_t indir_blocks[INDIR_DOUB_SIZE];
   };
 
 static struct list open_inodes; /* List of open inodes, so that opening a
@@ -89,7 +91,7 @@ static block_sector_t
 byte_to_sector (const struct inode *inode, off_t pos)
 {
   ASSERT (inode != NULL);
-  ASSERT ((unsigned) pos < max_block * BLOCK_SECTOR_SIZE);
+  ASSERT ((unsigned) pos < MAX_BLOCK * BLOCK_SECTOR_SIZE);
 
   /* Retrieve the inode_disk object associated with the inode. */
   struct inode_disk new_idisk;
@@ -106,7 +108,7 @@ static block_sector_t
 block_lookup (struct inode_disk *idisk, unsigned block_loc)
 {
   /* Ensure block_loc does not exceed system constraints. */
-  ASSERT (block_loc < max_block);
+  ASSERT (block_loc < MAX_BLOCK);
 
   if (block_loc < FIRSTLEVEL_SIZE) /* First level. */
     return idisk->first_level[block_loc];
@@ -116,7 +118,7 @@ block_lookup (struct inode_disk *idisk, unsigned block_loc)
     return doub_indir_lookup (idisk, block_loc);
 
   /* Unreachable code.  Prevents compiler warnings. */
-  return (max_block + 1);
+  return (MAX_BLOCK + 1);
 }
 
 /* Search for an inode's block in the indirect level. */
@@ -137,6 +139,7 @@ doub_indir_lookup (struct inode_disk *idisk, unsigned block_loc)
   cache_read (idisk->doub_indir_level, &new_doubindir_sect,
               BLOCK_SECTOR_SIZE, 0);
 
+  /* Calculate doubly indirect and indirect entry. */
   int doubly_indir_entry = (block_loc - (FIRSTLEVEL_SIZE + INDIR_DOUB_SIZE))
                            / INDIR_DOUB_SIZE;
   block_sector_t indir_entry = new_doubindir_sect.
@@ -167,6 +170,7 @@ inode_is_file (const struct inode *inode)
     return true;
 }
 
+/* Returns true if the inode has been deleted and is no longer in use. */
 bool
 inode_is_removed (struct inode *inode)
 {
@@ -184,8 +188,7 @@ inode_init (void)
 }
 
 /* Initializes an inode with LENGTH bytes of data and
-   writes the new inode to sector SECTOR on the file system
-   device.
+   writes the new inode to sector SECTOR on the file system device.
    Returns true if successful.
    Returns false if memory or disk allocation fails. */
 bool
@@ -197,7 +200,7 @@ inode_create (block_sector_t sector, off_t length, unsigned is_file)
   ASSERT (length >= 0);
 
   /* If this assertion fails, the inode structure is not exactly
-     one sector in size, and you should fix that. */
+     one sector in size. */
   ASSERT (sizeof *disk_inode == BLOCK_SECTOR_SIZE);
 
   disk_inode = calloc (1, sizeof *disk_inode);
@@ -393,6 +396,8 @@ inode_read_at (struct inode *inode, void *buffer_, off_t size, off_t offset)
       bytes_read += chunk_size;
     }
 
+  /* If it attempted to read past the end of the file, it should release
+     the inode's lock. */
   if ((unsigned) (size + offset) > new_idisk.length)
     {
       if (lock_success)
@@ -438,6 +443,8 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
   cache_read (inode->sector, &new_idisk, BLOCK_SECTOR_SIZE, 0);
   bool file_grown = false;
 
+  /* If file growth is needed, proceed to grow and write to the file
+     atomically. */
   if ((uint32_t) (offset + size) > new_idisk.length)
     {
       lock_success = inode_grab_lock (inode);
@@ -480,14 +487,17 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
       int chunk_size = size < sector_left ? size : sector_left;
       if (chunk_size <= 0)
         break;
+      
       cache_write (sector_idx, (void *) buffer + bytes_written,
         chunk_size, sector_ofs);
+        
       /* Advance. */
       size -= chunk_size;
       offset += chunk_size;
       bytes_written += chunk_size;
     }
 
+    /* If the file was grown, release the lock associated with the inode. */
   if (file_grown)
     {
       if (lock_success)
@@ -562,8 +572,8 @@ static bool
 file_block_growth (struct inode_disk *disk_inode)
 {
   uint32_t inode_blocks = disk_inode->num_blocks;
-  ASSERT ((unsigned) inode_blocks <= max_block);
-  block_sector_t new_sector = (max_block + 1);
+  ASSERT ((unsigned) inode_blocks <= MAX_BLOCK);
+  block_sector_t new_sector = (MAX_BLOCK + 1);
 
   /* First check if we need to set up the indirect or doubly-indirect
      levels before proceeding to check where the next block should live. */
@@ -572,7 +582,7 @@ file_block_growth (struct inode_disk *disk_inode)
   if (inode_blocks == FIRSTLEVEL_SIZE)
     {
       new_sector = allocate_new_block ();
-      if (new_sector == (block_sector_t) (max_block + 1))
+      if (new_sector == (block_sector_t) (MAX_BLOCK + 1))
         return false;
       disk_inode->indir_level = new_sector;
     }
@@ -580,7 +590,7 @@ file_block_growth (struct inode_disk *disk_inode)
   else if (inode_blocks == (FIRSTLEVEL_SIZE + INDIR_DOUB_SIZE))
     {
       new_sector = allocate_new_block ();
-      if (new_sector == (block_sector_t) (max_block + 1))
+      if (new_sector == (block_sector_t) (MAX_BLOCK + 1))
         return false;
       disk_inode->doub_indir_level = new_sector;
     }
@@ -589,7 +599,7 @@ file_block_growth (struct inode_disk *disk_inode)
   if (inode_blocks < FIRSTLEVEL_SIZE)
     {
       new_sector = allocate_new_block ();
-      if (new_sector == (block_sector_t) (max_block + 1))
+      if (new_sector == (block_sector_t) (MAX_BLOCK + 1))
         return false;
       disk_inode->first_level[inode_blocks] = new_sector;
     }
@@ -599,7 +609,7 @@ file_block_growth (struct inode_disk *disk_inode)
       cache_read (disk_inode->indir_level, &new_indir_sect,
                   BLOCK_SECTOR_SIZE, 0);
       new_sector = allocate_new_block ();
-      if (new_sector == (block_sector_t) (max_block + 1))
+      if (new_sector == (block_sector_t) (MAX_BLOCK + 1))
         return false;
       new_indir_sect.
         indir_blocks[inode_blocks - FIRSTLEVEL_SIZE] = new_sector;
@@ -624,18 +634,19 @@ file_block_growth (struct inode_disk *disk_inode)
       if (indir_entry == 0)
         {
           new_sector = allocate_new_block ();
-          if (new_sector == (block_sector_t) (max_block + 1))
+          if (new_sector == (block_sector_t) (MAX_BLOCK + 1))
             return false;
           new_doubindir.indir_blocks[doubly_indir_entry] = new_sector;
           cache_write (disk_inode->doub_indir_level,
             &new_doubindir, BLOCK_SECTOR_SIZE, 0);
         }
+        
       block_sector_t indir_block =
         new_doubindir.indir_blocks[doubly_indir_entry];
       cache_read (indir_block, &new_doubindir, BLOCK_SECTOR_SIZE, 0);
 
       new_sector = allocate_new_block ();
-      if (new_sector == (block_sector_t) (max_block + 1))
+      if (new_sector == (block_sector_t) (MAX_BLOCK + 1))
         return false;
 
       new_doubindir.indir_blocks[indir_entry] = new_sector;
@@ -648,7 +659,7 @@ file_block_growth (struct inode_disk *disk_inode)
 }
 
 /* Allocate a new block in the free map and add it to the cache.
-   Returns the new block sector if successful and (max_block + 1)
+   Returns the new block sector if successful and (MAX_BLOCK + 1)
    if a new block could not be allocated. */
 static block_sector_t
 allocate_new_block (void)
@@ -656,7 +667,7 @@ allocate_new_block (void)
   block_sector_t new_block;
   bool success = free_map_allocate (1, &new_block);
   if (!success)
-    return (block_sector_t) (max_block + 1);
+    return (block_sector_t) (MAX_BLOCK + 1);
   else
     {
       /* Create a new buffer and zero it out before writing it to
@@ -672,7 +683,7 @@ allocate_new_block (void)
 /* Grab the inode's lock if it does not already hold it.  Returns
    false if the inode's lock was already held (which means it was
    acquired in a different function and is needed later on). */
-bool
+static bool
 inode_grab_lock (struct inode *inode)
 {
   if (lock_held_by_current_thread (&inode->inode_lock))
@@ -688,7 +699,7 @@ inode_grab_lock (struct inode *inode)
    any return value since it will only be called by the last function in
    the event of a nested function call sequence that may require grabbing
    the same lock. */
-void
+static void
 inode_release_lock (struct inode *inode)
 {
   lock_release (&inode->inode_lock);

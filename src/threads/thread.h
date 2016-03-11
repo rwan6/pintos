@@ -96,7 +96,6 @@ struct thread
     enum thread_status status;          /* Thread state. */
     char name[16];                      /* Name (for debugging purposes). */
     unsigned magic;                     /* Detects stack overflow. */
-    struct dir *current_directory;      /* Absolute working directory path */
 
     /* Member variables for Advanced scheduler.
        Also owned by thread.c. */
@@ -122,6 +121,9 @@ struct thread
        waiting on */
     struct list donated_list;           /* List of threads that donated to
        this thread */
+      
+    /* Owned by syscall.c, filesys.c, and directory.c. */
+    struct dir *current_directory;      /* Absolute working directory path */
 
 #ifdef USERPROG
     /* Owned by userprog/process.c and userprog/syscall.c */

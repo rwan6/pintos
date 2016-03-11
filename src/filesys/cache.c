@@ -83,7 +83,7 @@ read_ahead (void *aux UNUSED)
       /* If the readahead thread falls behind too far, force it to catch
          up. */
       if (ra_index + READAHEAD_SIZE < next_readahead_entry)
-        ra_index = next_readahead_entry - 1;
+        ra_index = next_readahead_entry - READAHEAD_CATCHUP;
 
       next_sector = readahead_list[ra_index];
       lock_release (&readahead_lock);
@@ -105,6 +105,7 @@ cache_lookup (block_sector_t sector_idx)
   while (1)
     {
       lock_acquire (&eviction_lookup_lock);
+      
       /* Look for the entry in the cache.  Set sector to be the cache index
          if we find the block in cache or if the next block is the one we
          are looking for. */
@@ -132,9 +133,9 @@ cache_lookup (block_sector_t sector_idx)
           lock_acquire (&cache_table[sector].entry_lock);
         }
       
-      /* Confirm it's indeed the block the process sought after.  If
-         not, repeat the process.  This ensures synchronization with the
-         eviction process. */  
+      /* Confirm it is the block being looked up.  If not, repeat the
+         process.  This ensures synchronization with the
+         eviction process. */
       if (cache_table[sector].sector_idx == (int) sector_idx &&
           cache_table[sector].next_sector_idx == -1)
             return sector;
@@ -154,7 +155,8 @@ cache_evict (block_sector_t evict_sector)
   while (1)
     {
       cache_clock_handle = (cache_clock_handle + 1) % CACHE_SIZE;
-      /* If it's not being evicted. */
+      
+      /* If it is not currently being evicted. */
       if (cache_table[cache_clock_handle].next_sector_idx == -1)
         {
           if (cache_table[cache_clock_handle].accessed)
@@ -191,6 +193,7 @@ cache_read (block_sector_t sector_idx, void *buffer, int chunk_size,
 {
   int index = cache_lookup (sector_idx);
   ASSERT (lock_held_by_current_thread (&cache_table[index].entry_lock));
+  
   memcpy (buffer, cache_table[index].data + sector_ofs, chunk_size);
   cache_table[index].accessed = true;
   lock_release (&cache_table[index].entry_lock);
@@ -206,6 +209,7 @@ cache_write (block_sector_t sector_idx, void *buffer, int chunk_size,
 {
   int index = cache_lookup (sector_idx);
   ASSERT (lock_held_by_current_thread (&cache_table[index].entry_lock));
+  
   memcpy (cache_table[index].data + sector_ofs, buffer, chunk_size);
   cache_table[index].accessed = true;
   cache_table[index].dirty = true;
@@ -227,8 +231,8 @@ cache_writeback_if_dirty (int index)
     }
 }
 
-/* Iterate over all cache entries call cache_writeback_if_dirty if the
-   entry is not unoccupied. */
+/* Iterate over all cache entries and call cache_writeback_if_dirty,
+   which will check if the block is dirty and should be written back. */
 void
 cache_flush (void)
 {

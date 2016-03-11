@@ -7,6 +7,7 @@
 
 struct bitmap;
 
+/* inode.c function prototypes. */
 void inode_init (void);
 bool inode_create (block_sector_t, off_t, unsigned);
 struct inode *inode_open (block_sector_t);
@@ -21,7 +22,5 @@ void inode_allow_write (struct inode *);
 off_t inode_length (const struct inode *);
 bool inode_is_file (const struct inode *);
 bool inode_is_removed (struct inode *);
-bool inode_grab_lock (struct inode *);
-void inode_release_lock (struct inode *);
 
 #endif /* filesys/inode.h */
