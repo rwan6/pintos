@@ -209,6 +209,9 @@ dir_add (struct dir *dir, const char *name, block_sector_t inode_sector,
   e.inode_sector = inode_sector;
 
   success = inode_write_at (dir->inode, &e, sizeof e, ofs) == sizeof e;
+  /* Because setup_dir calls dir_add, we prevent an infinite loop by not
+     setting up a directory that is already in the process of adding "." and
+     ".." */
   if (success && !is_file && strcmp (name, ".") && strcmp (name, ".."))
     success = setup_dir (dir, inode_sector);
 
@@ -265,6 +268,9 @@ dir_remove (struct dir *dir, const char *name)
   inode_remove (inode);
   success = true;
 
+  /* Because cleanup_dir calls dir_remove, we prevent an infinite loop by not
+     cleaning up a directory that is already in the process of adding "." and
+     "..". In addition, we do not cleanup the current working directory. */
   if (success && inode_get_inumber (inode) ==
       inode_get_inumber (thread_current ()->current_directory->inode)
       && strcmp (name, ".") && strcmp (name, ".."))
@@ -297,7 +303,10 @@ dir_readdir (struct dir *dir, char name[NAME_MAX + 1])
 }
 
 /* Returns the directory struct given a starting directory and an absolute
-   or relative path. */
+   or relative path. This will return a newly opened directory, closing any
+   other directories it open while traversing the path. This function always
+   opens exactly one more directory than it closes, unless it fails, in which
+   case the opened vs. closed numbers are equal. */
 struct dir *
 get_dir_from_path (struct dir *cur_dir, const char *path)
 {
@@ -321,10 +330,12 @@ get_dir_from_path (struct dir *cur_dir, const char *path)
       if (c != NULL && path[0] == '/' && path[1] != '\0') lookup_path++;
       if (lookup (cur_dir, lookup_path, &e, NULL) && !dir_entry_is_file (&e))
         {
+          dir_close (cur_dir);
           return dir_open (inode_open (e.inode_sector));
         }
       else
         {
+          dir_close (cur_dir);
           return NULL;
         }
     }
@@ -353,6 +364,7 @@ get_dir_from_path (struct dir *cur_dir, const char *path)
   return cur_dir;
 }
 
+/* Checks whether the specified directory is empty. */
 bool
 dir_is_empty (struct dir *dir)
 {
